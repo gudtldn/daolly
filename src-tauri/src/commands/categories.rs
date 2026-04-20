@@ -1,36 +1,29 @@
-use sea_orm::*;
+use sea_orm::{DatabaseConnection, EntityTrait};
 use serde::Deserialize;
 use tauri::State;
 
 use crate::commands::{AppError, CmdResult};
 use crate::db::entities::category;
+use crate::services;
 
-// -- DTO --
-
+/// 카테고리 생성 DTO
 #[derive(Deserialize)]
 pub struct CreateCategory {
     pub name: String,
+    /// 정렬 순서
     pub sort_order: i32,
 }
 
+/// 카테고리 수정 DTO
 #[derive(Deserialize)]
 pub struct UpdateCategory {
     pub name: String,
     pub sort_order: i32,
 }
 
-// -- Commands --
-
 #[tauri::command]
-pub async fn list_categories(
-    db: State<'_, DatabaseConnection>,
-) -> CmdResult<Vec<category::Model>> {
-    let results = category::Entity::find()
-        .order_by_asc(category::Column::SortOrder)
-        .all(db.inner())
-        .await?;
-
-    Ok(results)
+pub async fn list_categories(db: State<'_, DatabaseConnection>) -> CmdResult<Vec<category::Model>> {
+    Ok(services::categories::list(db.inner()).await?)
 }
 
 #[tauri::command]
@@ -38,17 +31,7 @@ pub async fn create_category(
     db: State<'_, DatabaseConnection>,
     data: CreateCategory,
 ) -> CmdResult<category::Model> {
-    let model = category::ActiveModel {
-        name: Set(data.name),
-        sort_order: Set(data.sort_order),
-        ..Default::default()
-    };
-
-    let result = category::Entity::insert(model)
-        .exec_with_returning(db.inner())
-        .await?;
-
-    Ok(result)
+    Ok(services::categories::create(db.inner(), data.name, data.sort_order).await?)
 }
 
 #[tauri::command]
@@ -62,26 +45,14 @@ pub async fn update_category(
         .await?
         .ok_or_else(|| AppError::NotFound(format!("category {id}")))?;
 
-    let mut active: category::ActiveModel = existing.into();
-    active.name = Set(data.name);
-    active.sort_order = Set(data.sort_order);
-
-    let updated = active.update(db.inner()).await?;
-    Ok(updated)
+    Ok(services::categories::update(db.inner(), existing, data.name, data.sort_order).await?)
 }
 
 #[tauri::command]
-pub async fn delete_category(
-    db: State<'_, DatabaseConnection>,
-    id: i32,
-) -> CmdResult<()> {
-    let res = category::Entity::delete_by_id(id)
-        .exec(db.inner())
-        .await?;
-
-    if res.rows_affected == 0 {
+pub async fn delete_category(db: State<'_, DatabaseConnection>, id: i32) -> CmdResult<()> {
+    let rows = services::categories::delete(db.inner(), id).await?;
+    if rows == 0 {
         return Err(AppError::NotFound(format!("category {id}")));
     }
-
     Ok(())
 }

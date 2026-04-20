@@ -1,30 +1,26 @@
-use chrono::Utc;
-use sea_orm::*;
+use sea_orm::{DatabaseConnection, EntityTrait};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use crate::commands::{AppError, CmdResult};
-use crate::db::entities::{payment, work_item, work_item_detail};
+use crate::db::entities::{payment, work_item, work_item::WorkItemStatus, work_item_detail};
+use crate::services;
+use crate::services::work_items::DetailInput;
 
-// -- DTO --
-
-#[derive(Deserialize)]
-pub struct DetailInput {
-    pub item_name: String,
-    pub unit_price: i32,
-    pub quantity: i32,
-    pub options_memo: Option<String>,
-}
-
+/// 접수 생성 DTO
 #[derive(Deserialize)]
 pub struct CreateWorkItem {
     pub customer_id: i32,
     pub description: String,
+    /// 총액
     pub price: i32,
     pub note: Option<String>,
+    /// 항목 스냅샷
     pub details: Vec<DetailInput>,
 }
 
+/// 접수 부분 수정 DTO
+/// NOTE: None인 필드는 변경하지 않습니다.
 #[derive(Deserialize)]
 pub struct UpdateWorkItem {
     pub description: Option<String>,
@@ -32,62 +28,34 @@ pub struct UpdateWorkItem {
     pub note: Option<String>,
 }
 
+/// 접수 상세 DTO
+/// NOTE: work_item + details + payments를 포함합니다.
 #[derive(Serialize)]
 pub struct WorkItemFull {
+    /// work_item 필드 평탄화
     #[serde(flatten)]
     pub work_item: work_item::Model,
     pub details: Vec<work_item_detail::Model>,
     pub payments: Vec<payment::Model>,
 }
 
-// -- Commands --
-
 #[tauri::command]
 pub async fn list_work_items(
     db: State<'_, DatabaseConnection>,
     customer_id: Option<i32>,
-    status: Option<String>,
+    status: Option<WorkItemStatus>,
 ) -> CmdResult<Vec<work_item::Model>> {
-    let mut query = work_item::Entity::find();
-
-    if let Some(cid) = customer_id {
-        query = query.filter(work_item::Column::CustomerId.eq(cid));
-    }
-    if let Some(s) = status {
-        query = query.filter(work_item::Column::Status.eq(s));
-    }
-
-    let results = query
-        .order_by_desc(work_item::Column::ReceivedAt)
-        .all(db.inner())
-        .await?;
-
-    Ok(results)
+    Ok(services::work_items::list(db.inner(), customer_id, status).await?)
 }
 
 #[tauri::command]
-pub async fn get_work_item(
-    db: State<'_, DatabaseConnection>,
-    id: i32,
-) -> CmdResult<WorkItemFull> {
-    let item = work_item::Entity::find_by_id(id)
-        .one(db.inner())
+pub async fn get_work_item(db: State<'_, DatabaseConnection>, id: i32) -> CmdResult<WorkItemFull> {
+    let (wi, details, payments) = services::work_items::get_full(db.inner(), id)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("work_item {id}")))?;
 
-    let details = work_item_detail::Entity::find()
-        .filter(work_item_detail::Column::WorkItemId.eq(id))
-        .all(db.inner())
-        .await?;
-
-    let payments = payment::Entity::find()
-        .filter(payment::Column::WorkItemId.eq(id))
-        .order_by_asc(payment::Column::PaidAt)
-        .all(db.inner())
-        .await?;
-
     Ok(WorkItemFull {
-        work_item: item,
+        work_item: wi,
         details,
         payments,
     })
@@ -98,48 +66,15 @@ pub async fn create_work_item(
     db: State<'_, DatabaseConnection>,
     data: CreateWorkItem,
 ) -> CmdResult<work_item::Model> {
-    let now = Utc::now().to_rfc3339();
-    let tx = db.inner().begin().await?;
-
-    // 1) work_item INSERT
-    let wi = work_item::ActiveModel {
-        customer_id: Set(data.customer_id),
-        status: Set("Received".to_owned()),
-        description: Set(data.description),
-        price: Set(data.price),
-        paid_amount: Set(0),
-        note: Set(data.note),
-        received_at: Set(now.clone()),
-        created_at: Set(now.clone()),
-        last_modified_at: Set(now),
-        ..Default::default()
-    };
-    let inserted = work_item::Entity::insert(wi)
-        .exec_with_returning(&tx)
-        .await?;
-
-    // 2) details INSERT
-    if !data.details.is_empty() {
-        let detail_models: Vec<work_item_detail::ActiveModel> = data
-            .details
-            .into_iter()
-            .map(|d| work_item_detail::ActiveModel {
-                work_item_id: Set(inserted.id),
-                item_name: Set(d.item_name),
-                unit_price: Set(d.unit_price),
-                quantity: Set(d.quantity),
-                options_memo: Set(d.options_memo),
-                ..Default::default()
-            })
-            .collect();
-
-        work_item_detail::Entity::insert_many(detail_models)
-            .exec(&tx)
-            .await?;
-    }
-
-    tx.commit().await?;
-    Ok(inserted)
+    Ok(services::work_items::create(
+        db.inner(),
+        data.customer_id,
+        data.description,
+        data.price,
+        data.note,
+        data.details,
+    )
+    .await?)
 }
 
 #[tauri::command]
@@ -153,47 +88,28 @@ pub async fn update_work_item(
         .await?
         .ok_or_else(|| AppError::NotFound(format!("work_item {id}")))?;
 
-    let mut active: work_item::ActiveModel = existing.into();
-
-    if let Some(desc) = data.description {
-        active.description = Set(desc);
-    }
-    if let Some(price) = data.price {
-        active.price = Set(price);
-    }
-    if let Some(note) = data.note {
-        active.note = Set(Some(note));
-    }
-    active.last_modified_at = Set(Utc::now().to_rfc3339());
-
-    let updated = active.update(db.inner()).await?;
-    Ok(updated)
+    Ok(services::work_items::update(
+        db.inner(),
+        existing,
+        data.description,
+        data.price,
+        data.note,
+    )
+    .await?)
 }
 
 #[tauri::command]
 pub async fn update_work_item_status(
     db: State<'_, DatabaseConnection>,
     id: i32,
-    status: String,
+    status: WorkItemStatus,
 ) -> CmdResult<work_item::Model> {
     let existing = work_item::Entity::find_by_id(id)
         .one(db.inner())
         .await?
         .ok_or_else(|| AppError::NotFound(format!("work_item {id}")))?;
 
-    let now = Utc::now().to_rfc3339();
-    let mut active: work_item::ActiveModel = existing.into();
-    active.status = Set(status.clone());
-    active.last_modified_at = Set(now.clone());
-
-    match status.as_str() {
-        "Completed" => active.completed_at = Set(Some(now)),
-        "PickedUp" => active.picked_up_at = Set(Some(now)),
-        _ => {}
-    }
-
-    let updated = active.update(db.inner()).await?;
-    Ok(updated)
+    Ok(services::work_items::update_status(db.inner(), existing, status).await?)
 }
 
 #[tauri::command]
@@ -202,62 +118,19 @@ pub async fn replace_work_item_details(
     work_item_id: i32,
     details: Vec<DetailInput>,
 ) -> CmdResult<Vec<work_item_detail::Model>> {
-    // work_item 존재 확인
     work_item::Entity::find_by_id(work_item_id)
         .one(db.inner())
         .await?
         .ok_or_else(|| AppError::NotFound(format!("work_item {work_item_id}")))?;
 
-    let tx = db.inner().begin().await?;
-
-    // 1) 기존 details 일괄 삭제
-    work_item_detail::Entity::delete_many()
-        .filter(work_item_detail::Column::WorkItemId.eq(work_item_id))
-        .exec(&tx)
-        .await?;
-
-    // 2) 새 details 일괄 삽입
-    if !details.is_empty() {
-        let models: Vec<work_item_detail::ActiveModel> = details
-            .into_iter()
-            .map(|d| work_item_detail::ActiveModel {
-                work_item_id: Set(work_item_id),
-                item_name: Set(d.item_name),
-                unit_price: Set(d.unit_price),
-                quantity: Set(d.quantity),
-                options_memo: Set(d.options_memo),
-                ..Default::default()
-            })
-            .collect();
-
-        work_item_detail::Entity::insert_many(models)
-            .exec(&tx)
-            .await?;
-    }
-
-    tx.commit().await?;
-
-    // 교체 후 결과 반환
-    let result = work_item_detail::Entity::find()
-        .filter(work_item_detail::Column::WorkItemId.eq(work_item_id))
-        .all(db.inner())
-        .await?;
-
-    Ok(result)
+    Ok(services::work_items::replace_details(db.inner(), work_item_id, details).await?)
 }
 
 #[tauri::command]
-pub async fn delete_work_item(
-    db: State<'_, DatabaseConnection>,
-    id: i32,
-) -> CmdResult<()> {
-    let res = work_item::Entity::delete_by_id(id)
-        .exec(db.inner())
-        .await?;
-
-    if res.rows_affected == 0 {
+pub async fn delete_work_item(db: State<'_, DatabaseConnection>, id: i32) -> CmdResult<()> {
+    let rows = services::work_items::delete(db.inner(), id).await?;
+    if rows == 0 {
         return Err(AppError::NotFound(format!("work_item {id}")));
     }
-
     Ok(())
 }

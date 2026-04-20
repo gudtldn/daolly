@@ -1,7 +1,18 @@
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
-/// 세탁물 접수 1건에 대한 테이블
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
+#[sea_orm(rs_type = "String", db_type = "Text")]
+pub enum WorkItemStatus {
+    #[sea_orm(string_value = "Received")]
+    Received,
+    #[sea_orm(string_value = "Completed")]
+    Completed,
+    #[sea_orm(string_value = "PickedUp")]
+    PickedUp,
+}
+
+/// 세탁물 접수 1건.
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "work_items")]
 pub struct Model {
@@ -9,8 +20,7 @@ pub struct Model {
     pub id: i32,
     /// 고객 FK
     pub customer_id: i32,
-    /// 상태: Received | Completed | PickedUp
-    pub status: String,
+    pub status: WorkItemStatus,
     /// 접수 요약 (예: "와이셔츠 외 2건")
     pub description: String,
     /// 총 금액 (원)

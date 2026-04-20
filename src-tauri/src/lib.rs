@@ -1,5 +1,6 @@
 mod commands;
 mod db;
+mod services;
 
 use sea_orm::DatabaseConnection;
 use tauri::Manager;
