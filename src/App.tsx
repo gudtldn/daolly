@@ -1,5 +1,6 @@
 import { MemoryRouter, Routes, Route, Navigate } from "react-router";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { GlobalDialog } from "@/components/GlobalDialog";
 import { Layout } from "@/components/Layout";
 import { useThemeEffect } from "@/hooks/useThemeEffect";
 import { DashboardPage } from "@/pages/DashboardPage";
@@ -33,6 +34,7 @@ function App() {
   return (
     <ErrorBoundary>
       <AppContent />
+      <GlobalDialog />
     </ErrorBoundary>
   );
 }
