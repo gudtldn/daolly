@@ -1,3 +1,4 @@
+mod commands;
 mod db;
 
 use sea_orm::DatabaseConnection;
@@ -22,6 +23,36 @@ pub fn run() {
             app.manage(db);
             Ok(())
         })
+        .invoke_handler(tauri::generate_handler![
+            // customers
+            commands::customers::list_customers,
+            commands::customers::get_customer,
+            commands::customers::create_customer,
+            commands::customers::update_customer,
+            commands::customers::delete_customer,
+            // categories
+            commands::categories::list_categories,
+            commands::categories::create_category,
+            commands::categories::update_category,
+            commands::categories::delete_category,
+            // price_items
+            commands::price_items::list_price_items,
+            commands::price_items::create_price_item,
+            commands::price_items::update_price_item,
+            commands::price_items::delete_price_item,
+            // work_items
+            commands::work_items::list_work_items,
+            commands::work_items::get_work_item,
+            commands::work_items::create_work_item,
+            commands::work_items::update_work_item,
+            commands::work_items::update_work_item_status,
+            commands::work_items::replace_work_item_details,
+            commands::work_items::delete_work_item,
+            // payments
+            commands::payments::list_payments,
+            commands::payments::create_payment,
+            commands::payments::delete_payment,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
