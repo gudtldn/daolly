@@ -1,8 +1,8 @@
-use sea_orm::{DatabaseConnection, EntityTrait};
+use sea_orm::DatabaseConnection;
 use serde::Deserialize;
 use tauri::State;
 
-use crate::commands::{AppError, CmdResult};
+use crate::commands::CmdResult;
 use crate::db::entities::payment;
 use crate::services;
 
@@ -35,12 +35,6 @@ pub async fn create_payment(
 
 #[tauri::command]
 pub async fn delete_payment(db: State<'_, DatabaseConnection>, id: i32) -> CmdResult<()> {
-    // 존재 확인
-    payment::Entity::find_by_id(id)
-        .one(db.inner())
-        .await?
-        .ok_or_else(|| AppError::NotFound(format!("payment {id}")))?;
-
     services::payments::delete(db.inner(), id).await?;
     Ok(())
 }

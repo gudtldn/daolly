@@ -76,7 +76,8 @@ async fn sync_paid_amount(tx: &DatabaseTransaction, work_item_id: i32) -> Result
         .await?
         .flatten();
 
-    let total = sum.unwrap_or(0) as i32;
+    let total = i32::try_from(sum.unwrap_or(0))
+        .map_err(|_| DbErr::Custom("paid_amount overflow: sum exceeds i32 range".to_owned()))?;
 
     let wi = work_item::Entity::find_by_id(work_item_id)
         .one(tx)

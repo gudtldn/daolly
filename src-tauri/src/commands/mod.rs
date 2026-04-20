@@ -21,6 +21,10 @@ pub enum AppError {
     /// 리소스 없음
     #[error("not found: {0}")]
     NotFound(String),
+
+    /// 입력 검증 실패
+    #[error("validation: {0}")]
+    Validation(String),
 }
 
 impl Serialize for AppError {

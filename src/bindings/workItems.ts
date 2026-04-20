@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   WorkItem,
   WorkItemFull,
+  WorkItemDetail,
   WorkItemStatus,
   CreateWorkItem,
   UpdateWorkItem,
@@ -34,7 +35,7 @@ export const workItemApi = {
   replaceDetails(
     workItemId: number,
     details: CreateWorkItem["details"],
-  ): Promise<void> {
+  ): Promise<WorkItemDetail[]> {
     return invoke("replace_work_item_details", { workItemId, details });
   },
 

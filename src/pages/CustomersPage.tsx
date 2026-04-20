@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
 import {
   Search,
   Plus,
@@ -288,9 +288,8 @@ function WorkItemListPanel({
               const isHighlighted = isActive && highlightedIdx === itemIdx;
               const details = mockDetailsMap[item.id] || [];
               return (
-                <>
+                <Fragment key={item.id}>
                   <tr
-                    key={item.id}
                     onClick={() => setExpandedId(isExpanded ? null : item.id)}
                     className={`hover:bg-surface-elevated transition-colors cursor-pointer ${isHighlighted ? "ring-2 ring-inset ring-primary-400" : ""}`}
                   >
@@ -330,7 +329,7 @@ function WorkItemListPanel({
                     </td>
                   </tr>
                   {isExpanded && (
-                    <tr key={`${item.id}-details`}>
+                    <tr>
                       <td colSpan={6} className="bg-surface-elevated/50 dark:bg-surface-elevated/30 px-6 py-3">
                         {details.length > 0 ? (
                           <table className="w-full text-sm">
@@ -359,7 +358,7 @@ function WorkItemListPanel({
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               );
             })}
             {workItems.length === 0 && (

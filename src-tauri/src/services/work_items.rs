@@ -144,7 +144,8 @@ pub async fn update(
         active.price = Set(price);
     }
     if let Some(note) = note {
-        active.note = Set(Some(note));
+        let trimmed = note.trim().to_owned();
+        active.note = Set(if trimmed.is_empty() { None } else { Some(trimmed) });
     }
     active.last_modified_at = Set(Utc::now().to_rfc3339());
 
@@ -161,16 +162,24 @@ pub async fn update_status(
     active.last_modified_at = Set(now.clone());
 
     match status {
-        WorkItemStatus::Completed => active.completed_at = Set(Some(now)),
-        WorkItemStatus::PickedUp => active.picked_up_at = Set(Some(now)),
-        _ => {}
+        WorkItemStatus::Received => {
+            active.completed_at = Set(None);
+            active.picked_up_at = Set(None);
+        }
+        WorkItemStatus::Completed => {
+            active.completed_at = Set(Some(now));
+            active.picked_up_at = Set(None);
+        }
+        WorkItemStatus::PickedUp => {
+            active.picked_up_at = Set(Some(now));
+        }
     }
     active.status = Set(status);
 
     active.update(db).await
 }
 
-/// 기존 세부항목을 삭제하고 새 항목으로 교체합니다 (delete-all + insert 트랜잭션).
+/// 기존 세부항목을 삭제하고 새 항목으로 교체합니다. (delete-all + insert 트랜잭션)
 pub async fn replace_details(
     db: &DatabaseConnection,
     work_item_id: i32,
@@ -201,12 +210,13 @@ pub async fn replace_details(
             .await?;
     }
 
-    tx.commit().await?;
-
-    work_item_detail::Entity::find()
+    let result = work_item_detail::Entity::find()
         .filter(work_item_detail::Column::WorkItemId.eq(work_item_id))
-        .all(db)
-        .await
+        .all(&tx)
+        .await?;
+
+    tx.commit().await?;
+    Ok(result)
 }
 
 pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<u64, DbErr> {

@@ -28,29 +28,33 @@ interface DialogActions {
 
 type DialogStore = DialogState & DialogActions;
 
-export const useDialogStore = create<DialogStore>((set) => ({
+export const useDialogStore = create<DialogStore>((set, get) => ({
   isOpen: false,
   config: null,
   resolvePromise: null,
 
   showAlert: (config) =>
     new Promise((resolve) => {
+      // 이전 다이얼로그가 열려 있으면 false로 resolve하여 Promise leak 방지
+      get().resolvePromise?.(false);
       set({ isOpen: true, config: { ...config, type: "alert" }, resolvePromise: resolve });
     }),
 
   showConfirm: (config) =>
     new Promise((resolve) => {
+      get().resolvePromise?.(false);
       set({ isOpen: true, config: { ...config, type: "confirm" }, resolvePromise: resolve });
     }),
 
   showCustom: (config) =>
     new Promise((resolve) => {
+      get().resolvePromise?.(false);
       set({ isOpen: true, config: { ...config, type: "custom" }, resolvePromise: resolve });
     }),
 
   close: (result) =>
     set((state) => {
       state.resolvePromise?.(result);
-      return { isOpen: false, resolvePromise: null };
+      return { isOpen: false, config: null, resolvePromise: null };
     }),
 }));
