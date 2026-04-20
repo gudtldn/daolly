@@ -68,8 +68,8 @@ describe("SettingsPage", () => {
     const user = userEvent.setup();
     renderWithRouter(<SettingsPage />);
 
-    // 기본값은 system
-    expect(useSettingsStore.getState().general.theme).toBe("system");
+    // 기본값은 light
+    expect(useSettingsStore.getState().general.theme).toBe("light");
 
     // 다크 테마 선택
     await user.click(screen.getByRole("button", { name: "다크" }));
@@ -83,8 +83,8 @@ describe("SettingsPage", () => {
   it("현재 테마 버튼이 활성 스타일을 가진다", () => {
     renderWithRouter(<SettingsPage />);
 
-    // 기본 system 테마가 활성
-    const systemBtn = screen.getByRole("button", { name: "시스템" });
-    expect(systemBtn.className).toContain("border-primary-500");
+    // 기본 light 테마가 활성
+    const lightBtn = screen.getByRole("button", { name: "라이트" });
+    expect(lightBtn.className).toContain("border-primary-500");
   });
 });

@@ -17,7 +17,7 @@ export interface AppSettings {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   general: {
-    theme: "system",
+    theme: "light",
     language: "ko",
     fontSize: "medium",
   },

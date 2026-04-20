@@ -29,6 +29,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
+      // NOTE: 시맨틱 토큰 대신 하드코딩 색상 사용 (CSS 로드 실패 시에도 동작하도록)
       return (
         <div className="h-screen flex flex-col items-center justify-center bg-secondary-50 text-secondary-800">
           <div className="text-6xl mb-6">!</div>

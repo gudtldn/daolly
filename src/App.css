@@ -81,7 +81,7 @@
 :root {
   --surface: #f1f5f9;          /* secondary-100 */
   --surface-card: #ffffff;
-  --surface-elevated: #ffffff;
+  --surface-elevated: #f8fafc;  /* secondary-50 - card 위 요소 구분 */
   --on-surface: #1e293b;       /* secondary-800 */
   --on-surface-muted: #64748b; /* secondary-500 */
   --border-default: #e2e8f0;   /* secondary-200 */
