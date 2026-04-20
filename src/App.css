@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* Primary (Blue) - 브랜드/강조색 */
   --color-primary-50: #eff6ff;
@@ -65,4 +67,32 @@
   --color-warning-800: #92400e;
   --color-warning-900: #78350f;
   --color-warning-950: #451a03;
+
+  /* 시맨틱 토큰 - 다크모드 자동 전환 */
+  --color-surface: var(--surface);
+  --color-surface-card: var(--surface-card);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-muted: var(--on-surface-muted);
+  --color-border-default: var(--border-default);
+}
+
+/* 라이트 모드 시맨틱 토큰 */
+:root {
+  --surface: #f1f5f9;          /* secondary-100 */
+  --surface-card: #ffffff;
+  --surface-elevated: #ffffff;
+  --on-surface: #1e293b;       /* secondary-800 */
+  --on-surface-muted: #64748b; /* secondary-500 */
+  --border-default: #e2e8f0;   /* secondary-200 */
+}
+
+/* 다크 모드 시맨틱 토큰 */
+.dark {
+  --surface: #0f172a;          /* secondary-900 */
+  --surface-card: #1e293b;     /* secondary-800 */
+  --surface-elevated: #334155; /* secondary-700 */
+  --on-surface: #f1f5f9;      /* secondary-100 */
+  --on-surface-muted: #94a3b8; /* secondary-400 */
+  --border-default: #334155;   /* secondary-700 */
 }

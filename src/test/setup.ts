@@ -3,8 +3,22 @@ import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
 import { useSettingsStore } from "@/stores/settingsStore";
 
+// jsdom에 matchMedia가 없으므로 mock 제공
+Object.defineProperty(window, "matchMedia", {
+  writable: true,
+  value: (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  }),
+});
+
 afterEach(() => {
   cleanup();
-  // 각 테스트 후 Zustand 스토어 초기화
   useSettingsStore.getState().resetSettings();
 });

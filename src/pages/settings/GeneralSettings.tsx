@@ -1,6 +1,6 @@
-import { Wrench, Sun, Moon, Monitor } from "lucide-react";
+import { Wrench, Sun, Moon, Monitor, Type, Download, Upload } from "lucide-react";
 import { useSettingsStore } from "@/stores/settingsStore";
-import type { AppSettings } from "@/types/settings";
+import type { AppSettings, FontSize } from "@/types/settings";
 
 const themeOptions: {
   value: AppSettings["general"]["theme"];
@@ -12,21 +12,29 @@ const themeOptions: {
   { value: "system", label: "시스템", icon: Monitor },
 ];
 
+const fontSizeOptions: { value: FontSize; label: string }[] = [
+  { value: "small", label: "작게" },
+  { value: "medium", label: "보통" },
+  { value: "large", label: "크게" },
+];
+
 export function GeneralSettings() {
   const theme = useSettingsStore((s) => s.general.theme);
   const setTheme = useSettingsStore((s) => s.setTheme);
+  const fontSize = useSettingsStore((s) => s.general.fontSize);
+  const setFontSize = useSettingsStore((s) => s.setFontSize);
 
   return (
     <div>
       <div className="flex items-center gap-2 mb-6">
-        <Wrench className="w-5 h-5 text-secondary-500" />
-        <h3 className="text-lg font-bold text-secondary-800">일반 설정</h3>
+        <Wrench className="w-5 h-5 text-on-surface-muted" />
+        <h3 className="text-lg font-bold text-on-surface">일반 설정</h3>
       </div>
 
       <div className="space-y-6">
         {/* 테마 설정 */}
-        <section className="bg-white rounded-lg border border-secondary-200 p-5">
-          <h4 className="text-sm font-semibold text-secondary-700 mb-3">테마</h4>
+        <section className="bg-surface-card rounded-lg border border-border-default p-5">
+          <h4 className="text-sm font-semibold text-on-surface mb-3">테마</h4>
           <div className="flex gap-3">
             {themeOptions.map((opt) => (
               <button
@@ -34,8 +42,8 @@ export function GeneralSettings() {
                 onClick={() => setTheme(opt.value)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm transition-colors cursor-pointer ${
                   theme === opt.value
-                    ? "border-primary-500 bg-primary-50 text-primary-700 font-semibold"
-                    : "border-secondary-200 text-secondary-600 hover:border-secondary-300 hover:bg-secondary-50"
+                    ? "border-primary-500 bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300 font-semibold"
+                    : "border-border-default text-on-surface-muted hover:border-secondary-300 hover:bg-surface-elevated"
                 }`}
               >
                 <opt.icon className="w-4 h-4" />
@@ -45,10 +53,49 @@ export function GeneralSettings() {
           </div>
         </section>
 
-        {/* 데이터 관리 placeholder */}
-        <section className="bg-white rounded-lg border border-secondary-200 p-5">
-          <h4 className="text-sm font-semibold text-secondary-700 mb-3">데이터 관리</h4>
-          <p className="text-sm text-secondary-500">준비 중입니다</p>
+        {/* 글꼴 크기 */}
+        <section className="bg-surface-card rounded-lg border border-border-default p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Type className="w-4 h-4 text-on-surface-muted" />
+            <h4 className="text-sm font-semibold text-on-surface">글꼴 크기</h4>
+          </div>
+          <div className="flex gap-3">
+            {fontSizeOptions.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setFontSize(opt.value)}
+                className={`px-4 py-2 rounded-lg border text-sm transition-colors cursor-pointer ${
+                  fontSize === opt.value
+                    ? "border-primary-500 bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300 font-semibold"
+                    : "border-border-default text-on-surface-muted hover:border-secondary-300 hover:bg-surface-elevated"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* 데이터 관리 */}
+        <section className="bg-surface-card rounded-lg border border-border-default p-5">
+          <h4 className="text-sm font-semibold text-on-surface mb-3">데이터 관리</h4>
+          <div className="flex gap-3">
+            <button
+              disabled
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border-default text-sm text-on-surface-muted opacity-50 cursor-not-allowed"
+            >
+              <Download className="w-4 h-4" />
+              백업
+            </button>
+            <button
+              disabled
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border-default text-sm text-on-surface-muted opacity-50 cursor-not-allowed"
+            >
+              <Upload className="w-4 h-4" />
+              복원
+            </button>
+          </div>
+          <p className="text-xs text-on-surface-muted mt-2">데이터베이스 구축 후 사용 가능합니다</p>
         </section>
       </div>
     </div>

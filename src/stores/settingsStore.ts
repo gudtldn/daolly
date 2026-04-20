@@ -1,11 +1,12 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { tauriStorage } from "@/stores/tauriStorage";
-import type { AppSettings } from "@/types/settings";
+import type { AppSettings, FontSize } from "@/types/settings";
 import { DEFAULT_SETTINGS } from "@/types/settings";
 
 interface SettingsActions {
   setTheme: (theme: AppSettings["general"]["theme"]) => void;
+  setFontSize: (fontSize: FontSize) => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   resetSettings: () => void;
@@ -23,6 +24,9 @@ export const useSettingsStore = create<SettingsState>()(
 
       setTheme: (theme) =>
         set((state) => ({ general: { ...state.general, theme } })),
+
+      setFontSize: (fontSize) =>
+        set((state) => ({ general: { ...state.general, fontSize } })),
 
       toggleSidebar: () =>
         set((state) => ({

@@ -37,10 +37,10 @@ function Clock() {
 
   return (
     <div className="text-right">
-      <div className="text-lg font-bold text-secondary-700 leading-none">
+      <div className="text-lg font-bold text-on-surface leading-none">
         {formatTime(now)}
       </div>
-      <div className="text-xs text-secondary-400 mt-1">
+      <div className="text-xs text-on-surface-muted mt-1">
         {formatDate(now)}
       </div>
     </div>
@@ -52,8 +52,8 @@ export function Header() {
   const title = pageTitles[location.pathname] ?? "";
 
   return (
-    <header className="h-16 bg-white shadow-sm flex items-center justify-between px-6 shrink-0 border-b border-secondary-200">
-      <h2 className="text-xl font-bold text-secondary-800">{title}</h2>
+    <header className="h-16 bg-surface-card shadow-sm flex items-center justify-between px-6 shrink-0 border-b border-border-default">
+      <h2 className="text-xl font-bold text-on-surface">{title}</h2>
       <Clock />
     </header>
   );
