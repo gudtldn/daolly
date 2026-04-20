@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
-import type { WorkItemFull, WorkItemStatus, CreateWorkItem, UpdateWorkItem, DetailInput } from "@/types";
+import type { WorkItemFull, WorkItemStatus, CreateWorkItem, UpdateWorkItem, DetailInput, Payment } from "@/types";
+import { paymentApi } from "@/bindings";
 
 // datetime-local <-> ISO 변환 헬퍼
 function toLocalInput(iso: string | null): string {
@@ -14,14 +15,20 @@ function fromLocalInput(local: string): string {
   return new Date(local).toISOString();
 }
 
+type Tab = "info" | "payment";
+
 interface Props {
   open: boolean;
   mode: "create" | "edit";
   customerId: number;
   /** edit 모드에서 사용할 기존 데이터 (full) */
   workItem?: WorkItemFull | null;
+  /** edit 모드에서 초기 탭 선택 */
+  initialTab?: Tab;
   onSave: (data: CreateWorkItem | UpdateWorkItem, details?: DetailInput[], status?: WorkItemStatus, pickedUpAt?: string) => Promise<void>;
   onClose: () => void;
+  /** 결제 변경 후 외부 상태 갱신 */
+  onPaymentChange?: () => void;
 }
 
 function emptyDetail(): DetailInput & { _key: number } {
@@ -30,7 +37,8 @@ function emptyDetail(): DetailInput & { _key: number } {
 
 type DetailRow = DetailInput & { _key: number };
 
-export function WorkItemFormCard({ open, mode, customerId, workItem, onSave, onClose }: Props) {
+export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab, onSave, onClose, onPaymentChange }: Props) {
+  const [activeTab, setActiveTab] = useState<Tab>("info");
   const [description, setDescription] = useState("");
   const [note, setNote] = useState("");
   const [details, setDetails] = useState<DetailRow[]>([emptyDetail()]);
@@ -42,6 +50,12 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, onSave, onC
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const descRef = useRef<HTMLInputElement>(null);
+
+  // 결제 탭 상태
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [payAmount, setPayAmount] = useState("");
+  const [payMethod, setPayMethod] = useState("현금");
+  const [payLoading, setPayLoading] = useState(false);
 
   // 자동 합산 가격
   const autoPrice = details.reduce((sum, d) => sum + d.unitPrice * d.quantity, 0);
@@ -83,9 +97,23 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, onSave, onC
     }
     setError("");
     setSaving(false);
-    const t = setTimeout(() => descRef.current?.focus(), 150);
+    setActiveTab(mode === "edit" && initialTab ? initialTab : "info");
+    // 결제 데이터 초기화
+    if (mode === "edit" && workItem) {
+      setPayments(workItem.payments);
+      const remaining = workItem.price - workItem.paidAmount;
+      setPayAmount(remaining > 0 ? String(remaining) : "");
+    } else {
+      setPayments([]);
+      setPayAmount("");
+    }
+    setPayMethod("현금");
+    setPayLoading(false);
+    const t = setTimeout(() => {
+      if (!initialTab || initialTab === "info") descRef.current?.focus();
+    }, 150);
     return () => clearTimeout(t);
-  }, [open, mode, workItem]);
+  }, [open, mode, workItem, initialTab]);
 
   // Esc로 닫기
   useEffect(() => {
@@ -96,6 +124,46 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, onSave, onC
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [open, onClose]);
+
+  // 결제 등록
+  const handleAddPayment = async () => {
+    if (!workItem) return;
+    const amount = parseInt(payAmount, 10) || 0;
+    if (amount <= 0) return;
+    setPayLoading(true);
+    try {
+      await paymentApi.create({ workItemId: workItem.id, amount, method: payMethod });
+      const updated = await paymentApi.list(workItem.id);
+      setPayments(updated);
+      const newPaid = updated.reduce((s, p) => s + p.amount, 0);
+      const remaining = workItem.price - newPaid;
+      setPayAmount(remaining > 0 ? String(remaining) : "");
+      onPaymentChange?.();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPayLoading(false);
+    }
+  };
+
+  // 결제 삭제
+  const handleDeletePayment = async (paymentId: number) => {
+    if (!workItem) return;
+    setPayLoading(true);
+    try {
+      await paymentApi.delete(paymentId);
+      const updated = await paymentApi.list(workItem.id);
+      setPayments(updated);
+      const newPaid = updated.reduce((s, p) => s + p.amount, 0);
+      const remaining = workItem.price - newPaid;
+      setPayAmount(remaining > 0 ? String(remaining) : "");
+      onPaymentChange?.();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPayLoading(false);
+    }
+  };
 
   // 품목 행 변경
   const updateDetail = (key: number, field: keyof DetailInput, value: string | number) => {
@@ -200,6 +268,25 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, onSave, onC
           </button>
         </div>
 
+        {/* 탭 바 (edit 모드에서만) */}
+        {mode === "edit" && (
+          <div className="flex border-b border-border-default shrink-0">
+            {([["info", "작업 정보"], ["payment", "결제 관리"]] as const).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setActiveTab(key)}
+                className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
+                  activeTab === key
+                    ? "text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400"
+                    : "text-on-surface-muted hover:text-on-surface hover:bg-surface-elevated"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* body - scrollable */}
         <div
           className="flex-1 overflow-y-auto px-5 py-4 space-y-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -210,6 +297,8 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, onSave, onC
             </div>
           )}
 
+          {activeTab === "info" ? (
+            <>
           {/* 작업내용 */}
           <div>
             <label className="block text-sm font-medium text-on-surface mb-1">
@@ -382,6 +471,115 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, onSave, onC
               className={`${inputCls} resize-y min-h-[60px]`}
             />
           </div>
+            </>
+          ) : (
+            <>
+          {/* ===== 결제 관리 탭 ===== */}
+          {(() => {
+            const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
+            const remaining = (workItem?.price ?? 0) - totalPaid;
+            return (
+              <>
+                {/* 요약 카드 */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-surface-elevated rounded-lg px-4 py-3 text-center">
+                    <div className="text-xs text-on-surface-muted mb-1">총액</div>
+                    <div className="text-lg font-bold text-on-surface">{(workItem?.price ?? 0).toLocaleString()}원</div>
+                  </div>
+                  <div className="bg-surface-elevated rounded-lg px-4 py-3 text-center">
+                    <div className="text-xs text-on-surface-muted mb-1">납부액</div>
+                    <div className="text-lg font-bold text-primary-600 dark:text-primary-400">{totalPaid.toLocaleString()}원</div>
+                  </div>
+                  <div className={`rounded-lg px-4 py-3 text-center ${remaining > 0 ? "bg-danger-50 dark:bg-danger-950" : "bg-success-50 dark:bg-success-950"}`}>
+                    <div className="text-xs text-on-surface-muted mb-1">잔액</div>
+                    <div className={`text-lg font-bold ${remaining > 0 ? "text-danger-600 dark:text-danger-400" : "text-success-600 dark:text-success-400"}`}>
+                      {remaining > 0 ? `${remaining.toLocaleString()}원` : "완납"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 결제 내역 */}
+                <div>
+                  <label className="block text-sm font-medium text-on-surface mb-2">결제 내역</label>
+                  {payments.length > 0 ? (
+                    <div className="border border-border-default rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-surface-elevated text-on-surface-muted">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-medium">일시</th>
+                            <th className="px-3 py-2 text-right font-medium">금액</th>
+                            <th className="px-3 py-2 text-left font-medium">수단</th>
+                            <th className="w-10"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border-default">
+                          {payments.map((p) => (
+                            <tr key={p.id}>
+                              <td className="px-3 py-2 text-on-surface-muted text-[13px]">
+                                {new Date(p.paidAt).toLocaleDateString("ko-KR")} {new Date(p.paidAt).toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit", hour12: true })}
+                              </td>
+                              <td className="px-3 py-2 text-right font-medium text-on-surface">{p.amount.toLocaleString()}원</td>
+                              <td className="px-3 py-2 text-on-surface-muted">{p.method || "-"}</td>
+                              <td className="px-1 py-2 text-center">
+                                <button
+                                  onClick={() => handleDeletePayment(p.id)}
+                                  disabled={payLoading}
+                                  className="p-1 text-on-surface-muted hover:text-danger-500 transition-colors cursor-pointer disabled:opacity-30"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-on-surface-muted text-center py-4 border border-border-default rounded-lg">
+                      결제 내역이 없습니다.
+                    </div>
+                  )}
+                </div>
+
+                {/* 신규 결제 등록 */}
+                {remaining > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-on-surface mb-2">결제 등록</label>
+                    <div className="flex gap-2 items-end">
+                      <div className="flex-1">
+                        <label className="block text-xs text-on-surface-muted mb-1">금액</label>
+                        <input
+                          type="number"
+                          value={payAmount}
+                          onChange={(e) => setPayAmount(e.target.value)}
+                          placeholder="결제 금액"
+                          className={inputCls}
+                        />
+                      </div>
+                      <div className="w-28">
+                        <label className="block text-xs text-on-surface-muted mb-1">수단</label>
+                        <select value={payMethod} onChange={(e) => setPayMethod(e.target.value)} className={inputCls}>
+                          <option value="현금">현금</option>
+                          <option value="카드">카드</option>
+                          <option value="계좌이체">계좌이체</option>
+                          <option value="기타">기타</option>
+                        </select>
+                      </div>
+                      <button
+                        onClick={handleAddPayment}
+                        disabled={payLoading || !payAmount || parseInt(payAmount, 10) <= 0}
+                        className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                      >
+                        {payLoading ? "처리 중..." : "등록"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+            </>
+          )}
         </div>
 
         {/* footer */}
@@ -390,15 +588,17 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, onSave, onC
             onClick={onClose}
             className="px-4 py-2 text-sm text-on-surface-muted border border-border-default rounded-lg hover:bg-surface-elevated transition-colors cursor-pointer"
           >
-            취소
+            {activeTab === "payment" ? "닫기" : "취소"}
           </button>
-          <button
-            onClick={handleSubmit}
-            disabled={saving}
-            className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {saving ? "저장 중..." : mode === "create" ? "접수" : "저장"}
-          </button>
+          {activeTab === "info" && (
+            <button
+              onClick={handleSubmit}
+              disabled={saving}
+              className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? "저장 중..." : mode === "create" ? "접수" : "저장"}
+            </button>
+          )}
         </div>
       </div>
     </div>

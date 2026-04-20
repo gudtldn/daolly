@@ -230,6 +230,7 @@ function WorkItemListPanel({
   onEdit,
   onDelete,
   onChangeStatus,
+  onPayment,
   selectedWorkItemId,
 }: {
   customer: Customer | null;
@@ -241,6 +242,7 @@ function WorkItemListPanel({
   onEdit: (id: number) => void;
   onDelete: (id: number) => void;
   onChangeStatus: (id: number, status: WorkItemStatus) => void;
+  onPayment: (id: number) => void;
   selectedWorkItemId: number | null;
 }) {
   const { workItems } = useWorkItemStore();
@@ -376,9 +378,12 @@ function WorkItemListPanel({
                           {item.price.toLocaleString()}원
                         </span>
                         {isUnpaid ? (
-                          <span className="px-2 py-0.5 bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 text-danger-600 dark:text-danger-400 rounded text-xs font-bold whitespace-nowrap leading-none">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onPayment(item.id); }}
+                            className="px-2 py-0.5 bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 text-danger-600 dark:text-danger-400 rounded text-xs font-bold whitespace-nowrap leading-none cursor-pointer hover:bg-danger-100 dark:hover:bg-danger-900 transition-colors"
+                          >
                             미수 {(item.price - item.paidAmount).toLocaleString()}
-                          </span>
+                          </button>
                         ) : (
                           <span className="px-2 py-0.5 bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800 text-primary-600 dark:text-primary-400 rounded text-xs font-bold whitespace-nowrap leading-none">
                             완납
@@ -497,13 +502,6 @@ export function CustomersPage() {
     setWiCardOpen(true);
   };
 
-  const handleWiEdit = async (id: number) => {
-    setWiCardMode("edit");
-    const full = await workItemApi.get(id);
-    setEditingWorkItem(full);
-    setWiCardOpen(true);
-  };
-
   const handleWiDelete = async (id: number) => {
     const item = workItems.find((w) => w.id === id);
     if (!item) return;
@@ -521,6 +519,25 @@ export function CustomersPage() {
   const handleWiChangeStatus = async (id: number, status: WorkItemStatus) => {
     await useWorkItemStore.getState().updateStatus(id, status);
     loadUnpaid();
+  };
+
+  // 미수금 뱃지 클릭 -> 결제 탭으로 열기
+  const [wiInitialTab, setWiInitialTab] = useState<"info" | "payment">("info");
+
+  const handleWiPayment = async (id: number) => {
+    setWiCardMode("edit");
+    const full = await workItemApi.get(id);
+    setEditingWorkItem(full);
+    setWiInitialTab("payment");
+    setWiCardOpen(true);
+  };
+
+  const handleWiEdit = async (id: number) => {
+    setWiCardMode("edit");
+    const full = await workItemApi.get(id);
+    setEditingWorkItem(full);
+    setWiInitialTab("info");
+    setWiCardOpen(true);
   };
 
   const handleWiCardSave = async (data: CreateWorkItem | UpdateWorkItem, details?: DetailInput[], status?: WorkItemStatus, pickedUpAtOverride?: string) => {
@@ -633,6 +650,7 @@ export function CustomersPage() {
         onEdit={handleWiEdit}
         onDelete={handleWiDelete}
         onChangeStatus={handleWiChangeStatus}
+        onPayment={handleWiPayment}
         selectedWorkItemId={expandedId}
       />
       <CustomerFormCard
@@ -647,8 +665,10 @@ export function CustomersPage() {
         mode={wiCardMode}
         customerId={selectedCustomer?.id ?? 0}
         workItem={editingWorkItem}
+        initialTab={wiInitialTab}
         onSave={handleWiCardSave}
         onClose={() => setWiCardOpen(false)}
+        onPaymentChange={() => { useWorkItemStore.getState().load(); loadUnpaid(); }}
       />
     </div>
   );
