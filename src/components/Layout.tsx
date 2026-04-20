@@ -4,7 +4,7 @@ import { Header } from "@/components/Header";
 
 export function Layout() {
   return (
-    <div className="h-screen flex overflow-hidden bg-surface text-on-surface">
+    <div className="h-screen flex overflow-hidden bg-surface text-on-surface transition-colors duration-200">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />

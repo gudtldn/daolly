@@ -21,7 +21,7 @@ describe("SettingsPage", () => {
     renderWithRouter(<SettingsPage />);
     // 좌측 카테고리 버튼의 활성 스타일 확인
     const generalBtn = screen.getByRole("button", { name: "일반 설정" });
-    expect(generalBtn.className).toContain("bg-primary-50");
+    expect(generalBtn.className).toContain("bg-primary-600");
     // 우측에 일반 설정 콘텐츠 표시
     expect(screen.getByText("테마")).toBeInTheDocument();
     expect(screen.getByText("데이터 관리")).toBeInTheDocument();
@@ -60,8 +60,8 @@ describe("SettingsPage", () => {
 
     const appInfoBtn = screen.getByRole("button", { name: "앱 정보" });
     const generalBtn = screen.getByRole("button", { name: "일반 설정" });
-    expect(appInfoBtn.className).toContain("bg-primary-50");
-    expect(generalBtn.className).not.toContain("bg-primary-50");
+    expect(appInfoBtn.className).toContain("bg-primary-600");
+    expect(generalBtn.className).not.toContain("bg-primary-600");
   });
 
   it("테마 버튼 클릭 시 스토어가 업데이트된다", async () => {

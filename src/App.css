@@ -89,10 +89,18 @@
 
 /* 다크 모드 시맨틱 토큰 */
 .dark {
-  --surface: #0f172a;          /* secondary-900 */
-  --surface-card: #1e293b;     /* secondary-800 */
-  --surface-elevated: #334155; /* secondary-700 */
+  --surface: #020617;          /* secondary-950 */
+  --surface-card: #0f172a;     /* secondary-900 */
+  --surface-elevated: #1e293b; /* secondary-800 */
   --on-surface: #f1f5f9;      /* secondary-100 */
   --on-surface-muted: #94a3b8; /* secondary-400 */
-  --border-default: #334155;   /* secondary-700 */
+  --border-default: #1e293b;   /* secondary-800 */
 }
+
+/* 커스텀 스크롤바 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+.dark ::-webkit-scrollbar-thumb { background: #334155; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #475569; }

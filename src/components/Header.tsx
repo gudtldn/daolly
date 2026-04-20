@@ -52,7 +52,7 @@ export function Header() {
   const title = pageTitles[location.pathname] ?? "";
 
   return (
-    <header className="h-16 bg-surface-card shadow-sm flex items-center justify-between px-6 shrink-0 border-b border-border-default">
+    <header className="h-16 bg-surface-card shadow-sm flex items-center justify-between px-6 shrink-0 border-b border-border-default transition-colors duration-200">
       <h2 className="text-xl font-bold text-on-surface">{title}</h2>
       <Clock />
     </header>

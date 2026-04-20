@@ -34,7 +34,7 @@ export function SettingsPage() {
               onClick={() => setActiveCategory(cat.id)}
               className={`w-full flex items-center gap-3 px-5 py-2.5 text-sm transition-colors cursor-pointer ${
                 activeCategory === cat.id
-                  ? "bg-primary-50 text-primary-700 font-semibold border-r-2 border-primary-600"
+                  ? "bg-primary-600 text-white font-semibold shadow-sm"
                   : "text-on-surface-muted hover:bg-surface-elevated hover:text-on-surface"
               }`}
             >
