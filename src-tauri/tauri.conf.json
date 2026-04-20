@@ -12,9 +12,12 @@
   "app": {
     "windows": [
       {
-        "title": "sidekick",
-        "width": 800,
-        "height": 600
+        "title": "Sidekick",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 960,
+        "minHeight": 640,
+        "center": true
       }
     ],
     "security": {
