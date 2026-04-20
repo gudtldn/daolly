@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { NavLink } from "react-router";
 import {
   LayoutDashboard,
@@ -11,6 +10,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
+import { useSettingsStore } from "@/stores/settingsStore";
 
 const mainNavItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "대시보드" },
@@ -24,7 +24,8 @@ const bottomNavItems = [
 ];
 
 export function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+  const collapsed = useSettingsStore((s) => s.ui.sidebarCollapsed);
+  const toggleSidebar = useSettingsStore((s) => s.toggleSidebar);
 
   return (
     <aside
@@ -36,7 +37,7 @@ export function Sidebar() {
       <div className="h-16 flex items-center px-4 bg-secondary-950 border-b border-secondary-800">
         {collapsed ? (
           <button
-            onClick={() => setCollapsed(false)}
+            onClick={toggleSidebar}
             className="w-full flex items-center justify-center text-secondary-400 hover:text-white transition-colors cursor-pointer"
             aria-label="사이드바 펼치기"
           >
@@ -51,7 +52,7 @@ export function Sidebar() {
               </h1>
             </div>
             <button
-              onClick={() => setCollapsed(true)}
+              onClick={toggleSidebar}
               className="text-secondary-400 hover:text-white transition-colors shrink-0 cursor-pointer ml-2"
               aria-label="사이드바 접기"
             >

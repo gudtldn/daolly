@@ -3,6 +3,7 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithRouter } from "@/test/test-utils";
 import { SettingsPage } from "@/pages/SettingsPage";
+import { useSettingsStore } from "@/stores/settingsStore";
 
 describe("SettingsPage", () => {
   it("환경 설정 제목을 렌더링한다", () => {
@@ -61,5 +62,29 @@ describe("SettingsPage", () => {
     const generalBtn = screen.getByRole("button", { name: "일반 설정" });
     expect(appInfoBtn.className).toContain("bg-primary-50");
     expect(generalBtn.className).not.toContain("bg-primary-50");
+  });
+
+  it("테마 버튼 클릭 시 스토어가 업데이트된다", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<SettingsPage />);
+
+    // 기본값은 system
+    expect(useSettingsStore.getState().general.theme).toBe("system");
+
+    // 다크 테마 선택
+    await user.click(screen.getByRole("button", { name: "다크" }));
+    expect(useSettingsStore.getState().general.theme).toBe("dark");
+
+    // 라이트 테마 선택
+    await user.click(screen.getByRole("button", { name: "라이트" }));
+    expect(useSettingsStore.getState().general.theme).toBe("light");
+  });
+
+  it("현재 테마 버튼이 활성 스타일을 가진다", () => {
+    renderWithRouter(<SettingsPage />);
+
+    // 기본 system 테마가 활성
+    const systemBtn = screen.getByRole("button", { name: "시스템" });
+    expect(systemBtn.className).toContain("border-primary-500");
   });
 });
