@@ -110,7 +110,7 @@ pub async fn create(
                 item_name: Set(d.item_name.trim().to_owned()),
                 unit_price: Set(d.unit_price),
                 quantity: Set(d.quantity),
-                options_memo: Set(d.options_memo),
+                options_memo: Set(d.options_memo.map(|s| s.trim().to_owned())),
                 ..Default::default()
             })
             .collect();
@@ -200,7 +200,7 @@ pub async fn replace_details(
                 item_name: Set(d.item_name.trim().to_owned()),
                 unit_price: Set(d.unit_price),
                 quantity: Set(d.quantity),
-                options_memo: Set(d.options_memo),
+                options_memo: Set(d.options_memo.map(|s| s.trim().to_owned())),
                 ..Default::default()
             })
             .collect();

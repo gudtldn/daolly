@@ -1,6 +1,14 @@
+import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { Info } from "lucide-react";
 
 export function AppInfoSettings() {
+  const [version, setVersion] = useState("...");
+
+  useEffect(() => {
+    getVersion().then(setVersion).catch(() => setVersion("unknown"));
+  }, []);
+
   return (
     <div>
       <div className="flex items-center gap-2 mb-6">
@@ -14,7 +22,7 @@ export function AppInfoSettings() {
           <dl className="space-y-3 text-sm">
             <div className="flex">
               <dt className="w-24 text-on-surface-muted shrink-0">버전</dt>
-              <dd className="text-on-surface">0.1.0</dd>
+              <dd className="text-on-surface">{version}</dd>
             </div>
             <div className="flex">
               <dt className="w-24 text-on-surface-muted shrink-0">프레임워크</dt>

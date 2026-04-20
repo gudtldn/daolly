@@ -12,6 +12,7 @@ export function GlobalDialog() {
       if (
         e.key === "Enter" &&
         config?.type !== "custom" &&
+        !config?.isDestructive &&
         document.activeElement?.tagName !== "BUTTON"
       ) {
         close(true);
