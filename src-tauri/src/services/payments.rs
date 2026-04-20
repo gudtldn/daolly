@@ -90,3 +90,89 @@ async fn sync_paid_amount(tx: &DatabaseTransaction, work_item_id: i32) -> Result
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::services::work_items::DetailInput;
+    use crate::services::{customers, work_items};
+    use crate::test_helpers::setup_test_db;
+
+    async fn setup_work_item(db: &DatabaseConnection) -> i32 {
+        let c = customers::create(db, "고객".into(), None, None)
+            .await
+            .unwrap();
+        let wi = work_items::create(
+            db,
+            c.id,
+            "접수".into(),
+            10000,
+            None,
+            vec![DetailInput {
+                item_name: "품목".into(),
+                unit_price: 10000,
+                quantity: 1,
+                options_memo: None,
+            }],
+        )
+        .await
+        .unwrap();
+        wi.id
+    }
+
+    #[tokio::test]
+    async fn create_payment_syncs_paid_amount() {
+        let db = setup_test_db().await.unwrap();
+        let wi_id = setup_work_item(&db).await;
+
+        create(&db, wi_id, 5000, Some("카드".into())).await.unwrap();
+
+        let wi = work_item::Entity::find_by_id(wi_id)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(wi.paid_amount, 5000);
+    }
+
+    #[tokio::test]
+    async fn delete_payment_syncs_paid_amount() {
+        let db = setup_test_db().await.unwrap();
+        let wi_id = setup_work_item(&db).await;
+
+        let p1 = create(&db, wi_id, 3000, None).await.unwrap();
+        create(&db, wi_id, 2000, None).await.unwrap();
+        // paid_amount = 5000
+
+        delete(&db, p1.id).await.unwrap();
+        let wi = work_item::Entity::find_by_id(wi_id)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(wi.paid_amount, 2000); // 3000 제거 후 2000만 남음
+    }
+
+    #[tokio::test]
+    async fn create_payment_zero_amount_error() {
+        let db = setup_test_db().await.unwrap();
+        let wi_id = setup_work_item(&db).await;
+
+        let err = create(&db, wi_id, 0, None).await.unwrap_err();
+        assert!(err.to_string().contains("amount must be positive"));
+    }
+
+    #[tokio::test]
+    async fn list_payments_ordered() {
+        let db = setup_test_db().await.unwrap();
+        let wi_id = setup_work_item(&db).await;
+
+        create(&db, wi_id, 1000, Some("현금".into())).await.unwrap();
+        create(&db, wi_id, 2000, Some("카드".into())).await.unwrap();
+
+        let payments = list(&db, wi_id).await.unwrap();
+        assert_eq!(payments.len(), 2);
+        assert_eq!(payments[0].amount, 1000);
+        assert_eq!(payments[1].amount, 2000);
+    }
+}

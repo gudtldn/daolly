@@ -213,3 +213,130 @@ pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<u64, DbErr> {
     let res = work_item::Entity::delete_by_id(id).exec(db).await?;
     Ok(res.rows_affected)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::services::customers;
+    use crate::test_helpers::setup_test_db;
+
+    async fn create_test_customer(db: &DatabaseConnection) -> i32 {
+        let c = customers::create(db, "테스트".into(), None, None)
+            .await
+            .unwrap();
+        c.id
+    }
+
+    #[tokio::test]
+    async fn create_work_item_with_details() {
+        let db = setup_test_db().await.unwrap();
+        let cid = create_test_customer(&db).await;
+
+        let details = vec![
+            DetailInput {
+                item_name: "와이셔츠".into(),
+                unit_price: 3000,
+                quantity: 2,
+                options_memo: None,
+            },
+            DetailInput {
+                item_name: "바지".into(),
+                unit_price: 4000,
+                quantity: 1,
+                options_memo: Some("급행".into()),
+            },
+        ];
+
+        let wi = create(&db, cid, "와이셔츠 외 1건".into(), 10000, None, details)
+            .await
+            .unwrap();
+
+        assert_eq!(wi.customer_id, cid);
+        assert_eq!(wi.status, WorkItemStatus::Received);
+        assert_eq!(wi.price, 10000);
+
+        // 세부항목 확인
+        let (_, dets, _) = get_full(&db, wi.id).await.unwrap().unwrap();
+        assert_eq!(dets.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn create_work_item_empty_description_error() {
+        let db = setup_test_db().await.unwrap();
+        let cid = create_test_customer(&db).await;
+        let err = create(&db, cid, "  ".into(), 0, None, vec![])
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("description is required"));
+    }
+
+    #[tokio::test]
+    async fn update_status_sets_completed_at() {
+        let db = setup_test_db().await.unwrap();
+        let cid = create_test_customer(&db).await;
+        let wi = create(&db, cid, "테스트".into(), 1000, None, vec![])
+            .await
+            .unwrap();
+
+        let updated = update_status(&db, wi, WorkItemStatus::Completed)
+            .await
+            .unwrap();
+        assert_eq!(updated.status, WorkItemStatus::Completed);
+        assert!(updated.completed_at.is_some());
+    }
+
+    #[tokio::test]
+    async fn replace_details_replaces_all() {
+        let db = setup_test_db().await.unwrap();
+        let cid = create_test_customer(&db).await;
+        let details = vec![DetailInput {
+            item_name: "A".into(),
+            unit_price: 1000,
+            quantity: 1,
+            options_memo: None,
+        }];
+        let wi = create(&db, cid, "테스트".into(), 1000, None, details)
+            .await
+            .unwrap();
+
+        // 기존 1개 -> 새로 2개로 교체
+        let new_details = vec![
+            DetailInput {
+                item_name: "B".into(),
+                unit_price: 2000,
+                quantity: 1,
+                options_memo: None,
+            },
+            DetailInput {
+                item_name: "C".into(),
+                unit_price: 3000,
+                quantity: 1,
+                options_memo: None,
+            },
+        ];
+        let replaced = replace_details(&db, wi.id, new_details).await.unwrap();
+        assert_eq!(replaced.len(), 2);
+        assert_eq!(replaced[0].item_name, "B");
+    }
+
+    #[tokio::test]
+    async fn list_filters_by_status() {
+        let db = setup_test_db().await.unwrap();
+        let cid = create_test_customer(&db).await;
+        let wi = create(&db, cid, "접수".into(), 1000, None, vec![])
+            .await
+            .unwrap();
+        create(&db, cid, "접수2".into(), 2000, None, vec![])
+            .await
+            .unwrap();
+        update_status(&db, wi, WorkItemStatus::Completed)
+            .await
+            .unwrap();
+
+        let received = list(&db, None, Some(WorkItemStatus::Received))
+            .await
+            .unwrap();
+        assert_eq!(received.len(), 1);
+        assert_eq!(received[0].description, "접수2");
+    }
+}

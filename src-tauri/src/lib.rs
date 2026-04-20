@@ -2,6 +2,9 @@ mod commands;
 mod db;
 mod services;
 
+#[cfg(test)]
+pub mod test_helpers;
+
 use sea_orm::DatabaseConnection;
 use tauri::Manager;
 

@@ -73,3 +73,43 @@ pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<u64, DbErr> {
     let res = price_item::Entity::delete_by_id(id).exec(db).await?;
     Ok(res.rows_affected)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::services::categories;
+    use crate::test_helpers::setup_test_db;
+
+    #[tokio::test]
+    async fn create_and_list_by_category() {
+        let db = setup_test_db().await.unwrap();
+        let cat = categories::create(&db, "상의".into(), 1).await.unwrap();
+        create(&db, cat.id, "와이셔츠".into(), 3000, 1)
+            .await
+            .unwrap();
+        create(&db, cat.id, "티셔츠".into(), 2000, 2).await.unwrap();
+
+        let items = list(&db, Some(cat.id)).await.unwrap();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].name, "와이셔츠"); // sort_order 1
+    }
+
+    #[tokio::test]
+    async fn partial_update() {
+        let db = setup_test_db().await.unwrap();
+        let cat = categories::create(&db, "하의".into(), 1).await.unwrap();
+        let item = create(&db, cat.id, "바지".into(), 4000, 1).await.unwrap();
+
+        let updated = update(&db, item, None, Some(5000), None).await.unwrap();
+        assert_eq!(updated.name, "바지"); // unchanged
+        assert_eq!(updated.default_price, 5000); // changed
+    }
+
+    #[tokio::test]
+    async fn create_empty_name_error() {
+        let db = setup_test_db().await.unwrap();
+        let cat = categories::create(&db, "상의".into(), 1).await.unwrap();
+        let err = create(&db, cat.id, "  ".into(), 1000, 1).await.unwrap_err();
+        assert!(err.to_string().contains("name is required"));
+    }
+}
