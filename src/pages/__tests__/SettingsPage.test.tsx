@@ -1,9 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithRouter } from "@/test/test-utils";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { useSettingsStore } from "@/stores/settingsStore";
+
+vi.mock("@tauri-apps/api/app", () => ({
+  getVersion: vi.fn().mockResolvedValue("0.1.0"),
+}));
 
 describe("SettingsPage", () => {
   it("환경 설정 제목을 렌더링한다", () => {

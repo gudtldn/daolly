@@ -1,5 +1,6 @@
 use sea_orm::{DatabaseConnection, EntityTrait};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use tauri::State;
 
 use crate::commands::{AppError, CmdResult};
@@ -136,4 +137,12 @@ pub async fn delete_work_item(db: State<'_, DatabaseConnection>, id: i32) -> Cmd
         return Err(AppError::NotFound(format!("work_item {id}")));
     }
     Ok(())
+}
+
+#[tauri::command]
+pub async fn get_unpaid_amounts(
+    db: State<'_, DatabaseConnection>,
+    customer_ids: Vec<i32>,
+) -> CmdResult<HashMap<i32, i64>> {
+    Ok(services::work_items::get_unpaid_by_customers(db.inner(), customer_ids).await?)
 }

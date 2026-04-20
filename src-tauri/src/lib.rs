@@ -52,6 +52,7 @@ pub fn run() {
             commands::work_items::update_work_item_status,
             commands::work_items::replace_work_item_details,
             commands::work_items::delete_work_item,
+            commands::work_items::get_unpaid_amounts,
             // payments
             commands::payments::list_payments,
             commands::payments::create_payment,

@@ -1,6 +1,7 @@
 use chrono::Utc;
 use sea_orm::*;
 use serde::Deserialize;
+use std::collections::HashMap;
 
 use crate::db::entities::{payment, work_item, work_item::WorkItemStatus, work_item_detail};
 
@@ -222,6 +223,50 @@ pub async fn replace_details(
 pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<u64, DbErr> {
     let res = work_item::Entity::delete_by_id(id).exec(db).await?;
     Ok(res.rows_affected)
+}
+
+/// 고객 ID 목록에 대해 미수금(price - paid_amount) 합계를 반환합니다.
+pub async fn get_unpaid_by_customers(
+    db: &DatabaseConnection,
+    customer_ids: Vec<i32>,
+) -> Result<HashMap<i32, i64>, DbErr> {
+    if customer_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    use sea_orm::{FromQueryResult, prelude::Expr, sea_query::{Func, SimpleExpr}};
+
+    #[derive(FromQueryResult)]
+    struct UnpaidRow {
+        customer_id: i32,
+        unpaid: Option<i64>,
+    }
+
+    let rows = work_item::Entity::find()
+        .select_only()
+        .column(work_item::Column::CustomerId)
+        .column_as(
+            SimpleExpr::from(Func::sum(
+                Expr::col(work_item::Column::Price)
+                    .sub(Expr::col(work_item::Column::PaidAmount)),
+            )),
+            "unpaid",
+        )
+        .filter(work_item::Column::CustomerId.is_in(customer_ids))
+        .group_by(work_item::Column::CustomerId)
+        .into_model::<UnpaidRow>()
+        .all(db)
+        .await?;
+
+    let map = rows
+        .into_iter()
+        .filter_map(|r| {
+            let unpaid = r.unpaid.unwrap_or(0);
+            if unpaid > 0 { Some((r.customer_id, unpaid)) } else { None }
+        })
+        .collect();
+
+    Ok(map)
 }
 
 #[cfg(test)]

@@ -1,12 +1,13 @@
 import { create } from "zustand";
 import type { Customer, CreateCustomer, UpdateCustomer } from "@/types";
-import { customerApi } from "@/bindings";
+import { customerApi, workItemApi } from "@/bindings";
 
 interface CustomerState {
   customers: Customer[];
   selectedCustomer: Customer | null;
   searchText: string;
   isLoading: boolean;
+  unpaidMap: Record<number, number>;
 }
 
 interface CustomerActions {
@@ -16,6 +17,7 @@ interface CustomerActions {
   create: (data: CreateCustomer) => Promise<Customer>;
   update: (id: number, data: UpdateCustomer) => Promise<Customer>;
   delete: (id: number) => Promise<void>;
+  loadUnpaid: () => Promise<void>;
 }
 
 type CustomerStore = CustomerState & CustomerActions;
@@ -25,6 +27,7 @@ export const useCustomerStore = create<CustomerStore>((set, get) => ({
   selectedCustomer: null,
   searchText: "",
   isLoading: false,
+  unpaidMap: {},
 
   load: async () => {
     set({ isLoading: true });
@@ -69,5 +72,15 @@ export const useCustomerStore = create<CustomerStore>((set, get) => ({
       customers: s.customers.filter((c) => c.id !== id),
       selectedCustomer: s.selectedCustomer?.id === id ? null : s.selectedCustomer,
     }));
+  },
+
+  loadUnpaid: async () => {
+    const ids = get().customers.map((c) => c.id);
+    if (ids.length === 0) {
+      set({ unpaidMap: {} });
+      return;
+    }
+    const unpaidMap = await workItemApi.getUnpaidAmounts(ids);
+    set({ unpaidMap });
   },
 }));

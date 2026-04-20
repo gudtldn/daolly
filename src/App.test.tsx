@@ -1,6 +1,28 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+
+// CustomersPage가 마운트 시 Tauri invoke를 호출하므로 mock 필요
+vi.mock("@/bindings", () => ({
+  customerApi: {
+    list: vi.fn().mockResolvedValue([]),
+    get: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+  },
+  workItemApi: {
+    list: vi.fn().mockResolvedValue([]),
+    get: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    updateStatus: vi.fn(),
+    replaceDetails: vi.fn(),
+    delete: vi.fn(),
+    getUnpaidAmounts: vi.fn().mockResolvedValue({}),
+  },
+}));
+
 import App from "@/App";
 
 describe("App", () => {

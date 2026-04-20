@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, Fragment } from "react";
+import { useState, useMemo, useEffect, useCallback, Fragment } from "react";
 import {
   Search,
   Plus,
@@ -8,46 +8,12 @@ import {
   ClipboardList,
   ChevronDown,
 } from "lucide-react";
-
-// -- 목업 데이터 (디자인 확인용, 기능 연결 시 제거) --
-const mockCustomers = [
-  { id: 1, name: "홍길동", phone: "010-1234-5678", note: "단골 / 바지 기장 줄임 주의" },
-  { id: 2, name: "김철수", phone: "010-9876-5432", note: "" },
-  { id: 3, name: "이영희", phone: "010-5555-1234", note: "정장만 맡김" },
-  { id: 4, name: "박지성", phone: "010-1111-2222", note: "미수금 주의 고객" },
-  { id: 5, name: "최민수", phone: "010-3333-4444", note: "" },
-  { id: 6, name: "정수아", phone: "-", note: "전화번호 미등록" },
-];
-
-const mockWorkItemsMap: Record<number, any[]> = {
-  1: [
-    { id: 101, status: "Received", receivedAt: "2025-01-01T14:30:00", pickedUpAt: null, desc: "와이셔츠 외 3건", price: 12000, paid: 12000, note: "" },
-    { id: 102, status: "Completed", receivedAt: "2025-01-03T09:15:00", pickedUpAt: null, desc: "겨울 패딩 드라이", price: 25000, paid: 10000, note: "얼룩 주의" },
-    { id: 103, status: "PickedUp", receivedAt: "2024-12-28T16:45:00", pickedUpAt: "2025-01-02T11:00:00", desc: "정장 상하의", price: 15000, paid: 15000, note: "" },
-  ],
-  4: [
-    { id: 104, status: "Completed", receivedAt: "2025-01-05T10:20:00", pickedUpAt: null, desc: "고급 니트", price: 8000, paid: 0, note: "" },
-  ],
-};
-
-// 목업: WorkItem별 상세 품목
-const mockDetailsMap: Record<number, { name: string; qty: number; unitPrice: number }[]> = {
-  101: [
-    { name: "와이셔츠", qty: 2, unitPrice: 3000 },
-    { name: "면바지", qty: 1, unitPrice: 4000 },
-    { name: "넥타이", qty: 1, unitPrice: 2000 },
-  ],
-  102: [
-    { name: "겨울 패딩 (드라이)", qty: 1, unitPrice: 25000 },
-  ],
-  103: [
-    { name: "정장 상의", qty: 1, unitPrice: 8000 },
-    { name: "정장 하의", qty: 1, unitPrice: 7000 },
-  ],
-  104: [
-    { name: "고급 니트 (드라이)", qty: 1, unitPrice: 8000 },
-  ],
-};
+import type { Customer, WorkItemDetail, WorkItemStatus, CreateCustomer, UpdateCustomer } from "@/types";
+import { useCustomerStore } from "@/stores/customerStore";
+import { useWorkItemStore } from "@/stores/workItemStore";
+import { useDialogStore } from "@/stores/dialogStore";
+import { workItemApi } from "@/bindings";
+import { CustomerFormCard } from "@/pages/customers/CustomerFormCard";
 
 // 날짜 포맷 헬퍼
 function formatDateShort(iso: string | null): string {
@@ -70,8 +36,8 @@ function formatDateFull(iso: string | null): string | undefined {
   });
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const config: Record<string, { label: string; cls: string }> = {
+function StatusBadge({ status }: { status: WorkItemStatus }) {
+  const config: Record<WorkItemStatus, { label: string; cls: string }> = {
     Received: { label: "접수", cls: "bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300" },
     Completed: { label: "완료", cls: "bg-success-100 text-success-700 dark:bg-success-900/50 dark:text-success-300" },
     PickedUp: { label: "수령", cls: "bg-secondary-200 text-secondary-600 dark:bg-secondary-700 dark:text-secondary-300" },
@@ -87,28 +53,29 @@ function StatusBadge({ status }: { status: string }) {
 function CustomerListPanel({
   selectedId,
   onSelect,
+  onAdd,
+  onEdit,
+  onDelete,
 }: {
   selectedId: number | null;
-  onSelect: (c: any) => void;
+  onSelect: (c: Customer) => void;
+  onAdd: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
+  const { customers, unpaidMap } = useCustomerStore();
   const [searchKeyword, setSearchKeyword] = useState("");
 
+  // 클라이언트 사이드 필터 (즉시 반응)
   const filtered = useMemo(() => {
-    if (!searchKeyword) return mockCustomers;
-    return mockCustomers.filter(
-      (c) => c.name.includes(searchKeyword) || c.phone.includes(searchKeyword)
+    if (!searchKeyword) return customers;
+    const kw = searchKeyword.toLowerCase();
+    return customers.filter(
+      (c) =>
+        c.name.toLowerCase().includes(kw) ||
+        (c.phoneNumber && c.phoneNumber.includes(kw)),
     );
-  }, [searchKeyword]);
-
-  // 고객별 미수금 계산
-  const unpaidMap = useMemo(() => {
-    const map: Record<number, number> = {};
-    for (const [custId, items] of Object.entries(mockWorkItemsMap)) {
-      const unpaid = items.reduce((sum: number, item: any) => sum + (item.price - item.paid), 0);
-      if (unpaid > 0) map[Number(custId)] = unpaid;
-    }
-    return map;
-  }, []);
+  }, [searchKeyword, customers]);
 
   return (
     <div className="w-[380px] bg-surface-card rounded-lg shadow-sm border border-border-default flex flex-col overflow-hidden shrink-0">
@@ -133,13 +100,21 @@ function CustomerListPanel({
             className="w-full pl-9 pr-3 py-2 border border-border-default rounded text-sm bg-surface-card text-on-surface placeholder:text-on-surface-muted focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
           />
         </div>
-        <button className="flex items-center px-3 py-2 bg-primary-600 text-white rounded text-sm font-medium hover:bg-primary-700 transition-colors cursor-pointer">
+        <button
+          onClick={onAdd}
+          className="flex items-center px-3 py-2 bg-primary-600 text-white rounded text-sm font-medium hover:bg-primary-700 transition-colors cursor-pointer">
           <Plus className="w-4 h-4 mr-1" /> 추가
         </button>
-        <button className="p-2 border border-border-default rounded text-on-surface-muted hover:bg-surface-elevated transition-colors cursor-pointer">
+        <button
+          onClick={onEdit}
+          disabled={selectedId === null}
+          className="p-2 border border-border-default rounded text-on-surface-muted hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
           <Pencil className="w-4 h-4" />
         </button>
-        <button className="p-2 border border-danger-200 dark:border-danger-800 rounded text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors cursor-pointer">
+        <button
+          onClick={onDelete}
+          disabled={selectedId === null}
+          className="p-2 border border-danger-200 dark:border-danger-800 rounded text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
           <Trash2 className="w-4 h-4" />
         </button>
       </div>
@@ -166,7 +141,7 @@ function CustomerListPanel({
                 >
                   {c.name}
                 </span>
-                <span className="text-sm text-on-surface-muted">{c.phone}</span>
+                <span className="text-sm text-on-surface-muted">{c.phoneNumber || "-"}</span>
               </div>
               <div className="flex justify-between items-center">
                 <div
@@ -205,12 +180,37 @@ function WorkItemListPanel({
   highlightedIdx,
   isActive,
 }: {
-  customer: any | null;
+  customer: Customer | null;
   expandedId: number | null;
   setExpandedId: (id: number | null) => void;
   highlightedIdx: number;
   isActive: boolean;
 }) {
+  const { workItems } = useWorkItemStore();
+  // 아코디언 상세: 열 때 lazy load, 로컬 캐시
+  const [detailsCache, setDetailsCache] = useState<Record<number, WorkItemDetail[]>>({});
+
+  const handleToggle = useCallback(async (itemId: number) => {
+    if (expandedId === itemId) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(itemId);
+    // 캐시에 없으면 로드
+    if (!detailsCache[itemId]) {
+      try {
+        const full = await workItemApi.get(itemId);
+        setDetailsCache((prev) => ({ ...prev, [itemId]: full.details }));
+      } catch {
+        setDetailsCache((prev) => ({ ...prev, [itemId]: [] }));
+      }
+    }
+  }, [expandedId, setExpandedId, detailsCache]);
+
+  // 고객 변경 시 디테일 캐시 초기화
+  useEffect(() => {
+    setDetailsCache({});
+  }, [customer?.id]);
 
   if (!customer) {
     return (
@@ -221,10 +221,9 @@ function WorkItemListPanel({
     );
   }
 
-  const workItems = mockWorkItemsMap[customer.id] || [];
-  const totalAmount = workItems.reduce((sum: number, item: any) => sum + item.price, 0);
+  const totalAmount = workItems.reduce((sum, item) => sum + item.price, 0);
   const totalUnpaid = workItems.reduce(
-    (sum: number, item: any) => sum + (item.price - item.paid),
+    (sum, item) => sum + (item.price - item.paidAmount),
     0
   );
 
@@ -282,15 +281,15 @@ function WorkItemListPanel({
             </tr>
           </thead>
           <tbody className="divide-y divide-border-default">
-            {workItems.map((item: any, itemIdx: number) => {
-              const isUnpaid = item.price > item.paid;
+            {workItems.map((item, itemIdx) => {
+              const isUnpaid = item.price > item.paidAmount;
               const isExpanded = expandedId === item.id;
               const isHighlighted = isActive && highlightedIdx === itemIdx;
-              const details = mockDetailsMap[item.id] || [];
+              const details = detailsCache[item.id];
               return (
                 <Fragment key={item.id}>
                   <tr
-                    onClick={() => setExpandedId(isExpanded ? null : item.id)}
+                    onClick={() => handleToggle(item.id)}
                     className={`hover:bg-surface-elevated transition-colors cursor-pointer ${isHighlighted ? "ring-2 ring-inset ring-primary-400" : ""}`}
                   >
                     <td className="px-3 py-3 text-center">
@@ -305,7 +304,7 @@ function WorkItemListPanel({
                     <td className="px-3 py-3 font-bold text-on-surface">
                       <div className="flex items-center gap-1.5">
                         <ChevronDown className={`w-4 h-4 text-on-surface-muted transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-                        {item.desc}
+                        {item.description}
                       </div>
                     </td>
                     <td className="px-3 py-3">
@@ -315,7 +314,7 @@ function WorkItemListPanel({
                         </span>
                         {isUnpaid ? (
                           <span className="px-2 py-0.5 bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 text-danger-600 dark:text-danger-400 rounded text-xs font-bold whitespace-nowrap leading-none">
-                            미수 {(item.price - item.paid).toLocaleString()}
+                            미수 {(item.price - item.paidAmount).toLocaleString()}
                           </span>
                         ) : (
                           <span className="px-2 py-0.5 bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800 text-primary-600 dark:text-primary-400 rounded text-xs font-bold whitespace-nowrap leading-none">
@@ -331,7 +330,9 @@ function WorkItemListPanel({
                   {isExpanded && (
                     <tr>
                       <td colSpan={6} className="bg-surface-elevated/50 dark:bg-surface-elevated/30 px-6 py-3">
-                        {details.length > 0 ? (
+                        {details === undefined ? (
+                          <p className="text-sm text-on-surface-muted text-center py-2">로딩 중...</p>
+                        ) : details.length > 0 ? (
                           <table className="w-full text-sm">
                             <thead>
                               <tr className="text-on-surface-muted text-xs">
@@ -342,12 +343,12 @@ function WorkItemListPanel({
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-border-default/50">
-                              {details.map((d, i) => (
-                                <tr key={i}>
-                                  <td className="py-1.5 text-on-surface">{d.name}</td>
-                                  <td className="py-1.5 text-center text-on-surface-muted">{d.qty}</td>
+                              {details.map((d) => (
+                                <tr key={d.id}>
+                                  <td className="py-1.5 text-on-surface">{d.itemName}</td>
+                                  <td className="py-1.5 text-center text-on-surface-muted">{d.quantity}</td>
                                   <td className="py-1.5 text-right text-on-surface-muted">{d.unitPrice.toLocaleString()}원</td>
-                                  <td className="py-1.5 text-right font-medium text-on-surface">{(d.qty * d.unitPrice).toLocaleString()}원</td>
+                                  <td className="py-1.5 text-right font-medium text-on-surface">{(d.quantity * d.unitPrice).toLocaleString()}원</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -379,21 +380,63 @@ function WorkItemListPanel({
 // 메인 레이아웃
 // ==========================================
 export function CustomersPage() {
-  const [selected, setSelected] = useState<any | null>(null);
+  const { customers, selectedCustomer, select, load, create, update, delete: deleteCustomer, loadUnpaid } = useCustomerStore();
+  const { workItems, setFilter } = useWorkItemStore();
+  const { showConfirm } = useDialogStore();
   const [activePanel, setActivePanel] = useState<"customers" | "workItems">("customers");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [highlightedIdx, setHighlightedIdx] = useState(0);
 
-  // 자동 선택 (첫 번째 고객)
-  useEffect(() => {
-    setSelected(mockCustomers[0]);
-  }, []);
+  // Floating Card 상태
+  const [cardOpen, setCardOpen] = useState(false);
+  const [cardMode, setCardMode] = useState<"create" | "edit">("create");
 
-  // 고객 변경 시 아코디언/하이라이트 초기화
+  const handleAdd = () => { setCardMode("create"); setCardOpen(true); };
+  const handleEdit = () => { if (!selectedCustomer) return; setCardMode("edit"); setCardOpen(true); };
+
+  const handleDelete = async () => {
+    if (!selectedCustomer) return;
+    const confirmed = await showConfirm({
+      title: "고객 삭제",
+      message: `"${selectedCustomer.name}" 고객을 삭제하시겠습니까? 관련 접수 내역도 모두 삭제됩니다.`,
+      confirmText: "삭제",
+      isDestructive: true,
+    });
+    if (!confirmed) return;
+    await deleteCustomer(selectedCustomer.id);
+    const { customers: remaining } = useCustomerStore.getState();
+    if (remaining.length > 0) select(remaining[0]);
+    loadUnpaid();
+  };
+
+  const handleCardSave = async (data: CreateCustomer | UpdateCustomer) => {
+    if (cardMode === "create") {
+      const created = await create(data as CreateCustomer);
+      select(created);
+    } else if (selectedCustomer) {
+      await update(selectedCustomer.id, data as UpdateCustomer);
+    }
+    loadUnpaid();
+  };
+
+  // 초기 로드
   useEffect(() => {
+    load().then(() => {
+      // 로드 완료 후 미수금 조회 + 첫 고객 자동 선택
+      const { customers: loaded } = useCustomerStore.getState();
+      if (loaded.length > 0) select(loaded[0]);
+      useCustomerStore.getState().loadUnpaid();
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 고객 선택 시 작업 항목 로드 + 아코디언 초기화
+  useEffect(() => {
+    if (selectedCustomer) {
+      setFilter({ customerId: selectedCustomer.id });
+    }
     setExpandedId(null);
     setHighlightedIdx(0);
-  }, [selected?.id]);
+  }, [selectedCustomer?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 키보드 네비게이션
   useEffect(() => {
@@ -401,14 +444,12 @@ export function CustomersPage() {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
 
-      const workItems = selected ? (mockWorkItemsMap[selected.id] || []) : [];
-
       switch (e.key) {
         case "ArrowUp":
           e.preventDefault();
           if (activePanel === "customers") {
-            const idx = mockCustomers.findIndex((c) => c.id === selected?.id);
-            if (idx > 0) setSelected(mockCustomers[idx - 1]);
+            const idx = customers.findIndex((c) => c.id === selectedCustomer?.id);
+            if (idx > 0) select(customers[idx - 1]);
           } else {
             setHighlightedIdx((prev) => Math.max(0, prev - 1));
           }
@@ -416,8 +457,8 @@ export function CustomersPage() {
         case "ArrowDown":
           e.preventDefault();
           if (activePanel === "customers") {
-            const idx = mockCustomers.findIndex((c) => c.id === selected?.id);
-            if (idx < mockCustomers.length - 1) setSelected(mockCustomers[idx + 1]);
+            const idx = customers.findIndex((c) => c.id === selectedCustomer?.id);
+            if (idx < customers.length - 1) select(customers[idx + 1]);
           } else {
             setHighlightedIdx((prev) => Math.min(workItems.length - 1, prev + 1));
           }
@@ -427,7 +468,6 @@ export function CustomersPage() {
           if (activePanel === "customers") {
             setActivePanel("workItems");
           } else {
-            // 아코디언 펼치기
             const item = workItems[highlightedIdx];
             if (item) setExpandedId(item.id);
           }
@@ -435,7 +475,6 @@ export function CustomersPage() {
         case "ArrowLeft":
           e.preventDefault();
           if (activePanel === "workItems") {
-            // 아코디언이 펼쳐져 있으면 접기, 아니면 고객 패널로
             if (expandedId !== null) {
               setExpandedId(null);
             } else {
@@ -447,12 +486,31 @@ export function CustomersPage() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selected, activePanel, highlightedIdx, expandedId]);
+  }, [customers, selectedCustomer, activePanel, highlightedIdx, expandedId, workItems, select]);
 
   return (
     <div className="h-full flex gap-4">
-      <CustomerListPanel selectedId={selected?.id ?? null} onSelect={(c) => { setSelected(c); setActivePanel("customers"); }} />
-      <WorkItemListPanel customer={selected} expandedId={expandedId} setExpandedId={setExpandedId} highlightedIdx={highlightedIdx} isActive={activePanel === "workItems"} />
+      <CustomerListPanel
+        selectedId={selectedCustomer?.id ?? null}
+        onSelect={(c) => { select(c); setActivePanel("customers"); }}
+        onAdd={handleAdd}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+      />
+      <WorkItemListPanel
+        customer={selectedCustomer}
+        expandedId={expandedId}
+        setExpandedId={setExpandedId}
+        highlightedIdx={highlightedIdx}
+        isActive={activePanel === "workItems"}
+      />
+      <CustomerFormCard
+        open={cardOpen}
+        mode={cardMode}
+        customer={selectedCustomer}
+        onSave={handleCardSave}
+        onClose={() => setCardOpen(false)}
+      />
     </div>
   );
 }
