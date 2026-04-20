@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 /// 결제 내역 테이블
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[sea_orm(table_name = "payments")]
 pub struct Model {
     #[sea_orm(primary_key)]

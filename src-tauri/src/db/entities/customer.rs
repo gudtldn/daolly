@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 /// 고객 정보 테이블 (이름+전화번호로 식별)
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[sea_orm(table_name = "customers")]
 pub struct Model {
     #[sea_orm(primary_key)]

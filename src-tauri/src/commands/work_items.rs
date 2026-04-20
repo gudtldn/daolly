@@ -9,6 +9,7 @@ use crate::services::work_items::DetailInput;
 
 /// 접수 생성 DTO
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateWorkItem {
     pub customer_id: i32,
     pub description: String,
@@ -22,6 +23,7 @@ pub struct CreateWorkItem {
 /// 접수 부분 수정 DTO
 /// NOTE: None인 필드는 변경하지 않습니다.
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateWorkItem {
     pub description: Option<String>,
     pub price: Option<i32>,
@@ -31,6 +33,7 @@ pub struct UpdateWorkItem {
 /// 접수 상세 DTO
 /// NOTE: work_item + details + payments를 포함합니다.
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkItemFull {
     /// work_item 필드 평탄화
     #[serde(flatten)]

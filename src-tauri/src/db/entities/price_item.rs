@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 /// 카테고리에 속하는 세탁 품목과 기본 단가 테이블
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[sea_orm(table_name = "price_items")]
 pub struct Model {
     #[sea_orm(primary_key)]

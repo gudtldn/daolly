@@ -8,6 +8,7 @@ use crate::services;
 
 /// 결제 등록 DTO
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreatePayment {
     pub work_item_id: i32,
     /// 결제 금액 (양수)

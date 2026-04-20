@@ -6,7 +6,7 @@ let storePromise: ReturnType<typeof load> | null = null;
 
 function getStore() {
   if (!storePromise) {
-    storePromise = load("settings.json", { autoSave: true });
+    storePromise = load("settings.json", { defaults: {}, autoSave: true });
   }
   return storePromise;
 }

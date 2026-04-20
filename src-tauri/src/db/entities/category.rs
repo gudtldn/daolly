@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 /// 단가표의 상위 분류 테이블 (예: 상의, 하의, 아우터)
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[sea_orm(table_name = "categories")]
 pub struct Model {
     #[sea_orm(primary_key)]

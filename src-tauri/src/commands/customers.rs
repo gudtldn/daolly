@@ -8,6 +8,7 @@ use serde::Deserialize;
 
 /// 고객 생성 DTO
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateCustomer {
     pub name: String,
     pub phone_number: Option<String>,
@@ -17,6 +18,7 @@ pub struct CreateCustomer {
 /// 고객 수정 DTO
 /// NOTE: 모든 필드를 덮어씁니다.
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateCustomer {
     pub name: String,
     pub phone_number: Option<String>,

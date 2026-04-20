@@ -8,6 +8,7 @@ use crate::services;
 
 /// 단가표 항목 생성 DTO
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreatePriceItem {
     pub category_id: i32,
     pub name: String,
@@ -19,6 +20,7 @@ pub struct CreatePriceItem {
 /// 단가표 항목 부분 수정 DTO
 /// NOTE: None인 필드는 변경하지 않습니다.
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdatePriceItem {
     pub name: Option<String>,
     pub default_price: Option<i32>,

@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 /// 접수 상세 품목 테이블 (접수 시점의 단가 스냅샷)
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[sea_orm(table_name = "work_item_details")]
 pub struct Model {
     #[sea_orm(primary_key)]

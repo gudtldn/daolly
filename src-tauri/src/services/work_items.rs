@@ -7,6 +7,7 @@ use crate::db::entities::{payment, work_item, work_item::WorkItemStatus, work_it
 /// 접수 세부항목 DTO
 /// NOTE: 접수 시점의 단가/수량을 스냅샷합니다.
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DetailInput {
     pub item_name: String,
     /// 접수 시점 단가

@@ -14,6 +14,7 @@ pub enum WorkItemStatus {
 
 /// 세탁물 접수 1건.
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[sea_orm(table_name = "work_items")]
 pub struct Model {
     #[sea_orm(primary_key)]

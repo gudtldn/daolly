@@ -8,6 +8,7 @@ use crate::services;
 
 /// 카테고리 생성 DTO
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateCategory {
     pub name: String,
     /// 정렬 순서
@@ -16,6 +17,7 @@ pub struct CreateCategory {
 
 /// 카테고리 수정 DTO
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateCategory {
     pub name: String,
     pub sort_order: i32,
