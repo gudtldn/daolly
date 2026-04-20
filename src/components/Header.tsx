@@ -26,8 +26,8 @@ function formatDate(date: Date): string {
   });
 }
 
-export function Header() {
-  const location = useLocation();
+// 시계를 별도 컴포넌트로 분리하여 1초 리렌더링 범위를 격리
+function Clock() {
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -35,19 +35,26 @@ export function Header() {
     return () => clearInterval(timer);
   }, []);
 
+  return (
+    <div className="text-right">
+      <div className="text-lg font-bold text-secondary-700 leading-none">
+        {formatTime(now)}
+      </div>
+      <div className="text-xs text-secondary-400 mt-1">
+        {formatDate(now)}
+      </div>
+    </div>
+  );
+}
+
+export function Header() {
+  const location = useLocation();
   const title = pageTitles[location.pathname] ?? "";
 
   return (
     <header className="h-16 bg-white shadow-sm flex items-center justify-between px-6 shrink-0 border-b border-secondary-200">
       <h2 className="text-xl font-bold text-secondary-800">{title}</h2>
-      <div className="text-right">
-        <div className="text-lg font-bold text-secondary-700 leading-none">
-          {formatTime(now)}
-        </div>
-        <div className="text-xs text-secondary-400 mt-1">
-          {formatDate(now)}
-        </div>
-      </div>
+      <Clock />
     </header>
   );
 }

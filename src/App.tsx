@@ -20,6 +20,7 @@ function App() {
             <Route path="/customers" element={<CustomersPage />} />
             <Route path="/sales" element={<SalesPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="*" element={<Navigate to="/customers" replace />} />
           </Route>
         </Routes>
       </MemoryRouter>
