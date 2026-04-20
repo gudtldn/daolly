@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { renderWithRouter } from "@/test/test-utils";
 import { Sidebar } from "@/components/Sidebar";
 
@@ -47,5 +48,32 @@ describe("Sidebar", () => {
   it("하단에 사용자 정보를 렌더링한다", () => {
     renderWithRouter(<Sidebar />);
     expect(screen.getByText("관리자")).toBeInTheDocument();
+  });
+
+  it("토글 버튼 클릭 시 사이드바가 접힌다", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<Sidebar />);
+
+    await user.click(screen.getByLabelText("사이드바 접기"));
+
+    // 접힌 상태: 라벨이 숨겨짐
+    expect(screen.queryByText("대시보드")).not.toBeInTheDocument();
+    // 로고 텍스트가 DOM에서 제거됨
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
+    // aside 너비 클래스 변경
+    const aside = document.querySelector("aside");
+    expect(aside?.className).toContain("w-16");
+  });
+
+  it("접힌 상태에서 토글 버튼 클릭 시 다시 펼쳐진다", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<Sidebar />);
+
+    await user.click(screen.getByLabelText("사이드바 접기"));
+    await user.click(screen.getByLabelText("사이드바 펼치기"));
+
+    expect(screen.getByText("대시보드")).toBeInTheDocument();
+    const aside = document.querySelector("aside");
+    expect(aside?.className).toContain("w-60");
   });
 });

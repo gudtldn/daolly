@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { NavLink } from "react-router";
 import {
   LayoutDashboard,
@@ -7,6 +8,8 @@ import {
   Settings,
   Shirt,
   User,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 
 const mainNavItems = [
@@ -21,63 +24,102 @@ const bottomNavItems = [
 ];
 
 export function Sidebar() {
+  const [collapsed, setCollapsed] = useState(false);
+
   return (
-    <aside className="w-60 bg-secondary-900 text-white flex flex-col shrink-0">
+    <aside
+      className={`${
+        collapsed ? "w-16" : "w-60"
+      } bg-secondary-900 text-white flex flex-col shrink-0 transition-[width] duration-200 overflow-hidden`}
+    >
       {/* 로고 영역 */}
-      <div className="h-16 flex items-center px-5 bg-secondary-950 border-b border-secondary-800">
-        <Shirt className="w-6 h-6 text-primary-400 mr-3" />
-        <h1 className="text-xl font-bold tracking-wider">Sidekick</h1>
+      <div className="h-16 flex items-center px-4 bg-secondary-950 border-b border-secondary-800">
+        {collapsed ? (
+          <button
+            onClick={() => setCollapsed(false)}
+            className="w-full flex items-center justify-center text-secondary-400 hover:text-white transition-colors cursor-pointer"
+            aria-label="사이드바 펼치기"
+          >
+            <PanelLeftOpen className="w-5 h-5" />
+          </button>
+        ) : (
+          <>
+            <div className="flex items-center min-w-0 flex-1 whitespace-nowrap overflow-hidden">
+              <Shirt className="w-6 h-6 text-primary-400 shrink-0" />
+              <h1 className="text-xl font-bold tracking-wider ml-3">
+                Sidekick
+              </h1>
+            </div>
+            <button
+              onClick={() => setCollapsed(true)}
+              className="text-secondary-400 hover:text-white transition-colors shrink-0 cursor-pointer ml-2"
+              aria-label="사이드바 접기"
+            >
+              <PanelLeftClose className="w-5 h-5" />
+            </button>
+          </>
+        )}
       </div>
 
       {/* 네비게이션 */}
-      <nav className="flex-1 py-2 space-y-1 overflow-y-auto">
+      <nav className="flex-1 py-2 space-y-1 overflow-y-auto overflow-x-hidden">
         {mainNavItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             className={({ isActive }) =>
-              `flex items-center px-5 py-3 transition-colors ${
+              `flex items-center whitespace-nowrap ${
+                collapsed ? "justify-center px-0 py-3" : "px-5 py-3"
+              } transition-colors ${
                 isActive
                   ? "bg-primary-600 text-white"
                   : "text-secondary-400 hover:bg-secondary-800 hover:text-white"
               }`
             }
           >
-            <item.icon className="w-5 h-5 mr-3" />
-            <span className="text-sm">{item.label}</span>
+            <item.icon className={`w-5 h-5 shrink-0 ${collapsed ? "" : "mr-3"}`} />
+            {!collapsed && <span className="text-sm">{item.label}</span>}
           </NavLink>
         ))}
 
         {/* 구분선 */}
-        <div className="mx-5 my-4 border-t border-secondary-800" />
+        <div className={`${collapsed ? "mx-3" : "mx-5"} my-4 border-t border-secondary-800`} />
 
         {bottomNavItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             className={({ isActive }) =>
-              `flex items-center px-5 py-3 transition-colors ${
+              `flex items-center whitespace-nowrap ${
+                collapsed ? "justify-center px-0 py-3" : "px-5 py-3"
+              } transition-colors ${
                 isActive
                   ? "bg-primary-600 text-white"
                   : "text-secondary-400 hover:bg-secondary-800 hover:text-white"
               }`
             }
           >
-            <item.icon className="w-5 h-5 mr-3" />
-            <span className="text-sm">{item.label}</span>
+            <item.icon className={`w-5 h-5 shrink-0 ${collapsed ? "" : "mr-3"}`} />
+            {!collapsed && <span className="text-sm">{item.label}</span>}
           </NavLink>
         ))}
       </nav>
 
       {/* 사용자 정보 */}
-      <div className="p-4 border-t border-secondary-800 flex items-center">
-        <div className="w-9 h-9 rounded-full bg-secondary-700 flex items-center justify-center mr-3">
+      <div
+        className={`p-4 border-t border-secondary-800 flex items-center whitespace-nowrap overflow-hidden ${
+          collapsed ? "justify-center" : ""
+        }`}
+      >
+        <div className="w-9 h-9 rounded-full bg-secondary-700 flex items-center justify-center shrink-0">
           <User className="w-5 h-5 text-secondary-400" />
         </div>
-        <div>
-          <p className="text-sm font-semibold">관리자</p>
-          <p className="text-xs text-secondary-500">Sidekick</p>
-        </div>
+        {!collapsed && (
+          <div className="ml-3">
+            <p className="text-sm font-semibold">관리자</p>
+            <p className="text-xs text-secondary-500">Sidekick</p>
+          </div>
+        )}
       </div>
     </aside>
   );
