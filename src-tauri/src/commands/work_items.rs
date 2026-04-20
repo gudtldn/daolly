@@ -17,6 +17,8 @@ pub struct CreateWorkItem {
     /// 총액
     pub price: i32,
     pub note: Option<String>,
+    /// 접수 일시 (RFC3339). None이면 현재 시각 사용
+    pub received_at: Option<String>,
     /// 항목 스냅샷
     pub details: Vec<DetailInput>,
 }
@@ -29,6 +31,10 @@ pub struct UpdateWorkItem {
     pub description: Option<String>,
     pub price: Option<i32>,
     pub note: Option<String>,
+    /// 접수 일시 변경
+    pub received_at: Option<String>,
+    /// 수령 일시 변경
+    pub picked_up_at: Option<String>,
 }
 
 /// 접수 상세 DTO
@@ -76,6 +82,7 @@ pub async fn create_work_item(
         data.description,
         data.price,
         data.note,
+        data.received_at,
         data.details,
     )
     .await?)
@@ -98,6 +105,8 @@ pub async fn update_work_item(
         data.description,
         data.price,
         data.note,
+        data.received_at,
+        data.picked_up_at,
     )
     .await?)
 }

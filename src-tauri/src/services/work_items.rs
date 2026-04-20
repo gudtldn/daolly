@@ -76,6 +76,7 @@ pub async fn create(
     description: String,
     price: i32,
     note: Option<String>,
+    received_at: Option<String>,
     details: Vec<DetailInput>,
 ) -> Result<work_item::Model, DbErr> {
     let description = description.trim().to_owned();
@@ -85,6 +86,7 @@ pub async fn create(
     let note = note.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty());
 
     let now = Utc::now().to_rfc3339();
+    let recv = received_at.unwrap_or_else(|| now.clone());
     let tx = db.begin().await?;
 
     let wi = work_item::ActiveModel {
@@ -94,7 +96,7 @@ pub async fn create(
         price: Set(price),
         paid_amount: Set(0),
         note: Set(note),
-        received_at: Set(now.clone()),
+        received_at: Set(recv),
         created_at: Set(now.clone()),
         last_modified_at: Set(now),
         ..Default::default()
@@ -131,6 +133,8 @@ pub async fn update(
     description: Option<String>,
     price: Option<i32>,
     note: Option<String>,
+    received_at: Option<String>,
+    picked_up_at: Option<String>,
 ) -> Result<work_item::Model, DbErr> {
     let mut active: work_item::ActiveModel = existing.into();
 
@@ -147,6 +151,12 @@ pub async fn update(
     if let Some(note) = note {
         let trimmed = note.trim().to_owned();
         active.note = Set(if trimmed.is_empty() { None } else { Some(trimmed) });
+    }
+    if let Some(recv) = received_at {
+        active.received_at = Set(recv);
+    }
+    if let Some(pick) = picked_up_at {
+        active.picked_up_at = Set(if pick.is_empty() { None } else { Some(pick) });
     }
     active.last_modified_at = Set(Utc::now().to_rfc3339());
 
@@ -302,7 +312,7 @@ mod tests {
             },
         ];
 
-        let wi = create(&db, cid, "와이셔츠 외 1건".into(), 10000, None, details)
+        let wi = create(&db, cid, "와이셔츠 외 1건".into(), 10000, None, None, details)
             .await
             .unwrap();
 
@@ -319,7 +329,7 @@ mod tests {
     async fn create_work_item_empty_description_error() {
         let db = setup_test_db().await.unwrap();
         let cid = create_test_customer(&db).await;
-        let err = create(&db, cid, "  ".into(), 0, None, vec![])
+        let err = create(&db, cid, "  ".into(), 0, None, None, vec![])
             .await
             .unwrap_err();
         assert!(err.to_string().contains("description is required"));
@@ -329,7 +339,7 @@ mod tests {
     async fn update_status_sets_completed_at() {
         let db = setup_test_db().await.unwrap();
         let cid = create_test_customer(&db).await;
-        let wi = create(&db, cid, "테스트".into(), 1000, None, vec![])
+        let wi = create(&db, cid, "테스트".into(), 1000, None, None, vec![])
             .await
             .unwrap();
 
@@ -350,7 +360,7 @@ mod tests {
             quantity: 1,
             options_memo: None,
         }];
-        let wi = create(&db, cid, "테스트".into(), 1000, None, details)
+        let wi = create(&db, cid, "테스트".into(), 1000, None, None, details)
             .await
             .unwrap();
 
@@ -378,10 +388,10 @@ mod tests {
     async fn list_filters_by_status() {
         let db = setup_test_db().await.unwrap();
         let cid = create_test_customer(&db).await;
-        let wi = create(&db, cid, "접수".into(), 1000, None, vec![])
+        let wi = create(&db, cid, "접수".into(), 1000, None, None, vec![])
             .await
             .unwrap();
-        create(&db, cid, "접수2".into(), 2000, None, vec![])
+        create(&db, cid, "접수2".into(), 2000, None, None, vec![])
             .await
             .unwrap();
         update_status(&db, wi, WorkItemStatus::Completed)

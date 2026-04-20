@@ -109,6 +109,7 @@ mod tests {
             "접수".into(),
             10000,
             None,
+            None,
             vec![DetailInput {
                 item_name: "품목".into(),
                 unit_price: 10000,

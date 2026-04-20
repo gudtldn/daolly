@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, Fragment } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from "react";
 import {
   Search,
   Plus,
@@ -8,12 +8,13 @@ import {
   ClipboardList,
   ChevronDown,
 } from "lucide-react";
-import type { Customer, WorkItemDetail, WorkItemStatus, CreateCustomer, UpdateCustomer } from "@/types";
+import type { Customer, WorkItemFull, WorkItemDetail, WorkItemStatus, CreateWorkItem, UpdateWorkItem, DetailInput, CreateCustomer, UpdateCustomer } from "@/types";
 import { useCustomerStore } from "@/stores/customerStore";
 import { useWorkItemStore } from "@/stores/workItemStore";
 import { useDialogStore } from "@/stores/dialogStore";
 import { workItemApi } from "@/bindings";
 import { CustomerFormCard } from "@/pages/customers/CustomerFormCard";
+import { WorkItemFormCard } from "@/pages/customers/WorkItemFormCard";
 
 // 날짜 포맷 헬퍼
 function formatDateShort(iso: string | null): string {
@@ -36,15 +37,61 @@ function formatDateFull(iso: string | null): string | undefined {
   });
 }
 
+const STATUS_CONFIG: Record<WorkItemStatus, { label: string; cls: string }> = {
+  Received: { label: "접수", cls: "bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300" },
+  Completed: { label: "완료", cls: "bg-success-100 text-success-700 dark:bg-success-900/50 dark:text-success-300" },
+  PickedUp: { label: "수령", cls: "bg-secondary-200 text-secondary-600 dark:bg-secondary-700 dark:text-secondary-300" },
+};
+
 function StatusBadge({ status }: { status: WorkItemStatus }) {
-  const config: Record<WorkItemStatus, { label: string; cls: string }> = {
-    Received: { label: "접수", cls: "bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300" },
-    Completed: { label: "완료", cls: "bg-success-100 text-success-700 dark:bg-success-900/50 dark:text-success-300" },
-    PickedUp: { label: "수령", cls: "bg-secondary-200 text-secondary-600 dark:bg-secondary-700 dark:text-secondary-300" },
-  };
-  const c = config[status];
+  const c = STATUS_CONFIG[status];
   if (!c) return null;
   return <span className={`inline-block px-2.5 py-1 rounded text-xs font-bold whitespace-nowrap ${c.cls}`}>{c.label}</span>;
+}
+
+// 상태 인라인 드롭다운
+function StatusDropdown({ status, onChangeStatus }: { status: WorkItemStatus; onChangeStatus: (s: WorkItemStatus) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // 외부 클릭으로 닫기
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const options: WorkItemStatus[] = ["Received", "Completed", "PickedUp"];
+
+  return (
+    <div ref={ref} className="relative inline-block">
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        className="cursor-pointer"
+      >
+        <StatusBadge status={status} />
+      </button>
+      {open && (
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-surface-card border border-border-default rounded-lg shadow-lg py-1 z-30 min-w-[80px]">
+          {options.map((s) => {
+            const c = STATUS_CONFIG[s];
+            return (
+              <button
+                key={s}
+                onClick={(e) => { e.stopPropagation(); onChangeStatus(s); setOpen(false); }}
+                className={`w-full px-3 py-1.5 text-xs font-bold text-left hover:bg-surface-elevated transition-colors cursor-pointer ${s === status ? "opacity-50" : ""}`}
+              >
+                <span className={`inline-block px-2 py-0.5 rounded ${c.cls}`}>{c.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ==========================================
@@ -162,7 +209,7 @@ function CustomerListPanel({
         })}
         {filtered.length === 0 && (
           <div className="p-8 text-center text-on-surface-muted text-sm">
-            검색 결과가 없습니다.
+            {searchKeyword ? "검색 결과가 없습니다." : "등록된 고객이 없습니다."}
           </div>
         )}
       </ul>
@@ -179,12 +226,22 @@ function WorkItemListPanel({
   setExpandedId,
   highlightedIdx,
   isActive,
+  onAdd,
+  onEdit,
+  onDelete,
+  onChangeStatus,
+  selectedWorkItemId,
 }: {
   customer: Customer | null;
   expandedId: number | null;
   setExpandedId: (id: number | null) => void;
   highlightedIdx: number;
   isActive: boolean;
+  onAdd: () => void;
+  onEdit: (id: number) => void;
+  onDelete: (id: number) => void;
+  onChangeStatus: (id: number, status: WorkItemStatus) => void;
+  selectedWorkItemId: number | null;
 }) {
   const { workItems } = useWorkItemStore();
   // 아코디언 상세: 열 때 lazy load, 로컬 캐시
@@ -255,13 +312,21 @@ function WorkItemListPanel({
           </span>
         </div>
         <div className="flex space-x-2">
-          <button className="flex items-center px-3 py-2 bg-primary-600 text-white rounded text-sm font-medium hover:bg-primary-700 transition-colors cursor-pointer">
+          <button
+            onClick={onAdd}
+            className="flex items-center px-3 py-2 bg-primary-600 text-white rounded text-sm font-medium hover:bg-primary-700 transition-colors cursor-pointer">
             <Plus className="w-4 h-4 mr-1" /> 추가
           </button>
-          <button className="p-2 border border-border-default rounded text-on-surface-muted hover:bg-surface-elevated transition-colors cursor-pointer">
+          <button
+            onClick={() => selectedWorkItemId && onEdit(selectedWorkItemId)}
+            disabled={!selectedWorkItemId}
+            className="p-2 border border-border-default rounded text-on-surface-muted hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
             <Pencil className="w-4 h-4" />
           </button>
-          <button className="p-2 border border-danger-200 dark:border-danger-800 rounded text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors cursor-pointer">
+          <button
+            onClick={() => selectedWorkItemId && onDelete(selectedWorkItemId)}
+            disabled={!selectedWorkItemId}
+            className="p-2 border border-danger-200 dark:border-danger-800 rounded text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
@@ -278,6 +343,7 @@ function WorkItemListPanel({
               <th className="px-3 py-3 font-medium">작업내용</th>
               <th className="px-3 py-3 font-medium w-24">결제</th>
               <th className="px-3 py-3 font-medium w-28">메모</th>
+              <th className="w-10"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border-default">
@@ -290,10 +356,10 @@ function WorkItemListPanel({
                 <Fragment key={item.id}>
                   <tr
                     onClick={() => handleToggle(item.id)}
-                    className={`hover:bg-surface-elevated transition-colors cursor-pointer ${isHighlighted ? "ring-2 ring-inset ring-primary-400" : ""}`}
+                    className={`hover:bg-surface-elevated transition-colors cursor-pointer ${isExpanded ? "bg-primary-50/60 dark:bg-primary-950/40" : ""} ${isHighlighted ? "ring-2 ring-inset ring-primary-400" : ""}`}
                   >
                     <td className="px-3 py-3 text-center">
-                      <StatusBadge status={item.status} />
+                      <StatusDropdown status={item.status} onChangeStatus={(s) => onChangeStatus(item.id, s)} />
                     </td>
                     <td className="px-2 py-3 text-on-surface-muted font-mono text-[13px] tracking-tighter" title={formatDateFull(item.receivedAt)}>
                       {formatDateShort(item.receivedAt)}
@@ -302,10 +368,7 @@ function WorkItemListPanel({
                       {formatDateShort(item.pickedUpAt)}
                     </td>
                     <td className="px-3 py-3 font-bold text-on-surface">
-                      <div className="flex items-center gap-1.5">
-                        <ChevronDown className={`w-4 h-4 text-on-surface-muted transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-                        {item.description}
-                      </div>
+                      {item.description}
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex flex-col items-start gap-1">
@@ -323,13 +386,16 @@ function WorkItemListPanel({
                         )}
                       </div>
                     </td>
-                    <td className="px-3 py-3 text-on-surface-muted text-[13px]">
+                    <td className="px-3 py-3 text-on-surface-muted text-[13px] max-w-[112px] truncate" title={item.note || ""}>
                       {item.note || ""}
+                    </td>
+                    <td className="px-2 py-3 text-center">
+                      <ChevronDown className={`w-4 h-4 text-on-surface-muted transition-transform inline-block ${isExpanded ? "rotate-180" : ""}`} />
                     </td>
                   </tr>
                   {isExpanded && (
                     <tr>
-                      <td colSpan={6} className="bg-surface-elevated/50 dark:bg-surface-elevated/30 px-6 py-3">
+                      <td colSpan={7} className="bg-surface-elevated/50 dark:bg-surface-elevated/30 px-6 py-3">
                         {details === undefined ? (
                           <p className="text-sm text-on-surface-muted text-center py-2">로딩 중...</p>
                         ) : details.length > 0 ? (
@@ -364,7 +430,7 @@ function WorkItemListPanel({
             })}
             {workItems.length === 0 && (
               <tr>
-                <td colSpan={6} className="p-12 text-center text-on-surface-muted">
+                <td colSpan={7} className="p-12 text-center text-on-surface-muted">
                   등록된 작업 항목이 없습니다.
                 </td>
               </tr>
@@ -415,6 +481,66 @@ export function CustomersPage() {
       select(created);
     } else if (selectedCustomer) {
       await update(selectedCustomer.id, data as UpdateCustomer);
+    }
+    loadUnpaid();
+  };
+
+  // 작업항목 Floating Card 상태
+  const [wiCardOpen, setWiCardOpen] = useState(false);
+  const [wiCardMode, setWiCardMode] = useState<"create" | "edit">("create");
+  const [editingWorkItem, setEditingWorkItem] = useState<WorkItemFull | null>(null);
+
+  const handleWiAdd = () => {
+    if (!selectedCustomer) return;
+    setWiCardMode("create");
+    setEditingWorkItem(null);
+    setWiCardOpen(true);
+  };
+
+  const handleWiEdit = async (id: number) => {
+    setWiCardMode("edit");
+    const full = await workItemApi.get(id);
+    setEditingWorkItem(full);
+    setWiCardOpen(true);
+  };
+
+  const handleWiDelete = async (id: number) => {
+    const item = workItems.find((w) => w.id === id);
+    if (!item) return;
+    const confirmed = await showConfirm({
+      title: "작업 삭제",
+      message: `"${item.description}" 작업을 삭제하시겠습니까?`,
+      confirmText: "삭제",
+      isDestructive: true,
+    });
+    if (!confirmed) return;
+    await useWorkItemStore.getState().delete(id);
+    loadUnpaid();
+  };
+
+  const handleWiChangeStatus = async (id: number, status: WorkItemStatus) => {
+    await useWorkItemStore.getState().updateStatus(id, status);
+    loadUnpaid();
+  };
+
+  const handleWiCardSave = async (data: CreateWorkItem | UpdateWorkItem, details?: DetailInput[], status?: WorkItemStatus, pickedUpAtOverride?: string) => {
+    if (wiCardMode === "create") {
+      const created = await useWorkItemStore.getState().create(data as CreateWorkItem);
+      if (status) {
+        await useWorkItemStore.getState().updateStatus(created.id, status);
+      }
+      if (pickedUpAtOverride) {
+        await useWorkItemStore.getState().update(created.id, { pickedUpAt: pickedUpAtOverride });
+      }
+    } else if (editingWorkItem) {
+      // 순서 중요: updateStatus가 날짜를 자동 설정하므로 먼저 호출, 그 후 update로 날짜 덜어쓰기
+      if (status) {
+        await useWorkItemStore.getState().updateStatus(editingWorkItem.id, status);
+      }
+      await useWorkItemStore.getState().update(editingWorkItem.id, data as UpdateWorkItem);
+      if (details) {
+        await workItemApi.replaceDetails(editingWorkItem.id, details);
+      }
     }
     loadUnpaid();
   };
@@ -503,6 +629,11 @@ export function CustomersPage() {
         setExpandedId={setExpandedId}
         highlightedIdx={highlightedIdx}
         isActive={activePanel === "workItems"}
+        onAdd={handleWiAdd}
+        onEdit={handleWiEdit}
+        onDelete={handleWiDelete}
+        onChangeStatus={handleWiChangeStatus}
+        selectedWorkItemId={expandedId}
       />
       <CustomerFormCard
         open={cardOpen}
@@ -510,6 +641,14 @@ export function CustomersPage() {
         customer={selectedCustomer}
         onSave={handleCardSave}
         onClose={() => setCardOpen(false)}
+      />
+      <WorkItemFormCard
+        open={wiCardOpen}
+        mode={wiCardMode}
+        customerId={selectedCustomer?.id ?? 0}
+        workItem={editingWorkItem}
+        onSave={handleWiCardSave}
+        onClose={() => setWiCardOpen(false)}
       />
     </div>
   );

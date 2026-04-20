@@ -47,6 +47,7 @@ export interface CreateWorkItem {
   description: string;
   price: number;
   note?: string | null;
+  receivedAt?: string | null;
   details: DetailInput[];
 }
 
@@ -54,6 +55,8 @@ export interface UpdateWorkItem {
   description?: string | null;
   price?: number | null;
   note?: string | null;
+  receivedAt?: string | null;
+  pickedUpAt?: string | null;
 }
 
 export interface CreatePayment {
