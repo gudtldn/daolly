@@ -15,12 +15,13 @@ function fromLocalInput(local: string): string {
   return new Date(local).toISOString();
 }
 
-// 결제 수단 키 -> 한글 표시 변환 (POS는 영문 key 저장, 고객관리는 한글 저장)
+// 결제 수단 키 -> 한글 표시 변환 (영문 key 기준, 구형 DB 한글 key fallback 포함)
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   cash: "현금",
   card: "카드",
   credit: "외상",
   transfer: "계좌이체",
+  // 구형 한글 key fallback (DB 마이그레이션 전 데이터 호환)
   "현금": "현금",
   "카드": "카드",
   "계좌이체": "계좌이체",

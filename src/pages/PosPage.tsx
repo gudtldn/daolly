@@ -259,12 +259,17 @@ function OrderPanel({
   const memoRef = useRef<string>("");
   const catTabsRef = useRef<HTMLDivElement>(null);
 
-  const handleCatTabsWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    if (catTabsRef.current) {
+  // native non-passive wheel -> horizontal scroll (React onWheel is passive in newer browsers)
+  useEffect(() => {
+    const el = catTabsRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
       e.preventDefault();
-      catTabsRef.current.scrollLeft += e.deltaY;
-    }
-  };
+      el.scrollLeft += e.deltaY;
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, []);
 
   useEffect(() => {
     Promise.all([categoryApi.list(), priceItemApi.list(), priceOptionApi.list()]).then(
@@ -318,7 +323,6 @@ function OrderPanel({
       {/* 카테고리 탭 */}
       <div
         ref={catTabsRef}
-        onWheel={handleCatTabsWheel}
         className="flex border-b border-border-default bg-surface overflow-x-auto shrink-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
       >
         {categories.map((cat) => (
@@ -640,13 +644,13 @@ export function PosPage() {
     const customerName = selectedCustomer?.name ?? "";
     setSubmitting(true);
     try {
-      await submit(method, note || undefined);
+      const workItem = await submit(method, note || undefined);
       const prevId = selectedCustomer?.id;
       setSelectedCustomer(null);
       setSubmitCount((n) => n + 1);
       toast.success(`${customerName}님 접수 완료`, {
         action: prevId
-          ? { label: "접수 확인", onClick: () => navigate("/customers", { state: { focusCustomerId: prevId } }) }
+          ? { label: "접수 확인", onClick: () => navigate("/customers", { state: { focusCustomerId: prevId, focusWorkItemId: workItem.id } }) }
           : undefined,
       });
     } catch (e) {

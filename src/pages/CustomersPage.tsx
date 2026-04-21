@@ -253,6 +253,7 @@ function WorkItemListPanel({
   selectedWorkItemId,
   detailsRefreshId,
   onGoToPreviousPanel,
+  focusWorkItemId,
 }: {
   customer: Customer | null;
   expandedId: number | null;
@@ -266,6 +267,7 @@ function WorkItemListPanel({
   selectedWorkItemId: number | null;
   detailsRefreshId: { id: number; nonce: number } | null;
   onGoToPreviousPanel: () => void;
+  focusWorkItemId?: number | null;
 }) {
   const { workItems } = useWorkItemStore();
 
@@ -365,6 +367,12 @@ function WorkItemListPanel({
   useEffect(() => {
     setDetailsCache({});
   }, [customer?.id]);
+
+  // focusWorkItemId가 있으면 자동으로 해당 항목 expand
+  useEffect(() => {
+    if (!focusWorkItemId) return;
+    handleToggle(focusWorkItemId);
+  }, [focusWorkItemId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // isActive 패널에서만 키보드 네비게이션 처리
   useEffect(() => {
@@ -611,6 +619,7 @@ export function CustomersPage() {
   const location = useLocation();
   const [activePanel, setActivePanel] = useState<"customers" | "workItems">("customers");
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [focusWorkItemId, setFocusWorkItemId] = useState<number | null>(null);
 
   // 고객 검색 필터 (CustomerListPanel과 키보드 네비게이션 공유)
   const [searchKeyword, setSearchKeyword] = useState("");
@@ -735,7 +744,9 @@ export function CustomersPage() {
 
   // 초기 로드
   useEffect(() => {
-    const focusId: number | undefined = (location.state as { focusCustomerId?: number } | null)?.focusCustomerId;
+    const state = location.state as { focusCustomerId?: number; focusWorkItemId?: number } | null;
+    const focusId = state?.focusCustomerId;
+    const focusItemId = state?.focusWorkItemId;
     load().then(() => {
       const { customers: loaded, selectedCustomer: current } = useCustomerStore.getState();
       if (focusId) {
@@ -745,6 +756,12 @@ export function CustomersPage() {
           select(target);
           setScrollToCustomerId(target.id);
           setTimeout(() => setScrollToCustomerId(null), 100);
+          // 작업 항목 자동 expand: 고객 workItems 로드 후 처리
+          if (focusItemId) {
+            setTimeout(() => {
+              setFocusWorkItemId(focusItemId);
+            }, 300);
+          }
         }
       } else if (!current && loaded.length > 0) {
         select(loaded[0]);
@@ -818,6 +835,7 @@ export function CustomersPage() {
         selectedWorkItemId={expandedId}
         detailsRefreshId={detailsRefreshId}
         onGoToPreviousPanel={() => setActivePanel("customers")}
+        focusWorkItemId={focusWorkItemId}
       />
       <CustomerFormCard
         open={cardOpen}
