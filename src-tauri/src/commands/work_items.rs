@@ -13,8 +13,9 @@ use crate::services::work_items::DetailInput;
 #[serde(rename_all = "camelCase")]
 pub struct CreateWorkItem {
     pub customer_id: i32,
-    pub description: String,
-    /// 총액
+    /// None이면 details에서 자동 생성
+    pub description: Option<String>,
+    /// 요양
     pub price: i64,
     pub note: Option<String>,
     /// 접수 일시 (RFC3339). None이면 현재 시각 사용
@@ -76,7 +77,6 @@ pub async fn create_work_item(
     db: State<'_, DatabaseConnection>,
     data: CreateWorkItem,
 ) -> CmdResult<work_item::Model> {
-    require_non_empty(&data.description, "작업 설명")?;
     require_non_negative(data.price, "청구 금액")?;
     Ok(services::work_items::create(
         db.inner(),
@@ -96,8 +96,12 @@ pub async fn update_work_item(
     id: i32,
     data: UpdateWorkItem,
 ) -> CmdResult<work_item::Model> {
-    if let Some(ref desc) = data.description { require_non_empty(desc, "작업 설명")?; }
-    if let Some(price) = data.price { require_non_negative(price, "청구 금액")?; }
+    if let Some(ref desc) = data.description {
+        require_non_empty(desc, "작업 설명")?;
+    }
+    if let Some(price) = data.price {
+        require_non_negative(price, "청구 금액")?;
+    }
     let existing = work_item::Entity::find_by_id(id)
         .one(db.inner())
         .await?

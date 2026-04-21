@@ -23,8 +23,7 @@ pub fn run() {
             let pending = app_data_dir.join("sidekick.db.pending_restore");
             if pending.exists() {
                 let db_path = app_data_dir.join("sidekick.db");
-                std::fs::rename(&pending, &db_path)
-                    .expect("failed to apply pending restore");
+                std::fs::rename(&pending, &db_path).expect("failed to apply pending restore");
             }
 
             // Tauri setup은 sync 클로저이므로 block_on으로 async DB 초기화 실행
@@ -61,6 +60,11 @@ pub fn run() {
             commands::work_items::replace_work_item_details,
             commands::work_items::delete_work_item,
             commands::work_items::get_unpaid_amounts,
+            // price_options
+            commands::price_options::list_price_options,
+            commands::price_options::create_price_option,
+            commands::price_options::update_price_option,
+            commands::price_options::delete_price_option,
             // payments
             commands::payments::list_payments,
             commands::payments::create_payment,

@@ -42,7 +42,14 @@ pub async fn create_payment(
     data: CreatePayment,
 ) -> CmdResult<payment::Model> {
     require_positive(data.amount, "결제 금액")?;
-    Ok(services::payments::create(db.inner(), data.work_item_id, data.amount, data.method, data.paid_at).await?)
+    Ok(services::payments::create(
+        db.inner(),
+        data.work_item_id,
+        data.amount,
+        data.method,
+        data.paid_at,
+    )
+    .await?)
 }
 
 #[tauri::command]

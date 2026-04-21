@@ -7,6 +7,7 @@ pub mod customers;
 pub mod database;
 pub mod payments;
 pub mod price_items;
+pub mod price_options;
 pub mod work_items;
 
 use serde::Serialize;
@@ -39,7 +40,9 @@ pub type CmdResult<T> = Result<T, AppError>;
 /// 빈 문자열 검증 helper
 pub fn require_non_empty(value: &str, field: &str) -> Result<(), AppError> {
     if value.trim().is_empty() {
-        Err(AppError::Validation(format!("{field}은(는) 비워둘 수 없습니다")))
+        Err(AppError::Validation(format!(
+            "{field}은(는) 비워둘 수 없습니다"
+        )))
     } else {
         Ok(())
     }
@@ -48,7 +51,9 @@ pub fn require_non_empty(value: &str, field: &str) -> Result<(), AppError> {
 /// 양수 검증 helper (0 이하 방지)
 pub fn require_positive(value: i64, field: &str) -> Result<(), AppError> {
     if value <= 0 {
-        Err(AppError::Validation(format!("{field}은(는) 0보다 커야 합니다")))
+        Err(AppError::Validation(format!(
+            "{field}은(는) 0보다 커야 합니다"
+        )))
     } else {
         Ok(())
     }
@@ -57,7 +62,9 @@ pub fn require_positive(value: i64, field: &str) -> Result<(), AppError> {
 /// 음수 방지 helper (0 허용)
 pub fn require_non_negative(value: i64, field: &str) -> Result<(), AppError> {
     if value < 0 {
-        Err(AppError::Validation(format!("{field}은(는) 0 이상이어야 합니다")))
+        Err(AppError::Validation(format!(
+            "{field}은(는) 0 이상이어야 합니다"
+        )))
     } else {
         Ok(())
     }

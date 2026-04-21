@@ -10,6 +10,8 @@ use crate::db::entities::{payment, work_item, work_item::WorkItemStatus, work_it
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DetailInput {
+    /// 통계용 품목 FK (None = 직접 입력)
+    pub price_item_id: Option<i32>,
     pub item_name: String,
     /// 접수 시점 단가
     pub unit_price: i64,
@@ -69,17 +71,38 @@ pub async fn get_full(
     Ok(Some((item, details, payments)))
 }
 
+/// details 목록에서 description 자동 생성
+fn build_description(details: &[DetailInput]) -> String {
+    if details.is_empty() {
+        return "직접 입력".to_owned();
+    }
+    let first = details[0].item_name.trim();
+    if details.len() == 1 {
+        if details[0].quantity > 1 {
+            format!("{} x{}", first, details[0].quantity)
+        } else {
+            first.to_owned()
+        }
+    } else {
+        let rest_qty: i32 = details[1..].iter().map(|d| d.quantity).sum();
+        format!("{} 외 {}건", first, rest_qty)
+    }
+}
+
 /// 접수와 세부항목을 트랜잭션으로 함께 생성합니다.
 pub async fn create(
     db: &DatabaseConnection,
     customer_id: i32,
-    description: String,
+    description: Option<String>,
     price: i64,
     note: Option<String>,
     received_at: Option<String>,
     details: Vec<DetailInput>,
 ) -> Result<work_item::Model, DbErr> {
-    let description = description.trim().to_owned();
+    let description = description
+        .map(|s| s.trim().to_owned())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| build_description(&details));
     let note = note.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty());
 
     let now = Utc::now().to_rfc3339();
@@ -89,7 +112,7 @@ pub async fn create(
     let wi = work_item::ActiveModel {
         customer_id: Set(customer_id),
         status: Set(WorkItemStatus::Received),
-        description: Set(description),
+        description: Set(Some(description)),
         price: Set(price),
         paid_amount: Set(0),
         note: Set(note),
@@ -107,6 +130,7 @@ pub async fn create(
             .into_iter()
             .map(|d| work_item_detail::ActiveModel {
                 work_item_id: Set(inserted.id),
+                price_item_id: Set(d.price_item_id),
                 item_name: Set(d.item_name.trim().to_owned()),
                 unit_price: Set(d.unit_price),
                 quantity: Set(d.quantity),
@@ -137,14 +161,18 @@ pub async fn update(
 
     if let Some(desc) = description {
         let desc = desc.trim().to_owned();
-        active.description = Set(desc);
+        active.description = Set(Some(desc));
     }
     if let Some(price) = price {
         active.price = Set(price);
     }
     if let Some(note) = note {
         let trimmed = note.trim().to_owned();
-        active.note = Set(if trimmed.is_empty() { None } else { Some(trimmed) });
+        active.note = Set(if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed)
+        });
     }
     if let Some(recv) = received_at {
         active.received_at = Set(recv);
@@ -202,6 +230,7 @@ pub async fn replace_details(
             .into_iter()
             .map(|d| work_item_detail::ActiveModel {
                 work_item_id: Set(work_item_id),
+                price_item_id: Set(d.price_item_id),
                 item_name: Set(d.item_name.trim().to_owned()),
                 unit_price: Set(d.unit_price),
                 quantity: Set(d.quantity),
@@ -238,7 +267,11 @@ pub async fn get_unpaid_by_customers(
         return Ok(HashMap::new());
     }
 
-    use sea_orm::{FromQueryResult, prelude::Expr, sea_query::{Func, SimpleExpr}};
+    use sea_orm::{
+        prelude::Expr,
+        sea_query::{Func, SimpleExpr},
+        FromQueryResult,
+    };
 
     #[derive(FromQueryResult)]
     struct UnpaidRow {
@@ -251,8 +284,7 @@ pub async fn get_unpaid_by_customers(
         .column(work_item::Column::CustomerId)
         .column_as(
             SimpleExpr::from(Func::sum(
-                Expr::col(work_item::Column::Price)
-                    .sub(Expr::col(work_item::Column::PaidAmount)),
+                Expr::col(work_item::Column::Price).sub(Expr::col(work_item::Column::PaidAmount)),
             )),
             "unpaid",
         )
@@ -266,7 +298,11 @@ pub async fn get_unpaid_by_customers(
         .into_iter()
         .filter_map(|r| {
             let unpaid = r.unpaid.unwrap_or(0);
-            if unpaid > 0 { Some((r.customer_id, unpaid)) } else { None }
+            if unpaid > 0 {
+                Some((r.customer_id, unpaid))
+            } else {
+                None
+            }
         })
         .collect();
 
@@ -306,9 +342,17 @@ mod tests {
             },
         ];
 
-        let wi = create(&db, cid, "와이셔츠 외 1건".into(), 10000, None, None, details)
-            .await
-            .unwrap();
+        let wi = create(
+            &db,
+            cid,
+            "와이셔츠 외 1건".into(),
+            10000,
+            None,
+            None,
+            details,
+        )
+        .await
+        .unwrap();
 
         assert_eq!(wi.customer_id, cid);
         assert_eq!(wi.status, WorkItemStatus::Received);

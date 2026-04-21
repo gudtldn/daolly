@@ -158,7 +158,9 @@ mod tests {
         let db = setup_test_db().await.unwrap();
         let wi_id = setup_work_item(&db).await;
 
-        create(&db, wi_id, 5000, Some("카드".into()), None).await.unwrap();
+        create(&db, wi_id, 5000, Some("카드".into()), None)
+            .await
+            .unwrap();
 
         let wi = work_item::Entity::find_by_id(wi_id)
             .one(&db)
@@ -191,8 +193,12 @@ mod tests {
         let db = setup_test_db().await.unwrap();
         let wi_id = setup_work_item(&db).await;
 
-        create(&db, wi_id, 1000, Some("현금".into()), None).await.unwrap();
-        create(&db, wi_id, 2000, Some("카드".into()), None).await.unwrap();
+        create(&db, wi_id, 1000, Some("현금".into()), None)
+            .await
+            .unwrap();
+        create(&db, wi_id, 2000, Some("카드".into()), None)
+            .await
+            .unwrap();
 
         let payments = list(&db, wi_id).await.unwrap();
         assert_eq!(payments.len(), 2);

@@ -58,8 +58,12 @@ pub async fn update_price_item(
     id: i32,
     data: UpdatePriceItem,
 ) -> CmdResult<price_item::Model> {
-    if let Some(ref name) = data.name { require_non_empty(name, "품목 이름")?; }
-    if let Some(price) = data.default_price { require_non_negative(price, "기본 단가")?; }
+    if let Some(ref name) = data.name {
+        require_non_empty(name, "품목 이름")?;
+    }
+    if let Some(price) = data.default_price {
+        require_non_negative(price, "기본 단가")?;
+    }
     let existing = price_item::Entity::find_by_id(id)
         .one(db.inner())
         .await?

@@ -22,8 +22,8 @@ pub struct Model {
     /// 고객 FK
     pub customer_id: i32,
     pub status: WorkItemStatus,
-    /// 접수 요약 (예: "와이셔츠 외 2건")
-    pub description: String,
+    /// 접수 요약 (예: "와이셔츠 외 2건"). details에서 자동 생성, 수동 수정 가능.
+    pub description: Option<String>,
     /// 총 금액 (원)
     pub price: i64,
     /// 결제 완료 금액 (payments 합계 캐시)

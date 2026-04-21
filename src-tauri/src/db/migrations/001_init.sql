@@ -21,6 +21,15 @@ CREATE TABLE IF NOT EXISTS price_items (
 CREATE INDEX IF NOT EXISTS idx_price_items_category ON price_items(category_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_price_items_cat_name ON price_items(category_id, name);
 
+-- 전역 추가 옵션 (예: 특수 오염제거 +2000원, 풀먹임 +1000원)
+CREATE TABLE IF NOT EXISTS price_options (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name       TEXT NOT NULL,
+  price      INTEGER NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_price_options_name ON price_options(name);
+
 
 -- ==============================================================================
 -- 2. 고객 및 영업(접수) 영역
@@ -43,7 +52,7 @@ CREATE TABLE IF NOT EXISTS work_items (
   id               INTEGER PRIMARY KEY AUTOINCREMENT,
   customer_id      INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
   status           TEXT    NOT NULL DEFAULT 'Received',
-  description      TEXT    NOT NULL,
+  description      TEXT,            -- 자동 생성 (details 기반), 수동 수정 가능
   price            INTEGER NOT NULL DEFAULT 0,
   paid_amount      INTEGER NOT NULL DEFAULT 0,
   note             TEXT,
@@ -61,6 +70,7 @@ CREATE INDEX IF NOT EXISTS idx_work_items_received ON work_items(received_at);
 CREATE TABLE IF NOT EXISTS work_item_details (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   work_item_id  INTEGER NOT NULL REFERENCES work_items(id) ON DELETE CASCADE,
+  price_item_id INTEGER REFERENCES price_items(id) ON DELETE SET NULL, -- 통계용 FK (직접입력시 NULL)
   item_name     TEXT    NOT NULL,
   unit_price    INTEGER NOT NULL,
   quantity      INTEGER NOT NULL DEFAULT 1,

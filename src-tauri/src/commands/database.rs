@@ -86,8 +86,8 @@ pub async fn list_backups(app: tauri::AppHandle) -> DbResult<Vec<BackupInfo>> {
             let metadata = std::fs::metadata(&path).ok()?;
             let filename = path.file_name()?.to_string_lossy().into_owned();
             // 파일명에서 날짜 파싱: sidekick_YYYYMMDD_HHMMSS.db
-            let created_at = parse_timestamp_from_filename(&filename)
-                .unwrap_or_else(|| "알 수 없음".to_owned());
+            let created_at =
+                parse_timestamp_from_filename(&filename).unwrap_or_else(|| "알 수 없음".to_owned());
             Some(BackupInfo {
                 filename,
                 created_at,

@@ -10,6 +10,8 @@ pub struct Model {
     pub id: i32,
     /// 접수 FK
     pub work_item_id: i32,
+    /// 품목 FK (통계용, 직접 입력시 None)
+    pub price_item_id: Option<i32>,
     /// 품목명 (접수 시점 스냅샷)
     pub item_name: String,
     /// 단가 (원, 접수 시점 스냅샷)

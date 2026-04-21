@@ -23,13 +23,21 @@ export interface PriceItem {
   sortOrder: number;
 }
 
+export interface PriceOption {
+  id: number;
+  name: string;
+  price: number;
+  sortOrder: number;
+}
+
 export type WorkItemStatus = "Received" | "Completed" | "PickedUp";
 
 export interface WorkItem {
   id: number;
   customerId: number;
   status: WorkItemStatus;
-  description: string;
+  /** details에서 자동 생성, 수동 수정 가능 */
+  description: string | null;
   price: number;
   paidAmount: number;
   note: string | null;
@@ -43,6 +51,8 @@ export interface WorkItem {
 export interface WorkItemDetail {
   id: number;
   workItemId: number;
+  /** 통계용 FK. 직접 입력시 null */
+  priceItemId: number | null;
   itemName: string;
   unitPrice: number;
   quantity: number;
