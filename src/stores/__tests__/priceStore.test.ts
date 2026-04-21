@@ -71,6 +71,16 @@ describe("priceStore", () => {
     });
   });
 
+  describe("createCategory", () => {
+    it("생성 후 카테고리 목록에 추가", async () => {
+      mockCatCreate.mockResolvedValue(cat1);
+      usePriceStore.setState({ categories: [cat2] });
+
+      await usePriceStore.getState().createCategory({ name: "상의", sortOrder: 1 });
+      expect(usePriceStore.getState().categories).toContainEqual(cat1);
+    });
+  });
+
   describe("deleteCategory", () => {
     it("삭제된 카테고리가 선택 중이면 선택 해제", async () => {
       mockCatDelete.mockResolvedValue(undefined);
@@ -79,6 +89,17 @@ describe("priceStore", () => {
       await usePriceStore.getState().deleteCategory(1);
       expect(usePriceStore.getState().categories).toEqual([cat2]);
       expect(usePriceStore.getState().selectedCategoryId).toBeNull();
+    });
+  });
+
+  describe("deletePriceItem", () => {
+    it("삭제 후 목록에서 제거", async () => {
+      mockPriceDelete.mockResolvedValue(undefined);
+      const price2: PriceItem = { id: 2, categoryId: 1, name: "바지", defaultPrice: 4000, sortOrder: 2 };
+      usePriceStore.setState({ priceItems: [price1, price2] });
+
+      await usePriceStore.getState().deletePriceItem(1);
+      expect(usePriceStore.getState().priceItems).toEqual([price2]);
     });
   });
 

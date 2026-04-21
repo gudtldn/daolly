@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { useCartStore, type CartItem } from "@/stores/cartStore";
+import { useCartStore } from "@/stores/cartStore";
 
 vi.mock("@/bindings", () => ({
   workItemApi: {
