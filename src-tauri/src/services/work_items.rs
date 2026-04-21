@@ -329,12 +329,14 @@ mod tests {
 
         let details = vec![
             DetailInput {
+                price_item_id: None,
                 item_name: "와이셔츠".into(),
                 unit_price: 3000,
                 quantity: 2,
                 options_memo: None,
             },
             DetailInput {
+                price_item_id: None,
                 item_name: "바지".into(),
                 unit_price: 4000,
                 quantity: 1,
@@ -345,7 +347,7 @@ mod tests {
         let wi = create(
             &db,
             cid,
-            "와이셔츠 외 1건".into(),
+            Some("와이셔츠 외 1건".to_owned()),
             10000,
             None,
             None,
@@ -367,7 +369,7 @@ mod tests {
     async fn update_status_sets_completed_at() {
         let db = setup_test_db().await.unwrap();
         let cid = create_test_customer(&db).await;
-        let wi = create(&db, cid, "테스트".into(), 1000, None, None, vec![])
+        let wi = create(&db, cid, Some("테스트".to_owned()), 1000, None, None, vec![])
             .await
             .unwrap();
 
@@ -383,24 +385,27 @@ mod tests {
         let db = setup_test_db().await.unwrap();
         let cid = create_test_customer(&db).await;
         let details = vec![DetailInput {
+            price_item_id: None,
             item_name: "A".into(),
             unit_price: 1000,
             quantity: 1,
             options_memo: None,
         }];
-        let wi = create(&db, cid, "테스트".into(), 1000, None, None, details)
+        let wi = create(&db, cid, Some("테스트".to_owned()), 1000, None, None, details)
             .await
             .unwrap();
 
         // 기존 1개 -> 새로 2개로 교체
         let new_details = vec![
             DetailInput {
+                price_item_id: None,
                 item_name: "B".into(),
                 unit_price: 2000,
                 quantity: 1,
                 options_memo: None,
             },
             DetailInput {
+                price_item_id: None,
                 item_name: "C".into(),
                 unit_price: 3000,
                 quantity: 1,
@@ -416,10 +421,10 @@ mod tests {
     async fn list_filters_by_status() {
         let db = setup_test_db().await.unwrap();
         let cid = create_test_customer(&db).await;
-        let wi = create(&db, cid, "접수".into(), 1000, None, None, vec![])
+        let wi = create(&db, cid, Some("접수".to_owned()), 1000, None, None, vec![])
             .await
             .unwrap();
-        create(&db, cid, "접수2".into(), 2000, None, None, vec![])
+        create(&db, cid, Some("접수2".to_owned()), 2000, None, None, vec![])
             .await
             .unwrap();
         update_status(&db, wi, WorkItemStatus::Completed)
@@ -430,6 +435,6 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(received.len(), 1);
-        assert_eq!(received[0].description, "접수2");
+        assert_eq!(received[0].description, Some("접수2".to_owned()));
     }
 }

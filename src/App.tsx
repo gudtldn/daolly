@@ -1,4 +1,5 @@
 import { MemoryRouter, Routes, Route, Navigate } from "react-router";
+import { Toaster } from "sonner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GlobalDialog } from "@/components/GlobalDialog";
 import { Layout } from "@/components/Layout";
@@ -35,6 +36,7 @@ function App() {
     <ErrorBoundary>
       <AppContent />
       <GlobalDialog />
+      <Toaster position="top-center" richColors />
     </ErrorBoundary>
   );
 }

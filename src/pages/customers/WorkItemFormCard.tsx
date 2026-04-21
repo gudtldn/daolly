@@ -71,7 +71,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
   useEffect(() => {
     if (!open) return;
     if (mode === "edit" && workItem) {
-      setDescription(workItem.description);
+      setDescription(workItem.description ?? "");
       setNote(workItem.note ?? "");
       setStatus(workItem.status);
       setReceivedAt(toLocalInput(workItem.receivedAt));

@@ -1,9 +1,12 @@
 import { create } from "zustand";
 import type { WorkItem, DetailInput } from "@/types";
-import { workItemApi } from "@/bindings";
+import { workItemApi, paymentApi } from "@/bindings";
+
+export type PaymentMethod = "card" | "cash" | "transfer" | "credit";
 
 export interface CartItem {
-  priceItemId: number;
+  /** null = 직접 입력 */
+  priceItemId: number | null;
   name: string;
   unitPrice: number;
   quantity: number;
@@ -17,12 +20,12 @@ interface CartState {
 
 interface CartActions {
   setCustomer: (id: number | null) => void;
-  addItem: (item: Omit<CartItem, "quantity" | "optionsMemo">) => void;
+  addItem: (item: Omit<CartItem, "quantity" | "optionsMemo"> & { optionsMemo?: string }) => void;
   removeItem: (index: number) => void;
   updateQuantity: (index: number, quantity: number) => void;
   updateOptionsMemo: (index: number, memo: string) => void;
   clear: () => void;
-  submit: (description: string, note?: string) => Promise<WorkItem>;
+  submit: (method: PaymentMethod, note?: string) => Promise<WorkItem>;
   totalPrice: () => number;
 }
 
@@ -36,14 +39,19 @@ export const useCartStore = create<CartStore>((set, get) => ({
 
   addItem: (item) => {
     set((s) => {
-      // 동일 품목이면 수량 +1
-      const existing = s.items.findIndex((i) => i.priceItemId === item.priceItemId);
+      // 직접 입력(null)이면 항상 새 항목. 동일 priceItemId + optionsMemo면 수량 +1
+      const existing =
+        item.priceItemId !== null
+          ? s.items.findIndex(
+              (i) => i.priceItemId === item.priceItemId && i.optionsMemo === (item.optionsMemo ?? ""),
+            )
+          : -1;
       if (existing >= 0) {
         const updated = [...s.items];
         updated[existing] = { ...updated[existing], quantity: updated[existing].quantity + 1 };
         return { items: updated };
       }
-      return { items: [...s.items, { ...item, quantity: 1, optionsMemo: "" }] };
+      return { items: [...s.items, { ...item, quantity: 1, optionsMemo: item.optionsMemo ?? "" }] };
     });
   },
 
@@ -73,12 +81,13 @@ export const useCartStore = create<CartStore>((set, get) => ({
     return get().items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
   },
 
-  submit: async (description, note) => {
+  submit: async (method, note) => {
     const { customerId, items } = get();
     if (!customerId) throw new Error("Customer is not selected");
     if (items.length === 0) throw new Error("Cart is empty");
 
     const details: DetailInput[] = items.map((item) => ({
+      priceItemId: item.priceItemId,
       itemName: item.name,
       unitPrice: item.unitPrice,
       quantity: item.quantity,
@@ -89,11 +98,19 @@ export const useCartStore = create<CartStore>((set, get) => ({
 
     const workItem = await workItemApi.create({
       customerId,
-      description,
       price,
       note: note || null,
       details,
     });
+
+    // 외상(credit)이면 결제 기록 생성 안 함
+    if (method !== "credit") {
+      await paymentApi.create({
+        workItemId: workItem.id,
+        amount: price,
+        method,
+      });
+    }
 
     get().clear();
     return workItem;

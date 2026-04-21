@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from "react";
+import { useLocation } from "react-router";
 import {
   Search,
   Plus,
@@ -588,6 +589,7 @@ export function CustomersPage() {
   const { customers, selectedCustomer, select, load, create, update, delete: deleteCustomer, loadUnpaid } = useCustomerStore();
   const { workItems, setFilter } = useWorkItemStore();
   const { showConfirm } = useDialogStore();
+  const location = useLocation();
   const [activePanel, setActivePanel] = useState<"customers" | "workItems">("customers");
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
@@ -702,12 +704,22 @@ export function CustomersPage() {
 
   // 초기 로드
   useEffect(() => {
+    const focusId: number | undefined = (location.state as { focusCustomerId?: number } | null)?.focusCustomerId;
     load().then(() => {
-      // selectedCustomer가 없을 때만 첫 번째 고객 자동 선택 (POS 등 외부 진입 시 기존 선택 유지)
       const { customers: loaded, selectedCustomer: current } = useCustomerStore.getState();
-      if (!current && loaded.length > 0) select(loaded[0]);
-      const target = useCustomerStore.getState().selectedCustomer;
-      if (target) setScrollToCustomerId(target.id);
+      if (focusId) {
+        // POS에서 '지난 접수 확인'으로 진입한 경우 해당 고객 포커싱
+        const target = loaded.find((c) => c.id === focusId);
+        if (target) {
+          select(target);
+          setScrollToCustomerId(target.id);
+          setTimeout(() => setScrollToCustomerId(null), 100);
+        }
+      } else if (!current && loaded.length > 0) {
+        select(loaded[0]);
+        const t = useCustomerStore.getState().selectedCustomer;
+        if (t) setScrollToCustomerId(t.id);
+      }
       useCustomerStore.getState().loadUnpaid();
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

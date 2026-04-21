@@ -137,11 +137,12 @@ mod tests {
         let wi = work_items::create(
             db,
             c.id,
-            "접수".into(),
+            Some("접수".to_owned()),
             10000,
             None,
             None,
             vec![DetailInput {
+                price_item_id: None,
                 item_name: "품목".into(),
                 unit_price: 10000,
                 quantity: 1,
