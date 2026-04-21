@@ -11,7 +11,7 @@ pub struct Model {
     /// 접수 FK
     pub work_item_id: i32,
     /// 결제 금액 (원)
-    pub amount: i32,
+    pub amount: i64,
     /// 결제 수단 (예: "현금", "카드", "계좌이체")
     pub method: Option<String>,
     /// 결제 일시

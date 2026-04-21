@@ -15,7 +15,7 @@ pub struct CreateWorkItem {
     pub customer_id: i32,
     pub description: String,
     /// 총액
-    pub price: i32,
+    pub price: i64,
     pub note: Option<String>,
     /// 접수 일시 (RFC3339). None이면 현재 시각 사용
     pub received_at: Option<String>,
@@ -29,7 +29,7 @@ pub struct CreateWorkItem {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateWorkItem {
     pub description: Option<String>,
-    pub price: Option<i32>,
+    pub price: Option<i64>,
     pub note: Option<String>,
     /// 접수 일시 변경
     pub received_at: Option<String>,

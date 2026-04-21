@@ -12,7 +12,7 @@ use crate::db::entities::{payment, work_item, work_item::WorkItemStatus, work_it
 pub struct DetailInput {
     pub item_name: String,
     /// 접수 시점 단가
-    pub unit_price: i32,
+    pub unit_price: i64,
     pub quantity: i32,
     /// 옵션 메모
     pub options_memo: Option<String>,
@@ -74,7 +74,7 @@ pub async fn create(
     db: &DatabaseConnection,
     customer_id: i32,
     description: String,
-    price: i32,
+    price: i64,
     note: Option<String>,
     received_at: Option<String>,
     details: Vec<DetailInput>,
@@ -131,7 +131,7 @@ pub async fn update(
     db: &DatabaseConnection,
     existing: work_item::Model,
     description: Option<String>,
-    price: Option<i32>,
+    price: Option<i64>,
     note: Option<String>,
     received_at: Option<String>,
     picked_up_at: Option<String>,

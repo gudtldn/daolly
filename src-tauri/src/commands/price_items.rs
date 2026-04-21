@@ -13,7 +13,7 @@ pub struct CreatePriceItem {
     pub category_id: i32,
     pub name: String,
     /// 기본 단가
-    pub default_price: i32,
+    pub default_price: i64,
     pub sort_order: i32,
 }
 
@@ -23,7 +23,7 @@ pub struct CreatePriceItem {
 #[serde(rename_all = "camelCase")]
 pub struct UpdatePriceItem {
     pub name: Option<String>,
-    pub default_price: Option<i32>,
+    pub default_price: Option<i64>,
     pub sort_order: Option<i32>,
 }
 

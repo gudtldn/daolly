@@ -13,7 +13,7 @@ pub struct Model {
     /// 품목명 (접수 시점 스냅샷)
     pub item_name: String,
     /// 단가 (원, 접수 시점 스냅샷)
-    pub unit_price: i32,
+    pub unit_price: i64,
     /// 수량 (default 1)
     pub quantity: i32,
     /// 옵션 메모 (예: "특수오염제거 (+2000)")

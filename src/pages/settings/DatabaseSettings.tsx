@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Database, FolderOpen, DownloadCloud, UploadCloud, Trash2, AlertTriangle } from "lucide-react";
+import { Database, FolderOpen, DownloadCloud, UploadCloud, AlertTriangle } from "lucide-react";
+import { useDialogStore } from "@/stores/dialogStore";
 
 interface BackupInfo {
   filename: string;
@@ -19,9 +20,9 @@ export function DatabaseSettings() {
   const [backups, setBackups] = useState<BackupInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [backupLoading, setBackupLoading] = useState(false);
-  const [restoreTarget, setRestoreTarget] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const { showCustom } = useDialogStore();
 
   useEffect(() => {
     invoke<string>("get_db_path")
@@ -65,8 +66,26 @@ export function DatabaseSettings() {
     }
   };
 
-  const handleRestore = async (filename: string) => {
-    setRestoreTarget(null);
+  const handleRestoreClick = async (filename: string) => {
+    const confirmed = await showCustom({
+      title: "복원 확인",
+      isDestructive: false,
+      confirmText: "복원 및 재시작",
+      cancelText: "취소",
+      customContent: (
+        <div>
+          <p className="text-sm text-on-surface mb-2">다음 백업 파일로 복원하시겠습니까?</p>
+          <p className="text-xs text-on-surface-muted font-mono bg-surface-elevated px-3 py-2 rounded mb-4 break-all">
+            {filename}
+          </p>
+          <div className="flex items-start gap-2 bg-warning-50 dark:bg-warning-950 border border-warning-200 dark:border-warning-800 rounded-lg px-4 py-3 text-sm text-warning-700 dark:text-warning-300">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>현재 데이터가 모두 교체됩니다. 복원 후 앱이 자동으로 재시작됩니다.</span>
+          </div>
+        </div>
+      ),
+    });
+    if (!confirmed) return;
     setError("");
     try {
       await invoke("restore_db", { filename });
@@ -146,24 +165,28 @@ export function DatabaseSettings() {
                     <th className="w-20"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border-default">
-                  {backups.map((b) => (
-                    <tr key={b.filename}>
-                      <td className="px-3 py-2 text-on-surface">{b.createdAt}</td>
-                      <td className="px-3 py-2 text-right text-on-surface-muted">{formatBytes(b.sizeBytes)}</td>
-                      <td className="px-2 py-2 text-center">
+              </table>
+              <div className="max-h-[240px] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <tbody className="divide-y divide-border-default">
+                    {backups.map((b) => (
+                      <tr key={b.filename}>
+                        <td className="px-3 py-2 text-on-surface">{b.createdAt}</td>
+                        <td className="px-3 py-2 text-right text-on-surface-muted">{formatBytes(b.sizeBytes)}</td>
+                        <td className="px-2 py-2 text-center">
                         <button
-                          onClick={() => setRestoreTarget(b.filename)}
+                          onClick={() => handleRestoreClick(b.filename)}
                           className="flex items-center gap-1 px-2 py-1 text-xs border border-border-default rounded hover:bg-surface-elevated transition-colors cursor-pointer mx-auto"
                         >
                           <UploadCloud className="w-3.5 h-3.5" />
                           복원
                         </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </section>
@@ -176,42 +199,6 @@ export function DatabaseSettings() {
           </p>
         </section>
       </div>
-
-      {/* 복원 확인 다이얼로그 */}
-      {restoreTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-surface-base rounded-xl border border-border-default p-6 w-[400px] shadow-xl">
-            <div className="flex items-center gap-3 mb-4">
-              <AlertTriangle className="w-6 h-6 text-warning-500 shrink-0" />
-              <h4 className="text-base font-bold text-on-surface">복원 확인</h4>
-            </div>
-            <p className="text-sm text-on-surface mb-2">
-              다음 백업 파일로 복원하시겠습니까?
-            </p>
-            <p className="text-xs text-on-surface-muted font-mono bg-surface-elevated px-3 py-2 rounded mb-4 break-all">
-              {restoreTarget}
-            </p>
-            <div className="bg-warning-50 dark:bg-warning-950 border border-warning-200 dark:border-warning-800 rounded-lg px-4 py-3 text-sm text-warning-700 dark:text-warning-300 mb-5">
-              현재 데이터가 모두 교체됩니다. 복원 후 앱이 자동으로 재시작됩니다.
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setRestoreTarget(null)}
-                className="px-4 py-2 text-sm border border-border-default rounded-lg hover:bg-surface-elevated transition-colors cursor-pointer"
-              >
-                취소
-              </button>
-              <button
-                onClick={() => handleRestore(restoreTarget)}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-warning-600 rounded-lg hover:bg-warning-700 transition-colors cursor-pointer"
-              >
-                <UploadCloud className="w-4 h-4" />
-                복원 및 재시작
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

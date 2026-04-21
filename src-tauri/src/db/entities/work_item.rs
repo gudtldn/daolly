@@ -25,9 +25,9 @@ pub struct Model {
     /// 접수 요약 (예: "와이셔츠 외 2건")
     pub description: String,
     /// 총 금액 (원)
-    pub price: i32,
+    pub price: i64,
     /// 결제 완료 금액 (payments 합계 캐시)
-    pub paid_amount: i32,
+    pub paid_amount: i64,
     /// 특이사항 메모
     pub note: Option<String>,
     /// 접수 일시

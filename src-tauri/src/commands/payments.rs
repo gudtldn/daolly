@@ -12,7 +12,7 @@ use crate::services;
 pub struct CreatePayment {
     pub work_item_id: i32,
     /// 결제 금액 (양수)
-    pub amount: i32,
+    pub amount: i64,
     /// 결제 수단
     pub method: Option<String>,
     /// 결제 일시 (ISO 8601). None이면 현재 시각 사용
@@ -23,7 +23,7 @@ pub struct CreatePayment {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdatePayment {
-    pub amount: i32,
+    pub amount: i64,
     pub method: Option<String>,
     pub paid_at: Option<String>,
 }

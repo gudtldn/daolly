@@ -7,6 +7,9 @@ import {
   Users,
   ClipboardList,
   ChevronDown,
+  ChevronUp,
+  ChevronsUpDown,
+  X,
 } from "lucide-react";
 import type { Customer, WorkItemFull, WorkItemDetail, WorkItemStatus, CreateWorkItem, UpdateWorkItem, DetailInput, CreateCustomer, UpdateCustomer } from "@/types";
 import { useCustomerStore } from "@/stores/customerStore";
@@ -103,15 +106,25 @@ function CustomerListPanel({
   onAdd,
   onEdit,
   onDelete,
+  scrollToId,
 }: {
   selectedId: number | null;
   onSelect: (c: Customer) => void;
   onAdd: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  scrollToId: number | null;
 }) {
   const { customers, unpaidMap } = useCustomerStore();
   const [searchKeyword, setSearchKeyword] = useState("");
+  const itemRefs = useRef<Map<number, HTMLLIElement>>(new Map());
+
+  // scrollToId 변경 시 해당 항목으로 스크롤
+  useEffect(() => {
+    if (scrollToId == null) return;
+    const el = itemRefs.current.get(scrollToId);
+    if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [scrollToId]);
 
   // 클라이언트 사이드 필터 (즉시 반응)
   const filtered = useMemo(() => {
@@ -144,8 +157,16 @@ function CustomerListPanel({
             placeholder="이름 / 전화번호 검색"
             value={searchKeyword}
             onChange={(e) => setSearchKeyword(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 border border-border-default rounded text-sm bg-surface-card text-on-surface placeholder:text-on-surface-muted focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+            className="w-full pl-9 pr-8 py-2 border border-border-default rounded text-sm bg-surface-card text-on-surface placeholder:text-on-surface-muted focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
           />
+          {searchKeyword && (
+            <button
+              onClick={() => setSearchKeyword("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-muted hover:text-on-surface transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
         <button
           onClick={onAdd}
@@ -173,6 +194,10 @@ function CustomerListPanel({
           return (
             <li
               key={c.id}
+              ref={(el) => {
+                if (el) itemRefs.current.set(c.id, el);
+                else itemRefs.current.delete(c.id);
+              }}
               onClick={() => onSelect(c)}
               className={`p-4 cursor-pointer transition-colors ${
                 isSelected
@@ -248,6 +273,41 @@ function WorkItemListPanel({
   detailsRefreshId: { id: number; nonce: number } | null;
 }) {
   const { workItems } = useWorkItemStore();
+
+  // 컬럼 정렬 상태: null -> asc -> desc -> null (3-state)
+  type SortCol = "status" | "receivedAt" | "pickedUpAt" | "description" | "price";
+  const [sortCol, setSortCol] = useState<SortCol | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc" | null>(null);
+
+  const handleSortClick = (col: SortCol) => {
+    if (sortCol !== col) {
+      setSortCol(col);
+      setSortDir("asc");
+    } else if (sortDir === "asc") {
+      setSortDir("desc");
+    } else if (sortDir === "desc") {
+      setSortCol(null);
+      setSortDir(null);
+    }
+  };
+
+  const sortedItems = useMemo(() => {
+    if (!sortCol || !sortDir) return workItems;
+    return [...workItems].sort((a, b) => {
+      let av: string | number | null;
+      let bv: string | number | null;
+      if (sortCol === "status") { av = a.status; bv = b.status; }
+      else if (sortCol === "receivedAt") { av = a.receivedAt; bv = b.receivedAt; }
+      else if (sortCol === "pickedUpAt") { av = a.pickedUpAt; bv = b.pickedUpAt; }
+      else if (sortCol === "description") { av = a.description; bv = b.description; }
+      else { av = a.price; bv = b.price; }
+      if (av === null || av === undefined) return sortDir === "asc" ? 1 : -1;
+      if (bv === null || bv === undefined) return sortDir === "asc" ? -1 : 1;
+      if (av < bv) return sortDir === "asc" ? -1 : 1;
+      if (av > bv) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [workItems, sortCol, sortDir]);
   // 아코디언 상세: 열 때 lazy load, 로컬 캐시
   const [detailsCache, setDetailsCache] = useState<Record<number, WorkItemDetail[]>>({});
 
@@ -361,17 +421,31 @@ function WorkItemListPanel({
         <table className="w-full text-sm text-left">
           <thead className="bg-surface-elevated sticky top-0 border-b border-border-default text-on-surface-muted z-10">
             <tr>
-              <th className="px-3 py-3 font-medium text-center w-20">상태</th>
-              <th className="px-2 py-3 font-medium w-14">접수</th>
-              <th className="px-2 py-3 font-medium w-14">수령</th>
-              <th className="px-3 py-3 font-medium">작업내용</th>
-              <th className="px-3 py-3 font-medium w-24">결제</th>
+              {(["status", "receivedAt", "pickedUpAt", "description", "price"] as const).map((col) => {
+                const labels: Record<string, string> = { status: "상태", receivedAt: "접수", pickedUpAt: "수령", description: "작업내용", price: "결제" };
+                const widths: Record<string, string> = { status: "px-3 py-3 text-center w-20", receivedAt: "px-2 py-3 w-14", pickedUpAt: "px-2 py-3 w-14", description: "px-3 py-3", price: "px-3 py-3 w-24" };
+                const isActive = sortCol === col;
+                return (
+                  <th
+                    key={col}
+                    onClick={() => handleSortClick(col)}
+                    className={`${widths[col]} font-medium cursor-pointer select-none hover:text-on-surface transition-colors group`}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      {labels[col]}
+                      {isActive && sortDir === "asc" && <ChevronUp className="w-3.5 h-3.5 text-primary-500" />}
+                      {isActive && sortDir === "desc" && <ChevronDown className="w-3.5 h-3.5 text-primary-500" />}
+                      {!isActive && <ChevronsUpDown className="w-3.5 h-3.5 opacity-0 group-hover:opacity-40 transition-opacity" />}
+                    </span>
+                  </th>
+                );
+              })}
               <th className="px-3 py-3 font-medium w-28">메모</th>
               <th className="w-10"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border-default">
-            {workItems.map((item, itemIdx) => {
+            {sortedItems.map((item, itemIdx) => {
               const isUnpaid = item.price > item.paidAmount;
               const isExpanded = expandedId === item.id;
               const isHighlighted = isActive && highlightedIdx === itemIdx;
@@ -483,6 +557,7 @@ export function CustomersPage() {
   // Floating Card 상태
   const [cardOpen, setCardOpen] = useState(false);
   const [cardMode, setCardMode] = useState<"create" | "edit">("create");
+  const [scrollToCustomerId, setScrollToCustomerId] = useState<number | null>(null);
 
   const handleAdd = () => { setCardMode("create"); setCardOpen(true); };
   const handleEdit = () => { if (!selectedCustomer) return; setCardMode("edit"); setCardOpen(true); };
@@ -506,6 +581,7 @@ export function CustomersPage() {
     if (cardMode === "create") {
       const created = await create(data as CreateCustomer);
       select(created);
+      setScrollToCustomerId(created.id);
     } else if (selectedCustomer) {
       await update(selectedCustomer.id, data as UpdateCustomer);
     }
@@ -663,6 +739,7 @@ export function CustomersPage() {
         onAdd={handleAdd}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        scrollToId={scrollToCustomerId}
       />
       <WorkItemListPanel
         customer={selectedCustomer}

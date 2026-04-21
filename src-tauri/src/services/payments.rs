@@ -18,7 +18,7 @@ pub async fn list(
 pub async fn create(
     db: &DatabaseConnection,
     work_item_id: i32,
-    amount: i32,
+    amount: i64,
     method: Option<String>,
     paid_at: Option<String>,
 ) -> Result<payment::Model, DbErr> {
@@ -54,7 +54,7 @@ pub async fn create(
 pub async fn update(
     db: &DatabaseConnection,
     id: i32,
-    amount: i32,
+    amount: i64,
     method: Option<String>,
     paid_at: Option<String>,
 ) -> Result<payment::Model, DbErr> {
@@ -114,8 +114,7 @@ async fn sync_paid_amount(tx: &DatabaseTransaction, work_item_id: i32) -> Result
         .await?
         .flatten();
 
-    let total = i32::try_from(sum.unwrap_or(0))
-        .map_err(|_| DbErr::Custom("paid_amount overflow: sum exceeds i32 range".to_owned()))?;
+    let total = sum.unwrap_or(0);
 
     let wi = work_item::Entity::find_by_id(work_item_id)
         .one(tx)

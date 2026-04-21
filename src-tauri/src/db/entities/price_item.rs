@@ -13,7 +13,7 @@ pub struct Model {
     /// 품목명 (카테고리 내 UNIQUE)
     pub name: String,
     /// 기본 단가 (원)
-    pub default_price: i32,
+    pub default_price: i64,
     /// UI 표시 순서
     pub sort_order: i32,
 }

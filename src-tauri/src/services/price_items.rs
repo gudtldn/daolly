@@ -22,7 +22,7 @@ pub async fn create(
     db: &DatabaseConnection,
     category_id: i32,
     name: String,
-    default_price: i32,
+    default_price: i64,
     sort_order: i32,
 ) -> Result<price_item::Model, DbErr> {
     let name = name.trim().to_owned();
@@ -47,7 +47,7 @@ pub async fn update(
     db: &DatabaseConnection,
     existing: price_item::Model,
     name: Option<String>,
-    default_price: Option<i32>,
+    default_price: Option<i64>,
     sort_order: Option<i32>,
 ) -> Result<price_item::Model, DbErr> {
     let mut active: price_item::ActiveModel = existing.into();
