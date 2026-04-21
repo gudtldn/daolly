@@ -9,6 +9,10 @@ vi.mock("@tauri-apps/api/app", () => ({
   getVersion: vi.fn().mockResolvedValue("0.1.0"),
 }));
 
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn().mockResolvedValue(""),
+}));
+
 describe("SettingsPage", () => {
   it("환경 설정 제목을 렌더링한다", () => {
     renderWithRouter(<SettingsPage />);
@@ -18,6 +22,7 @@ describe("SettingsPage", () => {
   it("카테고리 목록을 렌더링한다", () => {
     renderWithRouter(<SettingsPage />);
     expect(screen.getByRole("button", { name: "일반 설정" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "데이터 관리" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "앱 정보" })).toBeInTheDocument();
   });
 
@@ -28,7 +33,6 @@ describe("SettingsPage", () => {
     expect(generalBtn.className).toContain("bg-primary-600");
     // 우측에 일반 설정 콘텐츠 표시
     expect(screen.getByText("테마")).toBeInTheDocument();
-    expect(screen.getByText("데이터 관리")).toBeInTheDocument();
   });
 
   it("앱 정보 카테고리를 클릭하면 콘텐츠가 변경된다", async () => {

@@ -19,6 +19,14 @@ pub fn run() {
                 .app_data_dir()
                 .expect("failed to resolve app data directory");
 
+            // pending restore가 있으면 DB 초기화 전에 적용
+            let pending = app_data_dir.join("sidekick.db.pending_restore");
+            if pending.exists() {
+                let db_path = app_data_dir.join("sidekick.db");
+                std::fs::rename(&pending, &db_path)
+                    .expect("failed to apply pending restore");
+            }
+
             // Tauri setup은 sync 클로저이므로 block_on으로 async DB 초기화 실행
             let db: DatabaseConnection = tauri::async_runtime::block_on(db::init(app_data_dir))
                 .expect("failed to initialize database");
@@ -58,6 +66,12 @@ pub fn run() {
             commands::payments::create_payment,
             commands::payments::update_payment,
             commands::payments::delete_payment,
+            // database
+            commands::database::open_db_folder,
+            commands::database::get_db_path,
+            commands::database::backup_db,
+            commands::database::list_backups,
+            commands::database::restore_db,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

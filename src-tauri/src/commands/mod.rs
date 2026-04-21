@@ -4,6 +4,7 @@
 
 pub mod categories;
 pub mod customers;
+pub mod database;
 pub mod payments;
 pub mod price_items;
 pub mod work_items;

@@ -1,4 +1,4 @@
-import { Wrench, Sun, Moon, Monitor, Type, Download, Upload } from "lucide-react";
+import { Wrench, Sun, Moon, Monitor, Type } from "lucide-react";
 import { useSettingsStore } from "@/stores/settingsStore";
 import type { AppSettings, FontSize } from "@/types/settings";
 
@@ -74,28 +74,6 @@ export function GeneralSettings() {
               </button>
             ))}
           </div>
-        </section>
-
-        {/* 데이터 관리 */}
-        <section className="bg-surface-card rounded-lg border border-border-default p-5">
-          <h4 className="text-sm font-semibold text-on-surface mb-3">데이터 관리</h4>
-          <div className="flex gap-3">
-            <button
-              disabled
-              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border-default text-sm text-on-surface-muted opacity-50 cursor-not-allowed"
-            >
-              <Download className="w-4 h-4" />
-              백업
-            </button>
-            <button
-              disabled
-              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border-default text-sm text-on-surface-muted opacity-50 cursor-not-allowed"
-            >
-              <Upload className="w-4 h-4" />
-              복원
-            </button>
-          </div>
-          <p className="text-xs text-on-surface-muted mt-2">데이터베이스 구축 후 사용 가능합니다</p>
         </section>
       </div>
     </div>
