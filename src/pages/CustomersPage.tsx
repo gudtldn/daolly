@@ -232,6 +232,7 @@ function WorkItemListPanel({
   onChangeStatus,
   onPayment,
   selectedWorkItemId,
+  detailsRefreshId,
 }: {
   customer: Customer | null;
   expandedId: number | null;
@@ -244,10 +245,31 @@ function WorkItemListPanel({
   onChangeStatus: (id: number, status: WorkItemStatus) => void;
   onPayment: (id: number) => void;
   selectedWorkItemId: number | null;
+  detailsRefreshId: { id: number; nonce: number } | null;
 }) {
   const { workItems } = useWorkItemStore();
   // 아코디언 상세: 열 때 lazy load, 로컬 캐시
   const [detailsCache, setDetailsCache] = useState<Record<number, WorkItemDetail[]>>({});
+
+  // 수정 완료 시 해당 캐시 항목 무효화 -> 다음 열기 때 재로드
+  // nonce를 포함한 객체를 사용해 같은 ID를 연속 저장해도 effect 항상 재실행
+  // 현재 열려있는 행이면 즉시 재조회
+  useEffect(() => {
+    if (detailsRefreshId === null) return;
+    const { id } = detailsRefreshId;
+    setDetailsCache((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    if (expandedId === id) {
+      workItemApi.get(id).then((full) => {
+        setDetailsCache((prev) => ({ ...prev, [id]: full.details }));
+      }).catch(() => {
+        setDetailsCache((prev) => ({ ...prev, [id]: [] }));
+      });
+    }
+  }, [detailsRefreshId]);
 
   const handleToggle = useCallback(async (itemId: number) => {
     if (expandedId === itemId) {
@@ -523,6 +545,7 @@ export function CustomersPage() {
 
   // 미수금 뱃지 클릭 -> 결제 탭으로 열기
   const [wiInitialTab, setWiInitialTab] = useState<"info" | "payment">("info");
+  const [detailsRefreshId, setDetailsRefreshId] = useState<{ id: number; nonce: number } | null>(null);
 
   const handleWiPayment = async (id: number) => {
     setWiCardMode("edit");
@@ -558,6 +581,7 @@ export function CustomersPage() {
       if (details) {
         await workItemApi.replaceDetails(editingWorkItem.id, details);
       }
+      setDetailsRefreshId({ id: editingWorkItem.id, nonce: Date.now() });
     }
     loadUnpaid();
   };
@@ -652,6 +676,7 @@ export function CustomersPage() {
         onChangeStatus={handleWiChangeStatus}
         onPayment={handleWiPayment}
         selectedWorkItemId={expandedId}
+        detailsRefreshId={detailsRefreshId}
       />
       <CustomerFormCard
         open={cardOpen}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Plus, Trash2 } from "lucide-react";
+import { X, Plus, Trash2, Pencil, Check } from "lucide-react";
 import type { WorkItemFull, WorkItemStatus, CreateWorkItem, UpdateWorkItem, DetailInput, Payment } from "@/types";
 import { paymentApi } from "@/bindings";
 
@@ -55,7 +55,13 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
   const [payments, setPayments] = useState<Payment[]>([]);
   const [payAmount, setPayAmount] = useState("");
   const [payMethod, setPayMethod] = useState("현금");
+  const [payDate, setPayDate] = useState("");
   const [payLoading, setPayLoading] = useState(false);
+  // 결제 인라인 편집 상태
+  const [editingPaymentId, setEditingPaymentId] = useState<number | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editMethod, setEditMethod] = useState("");
+  const [editDate, setEditDate] = useState("");
 
   // 자동 합산 가격
   const autoPrice = details.reduce((sum, d) => sum + d.unitPrice * d.quantity, 0);
@@ -108,7 +114,9 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       setPayAmount("");
     }
     setPayMethod("현금");
+    setPayDate(toLocalInput(new Date().toISOString()));
     setPayLoading(false);
+    setEditingPaymentId(null);
     const t = setTimeout(() => {
       if (!initialTab || initialTab === "info") descRef.current?.focus();
     }, 150);
@@ -132,7 +140,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
     if (amount <= 0) return;
     setPayLoading(true);
     try {
-      await paymentApi.create({ workItemId: workItem.id, amount, method: payMethod });
+      await paymentApi.create({ workItemId: workItem.id, amount, method: payMethod, paidAt: payDate ? fromLocalInput(payDate) : undefined });
       const updated = await paymentApi.list(workItem.id);
       setPayments(updated);
       const newPaid = updated.reduce((s, p) => s + p.amount, 0);
@@ -145,6 +153,43 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       setPayLoading(false);
     }
   };
+
+  // 결제 수정 모드 진입
+  const handleEditPayment = (p: Payment) => {
+    setEditingPaymentId(p.id);
+    setEditAmount(String(p.amount));
+    setEditMethod(p.method ?? "현금");
+    setEditDate(toLocalInput(p.paidAt));
+  };
+
+  // 결제 수정 저장
+  const handleSaveEditPayment = async () => {
+    if (!workItem || editingPaymentId === null) return;
+    const amount = parseInt(editAmount, 10) || 0;
+    if (amount <= 0) return;
+    setPayLoading(true);
+    try {
+      await paymentApi.update(editingPaymentId, {
+        amount,
+        method: editMethod || null,
+        paidAt: editDate ? fromLocalInput(editDate) : undefined,
+      });
+      const updated = await paymentApi.list(workItem.id);
+      setPayments(updated);
+      const newPaid = updated.reduce((s, p) => s + p.amount, 0);
+      const remaining = workItem.price - newPaid;
+      setPayAmount(remaining > 0 ? String(remaining) : "");
+      setEditingPaymentId(null);
+      onPaymentChange?.();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPayLoading(false);
+    }
+  };
+
+  // 결제 수정 취소
+  const handleCancelEdit = () => setEditingPaymentId(null);
 
   // 결제 삭제
   const handleDeletePayment = async (paymentId: number) => {
@@ -509,27 +554,87 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                             <th className="px-3 py-2 text-left font-medium">일시</th>
                             <th className="px-3 py-2 text-right font-medium">금액</th>
                             <th className="px-3 py-2 text-left font-medium">수단</th>
-                            <th className="w-10"></th>
+                            <th className="w-16"></th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border-default">
                           {payments.map((p) => (
-                            <tr key={p.id}>
-                              <td className="px-3 py-2 text-on-surface-muted text-[13px]">
-                                {new Date(p.paidAt).toLocaleDateString("ko-KR")} {new Date(p.paidAt).toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit", hour12: true })}
-                              </td>
-                              <td className="px-3 py-2 text-right font-medium text-on-surface">{p.amount.toLocaleString()}원</td>
-                              <td className="px-3 py-2 text-on-surface-muted">{p.method || "-"}</td>
-                              <td className="px-1 py-2 text-center">
-                                <button
-                                  onClick={() => handleDeletePayment(p.id)}
-                                  disabled={payLoading}
-                                  className="p-1 text-on-surface-muted hover:text-danger-500 transition-colors cursor-pointer disabled:opacity-30"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </td>
-                            </tr>
+                            editingPaymentId === p.id ? (
+                              <tr key={p.id} className="bg-surface-elevated/50">
+                                <td className="px-2 py-1.5">
+                                  <input
+                                    type="datetime-local"
+                                    value={editDate}
+                                    onChange={(e) => setEditDate(e.target.value)}
+                                    className="w-full text-xs border border-border-default rounded px-1.5 py-1 bg-surface-base text-on-surface"
+                                  />
+                                </td>
+                                <td className="px-2 py-1.5">
+                                  <input
+                                    type="number"
+                                    value={editAmount}
+                                    onChange={(e) => setEditAmount(e.target.value)}
+                                    className="w-full text-xs border border-border-default rounded px-1.5 py-1 bg-surface-base text-on-surface text-right"
+                                  />
+                                </td>
+                                <td className="px-2 py-1.5">
+                                  <select
+                                    value={editMethod}
+                                    onChange={(e) => setEditMethod(e.target.value)}
+                                    className="w-full text-xs border border-border-default rounded px-1.5 py-1 bg-surface-base text-on-surface"
+                                  >
+                                    <option value="현금">현금</option>
+                                    <option value="카드">카드</option>
+                                    <option value="계좌이체">계좌이체</option>
+                                    <option value="기타">기타</option>
+                                  </select>
+                                </td>
+                                <td className="px-1 py-1.5">
+                                  <div className="flex gap-0.5 justify-center">
+                                    <button
+                                      onClick={handleSaveEditPayment}
+                                      disabled={payLoading || !editAmount || parseInt(editAmount, 10) <= 0}
+                                      className="p-1 text-primary-600 hover:text-primary-700 transition-colors cursor-pointer disabled:opacity-30"
+                                    >
+                                      <Check className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={handleCancelEdit}
+                                      disabled={payLoading}
+                                      className="p-1 text-on-surface-muted hover:text-on-surface transition-colors cursor-pointer disabled:opacity-30"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ) : (
+                              <tr key={p.id}>
+                                <td className="px-3 py-2 text-on-surface-muted text-[13px]">
+                                  {new Date(p.paidAt).toLocaleDateString("ko-KR")} {new Date(p.paidAt).toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit", hour12: true })}
+                                </td>
+                                <td className="px-3 py-2 text-right font-medium text-on-surface">{p.amount.toLocaleString()}원</td>
+                                <td className="px-3 py-2 text-on-surface-muted">{p.method || "-"}</td>
+                                <td className="px-1 py-2 text-center">
+                                  <div className="flex gap-0.5 justify-center">
+                                    <button
+                                      onClick={() => handleEditPayment(p)}
+                                      disabled={payLoading}
+                                      className="p-1 text-on-surface-muted hover:text-primary-600 transition-colors cursor-pointer disabled:opacity-30"
+                                    >
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeletePayment(p.id)}
+                                      disabled={payLoading}
+                                      className="p-1 text-on-surface-muted hover:text-danger-500 transition-colors cursor-pointer disabled:opacity-30"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            )
                           ))}
                         </tbody>
                       </table>
@@ -546,6 +651,15 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                   <div>
                     <label className="block text-sm font-medium text-on-surface mb-2">결제 등록</label>
                     <div className="flex gap-2 items-end">
+                      <div className="w-52">
+                        <label className="block text-xs text-on-surface-muted mb-1">일시</label>
+                        <input
+                          type="datetime-local"
+                          value={payDate}
+                          onChange={(e) => setPayDate(e.target.value)}
+                          className={inputCls}
+                        />
+                      </div>
                       <div className="flex-1">
                         <label className="block text-xs text-on-surface-muted mb-1">금액</label>
                         <input

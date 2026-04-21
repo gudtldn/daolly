@@ -63,4 +63,11 @@ export interface CreatePayment {
   workItemId: number;
   amount: number;
   method?: string | null;
+  paidAt?: string | null;
+}
+
+export interface UpdatePayment {
+  amount: number;
+  method?: string | null;
+  paidAt?: string | null;
 }

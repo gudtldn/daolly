@@ -20,6 +20,7 @@ export type {
   CreateWorkItem,
   UpdateWorkItem,
   CreatePayment,
+  UpdatePayment,
 } from "./dto";
 
 export type { AppSettings, GeneralSettings, UiSettings, FontSize } from "./settings";

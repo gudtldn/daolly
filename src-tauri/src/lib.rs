@@ -56,6 +56,7 @@ pub fn run() {
             // payments
             commands::payments::list_payments,
             commands::payments::create_payment,
+            commands::payments::update_payment,
             commands::payments::delete_payment,
         ])
         .run(tauri::generate_context!())

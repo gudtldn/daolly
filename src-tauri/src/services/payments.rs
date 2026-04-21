@@ -20,6 +20,7 @@ pub async fn create(
     work_item_id: i32,
     amount: i32,
     method: Option<String>,
+    paid_at: Option<String>,
 ) -> Result<payment::Model, DbErr> {
     if amount <= 0 {
         return Err(DbErr::Custom("amount must be positive".to_owned()));
@@ -29,13 +30,14 @@ pub async fn create(
         .filter(|s| !s.is_empty());
 
     let now = Utc::now().to_rfc3339();
+    let paid_at_val = paid_at.unwrap_or_else(|| now.clone());
     let tx = db.begin().await?;
 
     let model = payment::ActiveModel {
         work_item_id: Set(work_item_id),
         amount: Set(amount),
         method: Set(method),
-        paid_at: Set(now.clone()),
+        paid_at: Set(paid_at_val),
         created_at: Set(now),
         ..Default::default()
     };
@@ -46,6 +48,42 @@ pub async fn create(
     sync_paid_amount(&tx, work_item_id).await?;
     tx.commit().await?;
     Ok(inserted)
+}
+
+/// 결제 내역(금액, 수단, 일시)을 수정하고 work_item.paid_amount를 자동 갱신합니다.
+pub async fn update(
+    db: &DatabaseConnection,
+    id: i32,
+    amount: i32,
+    method: Option<String>,
+    paid_at: Option<String>,
+) -> Result<payment::Model, DbErr> {
+    if amount <= 0 {
+        return Err(DbErr::Custom("amount must be positive".to_owned()));
+    }
+    let method = method
+        .map(|s| s.trim().to_owned())
+        .filter(|s| !s.is_empty());
+
+    let tx = db.begin().await?;
+
+    let p = payment::Entity::find_by_id(id)
+        .one(&tx)
+        .await?
+        .ok_or_else(|| DbErr::Custom(format!("payment {id} not found")))?;
+    let wi_id = p.work_item_id;
+
+    let mut active: payment::ActiveModel = p.into();
+    active.amount = Set(amount);
+    active.method = Set(method);
+    if let Some(at) = paid_at {
+        active.paid_at = Set(at);
+    }
+    let updated = active.update(&tx).await?;
+
+    sync_paid_amount(&tx, wi_id).await?;
+    tx.commit().await?;
+    Ok(updated)
 }
 
 /// 결제를 삭제하고 work_item.paid_amount를 자동 갱신합니다.
@@ -127,7 +165,7 @@ mod tests {
         let db = setup_test_db().await.unwrap();
         let wi_id = setup_work_item(&db).await;
 
-        create(&db, wi_id, 5000, Some("카드".into())).await.unwrap();
+        create(&db, wi_id, 5000, Some("카드".into()), None).await.unwrap();
 
         let wi = work_item::Entity::find_by_id(wi_id)
             .one(&db)
@@ -142,8 +180,8 @@ mod tests {
         let db = setup_test_db().await.unwrap();
         let wi_id = setup_work_item(&db).await;
 
-        let p1 = create(&db, wi_id, 3000, None).await.unwrap();
-        create(&db, wi_id, 2000, None).await.unwrap();
+        let p1 = create(&db, wi_id, 3000, None, None).await.unwrap();
+        create(&db, wi_id, 2000, None, None).await.unwrap();
         // paid_amount = 5000
 
         delete(&db, p1.id).await.unwrap();
@@ -160,7 +198,7 @@ mod tests {
         let db = setup_test_db().await.unwrap();
         let wi_id = setup_work_item(&db).await;
 
-        let err = create(&db, wi_id, 0, None).await.unwrap_err();
+        let err = create(&db, wi_id, 0, None, None).await.unwrap_err();
         assert!(err.to_string().contains("amount must be positive"));
     }
 
@@ -169,8 +207,8 @@ mod tests {
         let db = setup_test_db().await.unwrap();
         let wi_id = setup_work_item(&db).await;
 
-        create(&db, wi_id, 1000, Some("현금".into())).await.unwrap();
-        create(&db, wi_id, 2000, Some("카드".into())).await.unwrap();
+        create(&db, wi_id, 1000, Some("현금".into()), None).await.unwrap();
+        create(&db, wi_id, 2000, Some("카드".into()), None).await.unwrap();
 
         let payments = list(&db, wi_id).await.unwrap();
         assert_eq!(payments.len(), 2);
