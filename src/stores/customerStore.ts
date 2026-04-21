@@ -5,14 +5,12 @@ import { customerApi, workItemApi } from "@/bindings";
 interface CustomerState {
   customers: Customer[];
   selectedCustomer: Customer | null;
-  searchText: string;
   isLoading: boolean;
   unpaidMap: Record<number, number>;
 }
 
 interface CustomerActions {
   load: () => Promise<void>;
-  search: (keyword: string) => Promise<void>;
   select: (customer: Customer | null) => void;
   create: (data: CreateCustomer) => Promise<Customer>;
   update: (id: number, data: UpdateCustomer) => Promise<Customer>;
@@ -25,24 +23,13 @@ type CustomerStore = CustomerState & CustomerActions;
 export const useCustomerStore = create<CustomerStore>((set, get) => ({
   customers: [],
   selectedCustomer: null,
-  searchText: "",
   isLoading: false,
   unpaidMap: {},
 
   load: async () => {
     set({ isLoading: true });
     try {
-      const customers = await customerApi.list(get().searchText || null);
-      set({ customers });
-    } finally {
-      set({ isLoading: false });
-    }
-  },
-
-  search: async (keyword) => {
-    set({ searchText: keyword, isLoading: true });
-    try {
-      const customers = await customerApi.list(keyword || null);
+      const customers = await customerApi.list(null);
       set({ customers });
     } finally {
       set({ isLoading: false });
@@ -53,7 +40,11 @@ export const useCustomerStore = create<CustomerStore>((set, get) => ({
 
   create: async (data) => {
     const customer = await customerApi.create(data);
-    set((s) => ({ customers: [...s.customers, customer] }));
+    set((s) => ({
+      customers: [...s.customers, customer].sort((a, b) =>
+        a.name.localeCompare(b.name, 'ko')
+      ),
+    }));
     return customer;
   },
 

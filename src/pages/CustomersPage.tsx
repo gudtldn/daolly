@@ -249,7 +249,6 @@ function WorkItemListPanel({
   customer,
   expandedId,
   setExpandedId,
-  highlightedIdx,
   isActive,
   onAdd,
   onEdit,
@@ -258,11 +257,11 @@ function WorkItemListPanel({
   onPayment,
   selectedWorkItemId,
   detailsRefreshId,
+  onGoToPreviousPanel,
 }: {
   customer: Customer | null;
   expandedId: number | null;
   setExpandedId: (id: number | null) => void;
-  highlightedIdx: number;
   isActive: boolean;
   onAdd: () => void;
   onEdit: (id: number) => void;
@@ -271,8 +270,17 @@ function WorkItemListPanel({
   onPayment: (id: number) => void;
   selectedWorkItemId: number | null;
   detailsRefreshId: { id: number; nonce: number } | null;
+  onGoToPreviousPanel: () => void;
 }) {
   const { workItems } = useWorkItemStore();
+
+  // 키보드 하이라이트 (sortedItems 기반으로 관리)
+  const [highlightedIdx, setHighlightedIdx] = useState(0);
+
+  // 고객 변경 시 하이라이트 초기화
+  useEffect(() => {
+    setHighlightedIdx(0);
+  }, [customer?.id]);
 
   // 컬럼 정렬 상태: null -> asc -> desc -> null (3-state)
   type SortCol = "status" | "receivedAt" | "pickedUpAt" | "description" | "price";
@@ -308,6 +316,36 @@ function WorkItemListPanel({
       return 0;
     });
   }, [workItems, sortCol, sortDir]);
+
+  // isActive 패널에서만 키보드 네비게이션 처리
+  useEffect(() => {
+    if (!isActive) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      switch (e.key) {
+        case "ArrowUp":
+          e.preventDefault();
+          setHighlightedIdx((prev) => Math.max(0, prev - 1));
+          break;
+        case "ArrowDown":
+          e.preventDefault();
+          setHighlightedIdx((prev) => Math.min(sortedItems.length - 1, prev + 1));
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          { const item = sortedItems[highlightedIdx]; if (item) setExpandedId(item.id); }
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          if (expandedId !== null) { setExpandedId(null); }
+          else { onGoToPreviousPanel(); }
+          break;
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isActive, sortedItems, highlightedIdx, expandedId, setExpandedId, onGoToPreviousPanel]); // eslint-disable-line react-hooks/exhaustive-deps
   // 아코디언 상세: 열 때 lazy load, 로컬 캐시
   const [detailsCache, setDetailsCache] = useState<Record<number, WorkItemDetail[]>>({});
 
@@ -552,7 +590,6 @@ export function CustomersPage() {
   const { showConfirm } = useDialogStore();
   const [activePanel, setActivePanel] = useState<"customers" | "workItems">("customers");
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [highlightedIdx, setHighlightedIdx] = useState(0);
 
   // Floating Card 상태
   const [cardOpen, setCardOpen] = useState(false);
@@ -582,6 +619,7 @@ export function CustomersPage() {
       const created = await create(data as CreateCustomer);
       select(created);
       setScrollToCustomerId(created.id);
+      setTimeout(() => setScrollToCustomerId(null), 100);
     } else if (selectedCustomer) {
       await update(selectedCustomer.id, data as UpdateCustomer);
     }
@@ -678,58 +716,36 @@ export function CustomersPage() {
       setFilter({ customerId: selectedCustomer.id });
     }
     setExpandedId(null);
-    setHighlightedIdx(0);
   }, [selectedCustomer?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 키보드 네비게이션
+  // 키보드 네비게이션 (customers 패널 전용; workItems 패널은 WorkItemListPanel 내부 처리)
   useEffect(() => {
+    if (activePanel !== "customers") return;
     const handleKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
-
       switch (e.key) {
-        case "ArrowUp":
+        case "ArrowUp": {
           e.preventDefault();
-          if (activePanel === "customers") {
-            const idx = customers.findIndex((c) => c.id === selectedCustomer?.id);
-            if (idx > 0) select(customers[idx - 1]);
-          } else {
-            setHighlightedIdx((prev) => Math.max(0, prev - 1));
-          }
+          const idx = customers.findIndex((c) => c.id === selectedCustomer?.id);
+          if (idx > 0) select(customers[idx - 1]);
           break;
-        case "ArrowDown":
+        }
+        case "ArrowDown": {
           e.preventDefault();
-          if (activePanel === "customers") {
-            const idx = customers.findIndex((c) => c.id === selectedCustomer?.id);
-            if (idx < customers.length - 1) select(customers[idx + 1]);
-          } else {
-            setHighlightedIdx((prev) => Math.min(workItems.length - 1, prev + 1));
-          }
+          const idx = customers.findIndex((c) => c.id === selectedCustomer?.id);
+          if (idx < customers.length - 1) select(customers[idx + 1]);
           break;
+        }
         case "ArrowRight":
           e.preventDefault();
-          if (activePanel === "customers") {
-            setActivePanel("workItems");
-          } else {
-            const item = workItems[highlightedIdx];
-            if (item) setExpandedId(item.id);
-          }
-          break;
-        case "ArrowLeft":
-          e.preventDefault();
-          if (activePanel === "workItems") {
-            if (expandedId !== null) {
-              setExpandedId(null);
-            } else {
-              setActivePanel("customers");
-            }
-          }
+          setActivePanel("workItems");
           break;
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [customers, selectedCustomer, activePanel, highlightedIdx, expandedId, workItems, select]);
+  }, [customers, selectedCustomer, activePanel, select]);
 
   return (
     <div className="h-full flex gap-4">
@@ -745,7 +761,6 @@ export function CustomersPage() {
         customer={selectedCustomer}
         expandedId={expandedId}
         setExpandedId={setExpandedId}
-        highlightedIdx={highlightedIdx}
         isActive={activePanel === "workItems"}
         onAdd={handleWiAdd}
         onEdit={handleWiEdit}
@@ -754,6 +769,7 @@ export function CustomersPage() {
         onPayment={handleWiPayment}
         selectedWorkItemId={expandedId}
         detailsRefreshId={detailsRefreshId}
+        onGoToPreviousPanel={() => setActivePanel("customers")}
       />
       <CustomerFormCard
         open={cardOpen}

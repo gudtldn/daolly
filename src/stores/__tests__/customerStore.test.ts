@@ -25,7 +25,6 @@ function resetStore() {
   useCustomerStore.setState({
     customers: [],
     selectedCustomer: null,
-    searchText: "",
     isLoading: false,
   });
 }
@@ -56,19 +55,8 @@ describe("customerStore", () => {
     });
   });
 
-  describe("search", () => {
-    it("검색어 설정 + 필터링된 목록 로드", async () => {
-      mockList.mockResolvedValue([customer1]);
-
-      await useCustomerStore.getState().search("홍");
-      expect(useCustomerStore.getState().searchText).toBe("홍");
-      expect(mockList).toHaveBeenCalledWith("홍");
-      expect(useCustomerStore.getState().customers).toEqual([customer1]);
-    });
-  });
-
   describe("create", () => {
-    it("생성 후 목록에 추가", async () => {
+    it("생성 후 목록에 추가 (name 오름차순 정렬 유지)", async () => {
       mockCreate.mockResolvedValue(customer1);
       useCustomerStore.setState({ customers: [] });
 

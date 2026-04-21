@@ -12,6 +12,7 @@ pub struct BackupInfo {
     pub size_bytes: u64,
 }
 
+// DatabaseConnection State를 주입받지 않으므로 CmdResult 대신 Result<T, String> 사용
 type DbResult<T> = Result<T, String>;
 
 /// DB가 있는 폴더를 파일 탐색기로 엽니다.
