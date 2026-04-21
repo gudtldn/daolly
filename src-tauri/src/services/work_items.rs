@@ -1,12 +1,15 @@
-use chrono::Utc;
+use chrono::{Local, Utc};
 use sea_orm::*;
 use serde::Deserialize;
 use std::collections::HashMap;
 
 use crate::db::entities::{payment, work_item, work_item::WorkItemStatus, work_item_detail};
 
-/// 접수 세부항목 DTO
-/// NOTE: 접수 시점의 단가/수량을 스냅샷합니다.
+/// Returns local datetime string without timezone suffix, e.g. "2025-04-22T09:00:00".
+fn local_now() -> String {
+    Local::now().format("%Y-%m-%dT%H:%M:%S").to_string()
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DetailInput {
@@ -112,7 +115,7 @@ pub async fn create(
     let note = note.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty());
 
     let now = Utc::now().to_rfc3339();
-    let recv = received_at.unwrap_or_else(|| now.clone());
+    let recv = received_at.unwrap_or_else(local_now);
     let tx = db.begin().await?;
 
     let wi = work_item::ActiveModel {
@@ -196,9 +199,10 @@ pub async fn update_status(
     existing: work_item::Model,
     status: WorkItemStatus,
 ) -> Result<work_item::Model, DbErr> {
-    let now = Utc::now().to_rfc3339();
+    let sys_now = Utc::now().to_rfc3339();
+    let local_ts = local_now();
     let mut active: work_item::ActiveModel = existing.into();
-    active.last_modified_at = Set(now.clone());
+    active.last_modified_at = Set(sys_now);
 
     match status {
         WorkItemStatus::Received => {
@@ -206,11 +210,11 @@ pub async fn update_status(
             active.picked_up_at = Set(None);
         }
         WorkItemStatus::Completed => {
-            active.completed_at = Set(Some(now));
+            active.completed_at = Set(Some(local_ts));
             active.picked_up_at = Set(None);
         }
         WorkItemStatus::PickedUp => {
-            active.picked_up_at = Set(Some(now));
+            active.picked_up_at = Set(Some(local_ts));
         }
     }
     active.status = Set(status);

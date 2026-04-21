@@ -76,6 +76,11 @@ pub fn run() {
             commands::database::backup_db,
             commands::database::list_backups,
             commands::database::restore_db,
+            // sales
+            commands::sales::list_sales_records,
+            commands::sales::list_unpaid_records,
+            commands::sales::list_weekly_chart,
+            commands::sales::list_top_items,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

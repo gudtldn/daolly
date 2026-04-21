@@ -8,6 +8,10 @@ export type {
   WorkItemDetail,
   Payment,
   WorkItemFull,
+  SalesRecord,
+  UnpaidRecord,
+  ChartDay,
+  TopItem,
 } from "./models";
 
 export type {

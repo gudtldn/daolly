@@ -11,8 +11,8 @@ function toLocalInput(iso: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 function fromLocalInput(local: string): string {
-  if (!local) return "";
-  return new Date(local).toISOString();
+  // Return local time as-is (with seconds) - no UTC conversion
+  return local ? local + ":00" : "";
 }
 
 // 결제 수단 키 -> 한글 표시 변환 (영문 key 기준, 구형 DB 한글 key fallback 포함)

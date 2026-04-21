@@ -73,3 +73,40 @@ export interface WorkItemFull extends WorkItem {
   details: WorkItemDetail[];
   payments: Payment[];
 }
+
+// Sales service DTOs
+export interface SalesRecord {
+  workItemId: number;
+  customerId: number;
+  customerName: string;
+  description: string | null;
+  price: number;
+  paidAmount: number;
+  /** null = credit (no payment recorded) */
+  paymentMethod: string | null;
+  receivedAt: string;
+}
+
+export interface UnpaidRecord {
+  workItemId: number;
+  customerId: number;
+  customerName: string;
+  customerPhone: string | null;
+  description: string | null;
+  price: number;
+  paidAmount: number;
+  unpaidAmount: number;
+  receivedAt: string;
+}
+
+export interface ChartDay {
+  date: string;
+  label: string;
+  total: number;
+}
+
+export interface TopItem {
+  rank: number;
+  itemName: string;
+  totalQuantity: number;
+}

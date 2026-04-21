@@ -4,3 +4,4 @@ export { priceItemApi } from "./priceItems";
 export { priceOptionApi } from "./priceOptions";
 export { workItemApi } from "./workItems";
 export { paymentApi } from "./payments";
+export { salesApi } from "./sales";
