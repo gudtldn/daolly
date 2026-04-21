@@ -80,9 +80,6 @@ pub async fn create(
     details: Vec<DetailInput>,
 ) -> Result<work_item::Model, DbErr> {
     let description = description.trim().to_owned();
-    if description.is_empty() {
-        return Err(DbErr::Custom("description is required".to_owned()));
-    }
     let note = note.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty());
 
     let now = Utc::now().to_rfc3339();
@@ -140,9 +137,6 @@ pub async fn update(
 
     if let Some(desc) = description {
         let desc = desc.trim().to_owned();
-        if desc.is_empty() {
-            return Err(DbErr::Custom("description cannot be empty".to_owned()));
-        }
         active.description = Set(desc);
     }
     if let Some(price) = price {
@@ -323,16 +317,6 @@ mod tests {
         // 세부항목 확인
         let (_, dets, _) = get_full(&db, wi.id).await.unwrap().unwrap();
         assert_eq!(dets.len(), 2);
-    }
-
-    #[tokio::test]
-    async fn create_work_item_empty_description_error() {
-        let db = setup_test_db().await.unwrap();
-        let cid = create_test_customer(&db).await;
-        let err = create(&db, cid, "  ".into(), 0, None, None, vec![])
-            .await
-            .unwrap_err();
-        assert!(err.to_string().contains("description is required"));
     }
 
     #[tokio::test]

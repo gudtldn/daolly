@@ -462,7 +462,7 @@ function WorkItemListPanel({
               {(["status", "receivedAt", "pickedUpAt", "description", "price"] as const).map((col) => {
                 const labels: Record<string, string> = { status: "상태", receivedAt: "접수", pickedUpAt: "수령", description: "작업내용", price: "결제" };
                 const widths: Record<string, string> = { status: "px-3 py-3 text-center w-28", receivedAt: "px-2 py-3 w-20", pickedUpAt: "px-2 py-3 w-20", description: "px-3 py-3", price: "px-3 py-3 w-28" };
-                const isActive = sortCol === col;
+                const isSortActive = sortCol === col;
                 return (
                   <th
                     key={col}
@@ -471,9 +471,9 @@ function WorkItemListPanel({
                   >
                     <span className="inline-flex items-center gap-1">
                       {labels[col]}
-                      {isActive && sortDir === "asc" && <ChevronUp className="w-3.5 h-3.5 text-primary-500" />}
-                      {isActive && sortDir === "desc" && <ChevronDown className="w-3.5 h-3.5 text-primary-500" />}
-                      {!isActive && <ChevronsUpDown className="w-3.5 h-3.5 opacity-0 group-hover:opacity-40 transition-opacity" />}
+                      {isSortActive && sortDir === "asc" && <ChevronUp className="w-3.5 h-3.5 text-primary-500" />}
+                      {isSortActive && sortDir === "desc" && <ChevronDown className="w-3.5 h-3.5 text-primary-500" />}
+                      {!isSortActive && <ChevronsUpDown className="w-3.5 h-3.5 opacity-0 group-hover:opacity-40 transition-opacity" />}
                     </span>
                   </th>
                 );

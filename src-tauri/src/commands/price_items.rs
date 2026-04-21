@@ -2,7 +2,7 @@ use sea_orm::{DatabaseConnection, EntityTrait};
 use serde::Deserialize;
 use tauri::State;
 
-use crate::commands::{AppError, CmdResult};
+use crate::commands::{require_non_empty, require_non_negative, AppError, CmdResult};
 use crate::db::entities::price_item;
 use crate::services;
 
@@ -40,6 +40,8 @@ pub async fn create_price_item(
     db: State<'_, DatabaseConnection>,
     data: CreatePriceItem,
 ) -> CmdResult<price_item::Model> {
+    require_non_empty(&data.name, "품목 이름")?;
+    require_non_negative(data.default_price, "기본 단가")?;
     Ok(services::price_items::create(
         db.inner(),
         data.category_id,
@@ -56,6 +58,8 @@ pub async fn update_price_item(
     id: i32,
     data: UpdatePriceItem,
 ) -> CmdResult<price_item::Model> {
+    if let Some(ref name) = data.name { require_non_empty(name, "품목 이름")?; }
+    if let Some(price) = data.default_price { require_non_negative(price, "기본 단가")?; }
     let existing = price_item::Entity::find_by_id(id)
         .one(db.inner())
         .await?

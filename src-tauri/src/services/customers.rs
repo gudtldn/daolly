@@ -36,10 +36,6 @@ pub async fn create(
         .filter(|s| !s.is_empty());
     let note = note.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty());
 
-    if name.is_empty() {
-        return Err(DbErr::Custom("name is required".to_owned()));
-    }
-
     let now = Utc::now().to_rfc3339();
     let model = customer::ActiveModel {
         name: Set(name),
@@ -67,10 +63,6 @@ pub async fn update(
         .map(|s| s.trim().to_owned())
         .filter(|s| !s.is_empty());
     let note = note.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty());
-
-    if name.is_empty() {
-        return Err(DbErr::Custom("name is required".to_owned()));
-    }
 
     let mut active: customer::ActiveModel = existing.into();
     active.name = Set(name);
@@ -109,13 +101,6 @@ mod tests {
             .unwrap();
         assert_eq!(c.name, "김철수");
         assert_eq!(c.phone_number, None); // whitespace-only -> None
-    }
-
-    #[tokio::test]
-    async fn create_customer_empty_name_error() {
-        let db = setup_test_db().await.unwrap();
-        let err = create(&db, "   ".into(), None, None).await.unwrap_err();
-        assert!(err.to_string().contains("name is required"));
     }
 
     #[tokio::test]

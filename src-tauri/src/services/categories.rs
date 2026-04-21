@@ -15,9 +15,6 @@ pub async fn create(
     sort_order: i32,
 ) -> Result<category::Model, DbErr> {
     let name = name.trim().to_owned();
-    if name.is_empty() {
-        return Err(DbErr::Custom("name is required".to_owned()));
-    }
 
     let model = category::ActiveModel {
         name: Set(name),
@@ -37,9 +34,6 @@ pub async fn update(
     sort_order: i32,
 ) -> Result<category::Model, DbErr> {
     let name = name.trim().to_owned();
-    if name.is_empty() {
-        return Err(DbErr::Custom("name is required".to_owned()));
-    }
 
     let mut active: category::ActiveModel = existing.into();
     active.name = Set(name);
@@ -64,13 +58,6 @@ mod tests {
         let c = create(&db, "상의".into(), 1).await.unwrap();
         assert_eq!(c.name, "상의");
         assert_eq!(c.sort_order, 1);
-    }
-
-    #[tokio::test]
-    async fn create_category_empty_name_error() {
-        let db = setup_test_db().await.unwrap();
-        let err = create(&db, "  ".into(), 0).await.unwrap_err();
-        assert!(err.to_string().contains("name is required"));
     }
 
     #[tokio::test]

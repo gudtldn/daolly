@@ -26,9 +26,6 @@ pub async fn create(
     sort_order: i32,
 ) -> Result<price_item::Model, DbErr> {
     let name = name.trim().to_owned();
-    if name.is_empty() {
-        return Err(DbErr::Custom("name is required".to_owned()));
-    }
 
     let model = price_item::ActiveModel {
         category_id: Set(category_id),
@@ -54,9 +51,6 @@ pub async fn update(
 
     if let Some(name) = name {
         let name = name.trim().to_owned();
-        if name.is_empty() {
-            return Err(DbErr::Custom("name cannot be empty".to_owned()));
-        }
         active.name = Set(name);
     }
     if let Some(price) = default_price {
@@ -103,13 +97,5 @@ mod tests {
         let updated = update(&db, item, None, Some(5000), None).await.unwrap();
         assert_eq!(updated.name, "바지"); // unchanged
         assert_eq!(updated.default_price, 5000); // changed
-    }
-
-    #[tokio::test]
-    async fn create_empty_name_error() {
-        let db = setup_test_db().await.unwrap();
-        let cat = categories::create(&db, "상의".into(), 1).await.unwrap();
-        let err = create(&db, cat.id, "  ".into(), 1000, 1).await.unwrap_err();
-        assert!(err.to_string().contains("name is required"));
     }
 }

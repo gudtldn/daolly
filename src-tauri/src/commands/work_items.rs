@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tauri::State;
 
-use crate::commands::{AppError, CmdResult};
+use crate::commands::{require_non_empty, require_non_negative, AppError, CmdResult};
 use crate::db::entities::{payment, work_item, work_item::WorkItemStatus, work_item_detail};
 use crate::services;
 use crate::services::work_items::DetailInput;
@@ -76,6 +76,8 @@ pub async fn create_work_item(
     db: State<'_, DatabaseConnection>,
     data: CreateWorkItem,
 ) -> CmdResult<work_item::Model> {
+    require_non_empty(&data.description, "작업 설명")?;
+    require_non_negative(data.price, "청구 금액")?;
     Ok(services::work_items::create(
         db.inner(),
         data.customer_id,
@@ -94,6 +96,8 @@ pub async fn update_work_item(
     id: i32,
     data: UpdateWorkItem,
 ) -> CmdResult<work_item::Model> {
+    if let Some(ref desc) = data.description { require_non_empty(desc, "작업 설명")?; }
+    if let Some(price) = data.price { require_non_negative(price, "청구 금액")?; }
     let existing = work_item::Entity::find_by_id(id)
         .one(db.inner())
         .await?

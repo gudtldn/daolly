@@ -22,9 +22,6 @@ pub async fn create(
     method: Option<String>,
     paid_at: Option<String>,
 ) -> Result<payment::Model, DbErr> {
-    if amount <= 0 {
-        return Err(DbErr::Custom("amount must be positive".to_owned()));
-    }
     let method = method
         .map(|s| s.trim().to_owned())
         .filter(|s| !s.is_empty());
@@ -58,9 +55,6 @@ pub async fn update(
     method: Option<String>,
     paid_at: Option<String>,
 ) -> Result<payment::Model, DbErr> {
-    if amount <= 0 {
-        return Err(DbErr::Custom("amount must be positive".to_owned()));
-    }
     let method = method
         .map(|s| s.trim().to_owned())
         .filter(|s| !s.is_empty());
@@ -190,15 +184,6 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(wi.paid_amount, 2000); // 3000 제거 후 2000만 남음
-    }
-
-    #[tokio::test]
-    async fn create_payment_zero_amount_error() {
-        let db = setup_test_db().await.unwrap();
-        let wi_id = setup_work_item(&db).await;
-
-        let err = create(&db, wi_id, 0, None, None).await.unwrap_err();
-        assert!(err.to_string().contains("amount must be positive"));
     }
 
     #[tokio::test]

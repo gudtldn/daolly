@@ -1,7 +1,7 @@
 use sea_orm::{DatabaseConnection, EntityTrait};
 use tauri::State;
 
-use crate::commands::{AppError, CmdResult};
+use crate::commands::{require_non_empty, AppError, CmdResult};
 use crate::db::entities::customer;
 use crate::services;
 use serde::Deserialize;
@@ -48,6 +48,7 @@ pub async fn create_customer(
     db: State<'_, DatabaseConnection>,
     data: CreateCustomer,
 ) -> CmdResult<customer::Model> {
+    require_non_empty(&data.name, "고객 이름")?;
     Ok(services::customers::create(db.inner(), data.name, data.phone_number, data.note).await?)
 }
 
@@ -57,6 +58,7 @@ pub async fn update_customer(
     id: i32,
     data: UpdateCustomer,
 ) -> CmdResult<customer::Model> {
+    require_non_empty(&data.name, "고객 이름")?;
     let existing = customer::Entity::find_by_id(id)
         .one(db.inner())
         .await?

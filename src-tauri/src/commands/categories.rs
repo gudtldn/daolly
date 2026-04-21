@@ -2,7 +2,7 @@ use sea_orm::{DatabaseConnection, EntityTrait};
 use serde::Deserialize;
 use tauri::State;
 
-use crate::commands::{AppError, CmdResult};
+use crate::commands::{require_non_empty, AppError, CmdResult};
 use crate::db::entities::category;
 use crate::services;
 
@@ -33,6 +33,7 @@ pub async fn create_category(
     db: State<'_, DatabaseConnection>,
     data: CreateCategory,
 ) -> CmdResult<category::Model> {
+    require_non_empty(&data.name, "카테고리 이름")?;
     Ok(services::categories::create(db.inner(), data.name, data.sort_order).await?)
 }
 
@@ -42,6 +43,7 @@ pub async fn update_category(
     id: i32,
     data: UpdateCategory,
 ) -> CmdResult<category::Model> {
+    require_non_empty(&data.name, "카테고리 이름")?;
     let existing = category::Entity::find_by_id(id)
         .one(db.inner())
         .await?
