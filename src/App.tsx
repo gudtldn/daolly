@@ -36,7 +36,19 @@ function App() {
     <ErrorBoundary>
       <AppContent />
       <GlobalDialog />
-      <Toaster position="top-center" richColors />
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          classNames: {
+            toast: "!bg-surface-card !border !border-border-default !shadow-lg !text-on-surface !rounded-xl",
+            title: "!text-on-surface !font-semibold !text-sm",
+            description: "!text-on-surface-muted !text-xs",
+            success: "!border-l-4 !border-l-primary-400",
+            error: "!border-l-4 !border-l-danger-400",
+            actionButton: "!bg-primary-50 dark:!bg-primary-950 !text-primary-600 dark:!text-primary-400 !border !border-primary-200 dark:!border-primary-800 !rounded-md !text-xs !font-medium !px-3 !py-1.5 !cursor-pointer hover:!bg-primary-100",
+          },
+        }}
+      />
     </ErrorBoundary>
   );
 }
