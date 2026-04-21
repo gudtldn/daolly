@@ -257,6 +257,14 @@ function OrderPanel({
   const [selectedOptionIds, setSelectedOptionIds] = useState<Set<number>>(new Set());
   const { showCustom } = useDialogStore();
   const memoRef = useRef<string>("");
+  const catTabsRef = useRef<HTMLDivElement>(null);
+
+  const handleCatTabsWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (catTabsRef.current) {
+      e.preventDefault();
+      catTabsRef.current.scrollLeft += e.deltaY;
+    }
+  };
 
   useEffect(() => {
     Promise.all([categoryApi.list(), priceItemApi.list(), priceOptionApi.list()]).then(
@@ -308,12 +316,16 @@ function OrderPanel({
   return (
     <div className="flex-1 min-w-0 bg-surface-card border border-border-default rounded-lg flex flex-col shadow-sm overflow-hidden">
       {/* 카테고리 탭 */}
-      <div className="flex border-b border-border-default bg-surface overflow-x-auto shrink-0">
+      <div
+        ref={catTabsRef}
+        onWheel={handleCatTabsWheel}
+        className="flex border-b border-border-default bg-surface overflow-x-auto shrink-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+      >
         {categories.map((cat) => (
           <button
             key={cat.id}
             onClick={() => setActiveCatId(cat.id)}
-            className={`flex-1 py-3.5 font-bold text-sm transition-colors whitespace-nowrap px-4 ${
+            className={`min-w-[4rem] flex-1 py-3.5 font-bold text-sm transition-colors whitespace-nowrap px-4 ${
               activeCatId === cat.id
                 ? "text-primary-600 border-b-2 border-primary-600 bg-surface-card"
                 : "text-on-surface-muted hover:text-on-surface hover:bg-surface-elevated"
@@ -325,7 +337,7 @@ function OrderPanel({
       </div>
 
       {/* 단가 버튼 그리드 */}
-      <div className="p-4 grid grid-cols-4 gap-3 shrink-0 bg-surface border-b border-border-default">
+      <div className="p-4 grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-3 shrink-0 bg-surface border-b border-border-default overflow-y-auto max-h-40">
         {catItems.map((item) => (
           <button
             key={item.id}

@@ -70,7 +70,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
   // 결제 탭 상태
   const [payments, setPayments] = useState<Payment[]>([]);
   const [payAmount, setPayAmount] = useState("");
-  const [payMethod, setPayMethod] = useState("현금");
+  const [payMethod, setPayMethod] = useState("cash");
   const [payDate, setPayDate] = useState("");
   const [payLoading, setPayLoading] = useState(false);
   // 결제 인라인 편집 상태
@@ -129,7 +129,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       setPayments([]);
       setPayAmount("");
     }
-    setPayMethod("현금");
+    setPayMethod("cash");
     setPayDate(toLocalInput(new Date().toISOString()));
     setPayLoading(false);
     setEditingPaymentId(null);
@@ -174,7 +174,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
   const handleEditPayment = (p: Payment) => {
     setEditingPaymentId(p.id);
     setEditAmount(String(p.amount));
-    setEditMethod(p.method ?? "현금");
+    setEditMethod(p.method ?? "cash");
     setEditDate(toLocalInput(p.paidAt));
   };
 
@@ -602,10 +602,10 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                                     onChange={(e) => setEditMethod(e.target.value)}
                                     className="w-full text-xs border border-border-default rounded px-1.5 py-1 bg-surface-base text-on-surface"
                                   >
-                                    <option value="현금">현금</option>
-                                    <option value="카드">카드</option>
-                                    <option value="계좌이체">계좌이체</option>
-                                    <option value="기타">기타</option>
+                                    <option value="cash">현금</option>
+                                    <option value="card">카드</option>
+                                    <option value="transfer">계좌이체</option>
+                                    <option value="credit">외상</option>
                                   </select>
                                 </td>
                                 <td className="px-1 py-1.5">
@@ -692,10 +692,10 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                       <div className="w-28">
                         <label className="block text-xs text-on-surface-muted mb-1">수단</label>
                         <select value={payMethod} onChange={(e) => setPayMethod(e.target.value)} className={inputCls}>
-                          <option value="현금">현금</option>
-                          <option value="카드">카드</option>
-                          <option value="계좌이체">계좌이체</option>
-                          <option value="기타">기타</option>
+                          <option value="cash">현금</option>
+                          <option value="card">카드</option>
+                          <option value="transfer">계좌이체</option>
+                          <option value="credit">외상</option>
                         </select>
                       </div>
                       <button
