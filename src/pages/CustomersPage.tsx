@@ -278,14 +278,6 @@ function WorkItemListPanel({
     setHighlightedIdx(0);
   }, [customer?.id]);
 
-  // 키보드로 하이라이트 이동 시 해당 행 스크롤
-  useEffect(() => {
-    const item = sortedItems[highlightedIdx];
-    if (!item) return;
-    const el = rowRefs.current.get(item.id);
-    if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [highlightedIdx, sortedItems]);
-
   // 컬럼 정렬 상태: null -> asc -> desc -> null (3-state)
   type SortCol = "status" | "receivedAt" | "pickedUpAt" | "description" | "price";
   const [sortCol, setSortCol] = useState<SortCol | null>(null);
@@ -320,6 +312,14 @@ function WorkItemListPanel({
       return 0;
     });
   }, [workItems, sortCol, sortDir]);
+
+  // 키보드로 하이라이트 이동 시 해당 행 스크롤
+  useEffect(() => {
+    const item = sortedItems[highlightedIdx];
+    if (!item) return;
+    const el = rowRefs.current.get(item.id);
+    if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [highlightedIdx, sortedItems]);
 
   // 아코디언 상세: 열 때 lazy load, 로컬 캐시
   const [detailsCache, setDetailsCache] = useState<Record<number, WorkItemDetail[]>>({});
