@@ -108,6 +108,9 @@ function CustomerListPanel({
   onEdit,
   onDelete,
   scrollToId,
+  searchKeyword,
+  onSearchChange,
+  filtered,
 }: {
   selectedId: number | null;
   onSelect: (c: Customer) => void;
@@ -115,9 +118,11 @@ function CustomerListPanel({
   onEdit: () => void;
   onDelete: () => void;
   scrollToId: number | null;
+  searchKeyword: string;
+  onSearchChange: (kw: string) => void;
+  filtered: Customer[];
 }) {
-  const { customers, unpaidMap } = useCustomerStore();
-  const [searchKeyword, setSearchKeyword] = useState("");
+  const { unpaidMap } = useCustomerStore();
   const itemRefs = useRef<Map<number, HTMLLIElement>>(new Map());
 
   // scrollToId 변경 시 해당 항목으로 스크롤
@@ -126,17 +131,6 @@ function CustomerListPanel({
     const el = itemRefs.current.get(scrollToId);
     if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [scrollToId]);
-
-  // 클라이언트 사이드 필터 (즉시 반응)
-  const filtered = useMemo(() => {
-    if (!searchKeyword) return customers;
-    const kw = searchKeyword.toLowerCase();
-    return customers.filter(
-      (c) =>
-        c.name.toLowerCase().includes(kw) ||
-        (c.phoneNumber && c.phoneNumber.includes(kw)),
-    );
-  }, [searchKeyword, customers]);
 
   return (
     <div className="w-[380px] bg-surface-card rounded-lg shadow-sm border border-border-default flex flex-col overflow-hidden shrink-0">
@@ -157,12 +151,12 @@ function CustomerListPanel({
             type="text"
             placeholder="이름 / 전화번호 검색"
             value={searchKeyword}
-            onChange={(e) => setSearchKeyword(e.target.value)}
+            onChange={(e) => onSearchChange(e.target.value)}
             className={`w-full pl-9 py-2 border border-border-default rounded text-sm bg-surface-card text-on-surface placeholder:text-on-surface-muted focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 ${searchKeyword ? "pr-8" : "pr-3"}`}
           />
           {searchKeyword && (
             <button
-              onClick={() => setSearchKeyword("")}
+              onClick={() => onSearchChange("")}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-muted hover:text-on-surface transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
@@ -277,11 +271,20 @@ function WorkItemListPanel({
 
   // 키보드 하이라이트 (sortedItems 기반으로 관리)
   const [highlightedIdx, setHighlightedIdx] = useState(0);
+  const rowRefs = useRef<Map<number, HTMLTableRowElement>>(new Map());
 
   // 고객 변경 시 하이라이트 초기화
   useEffect(() => {
     setHighlightedIdx(0);
   }, [customer?.id]);
+
+  // 키보드로 하이라이트 이동 시 해당 행 스크롤
+  useEffect(() => {
+    const item = sortedItems[highlightedIdx];
+    if (!item) return;
+    const el = rowRefs.current.get(item.id);
+    if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [highlightedIdx, sortedItems]);
 
   // 컬럼 정렬 상태: null -> asc -> desc -> null (3-state)
   type SortCol = "status" | "receivedAt" | "pickedUpAt" | "description" | "price";
@@ -318,35 +321,6 @@ function WorkItemListPanel({
     });
   }, [workItems, sortCol, sortDir]);
 
-  // isActive 패널에서만 키보드 네비게이션 처리
-  useEffect(() => {
-    if (!isActive) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement).tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
-      switch (e.key) {
-        case "ArrowUp":
-          e.preventDefault();
-          setHighlightedIdx((prev) => Math.max(0, prev - 1));
-          break;
-        case "ArrowDown":
-          e.preventDefault();
-          setHighlightedIdx((prev) => Math.min(sortedItems.length - 1, prev + 1));
-          break;
-        case "ArrowRight":
-          e.preventDefault();
-          { const item = sortedItems[highlightedIdx]; if (item) setExpandedId(item.id); }
-          break;
-        case "ArrowLeft":
-          e.preventDefault();
-          if (expandedId !== null) { setExpandedId(null); }
-          else { onGoToPreviousPanel(); }
-          break;
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isActive, sortedItems, highlightedIdx, expandedId, setExpandedId, onGoToPreviousPanel]); // eslint-disable-line react-hooks/exhaustive-deps
   // 아코디언 상세: 열 때 lazy load, 로컬 캐시
   const [detailsCache, setDetailsCache] = useState<Record<number, WorkItemDetail[]>>({});
 
@@ -368,7 +342,7 @@ function WorkItemListPanel({
         setDetailsCache((prev) => ({ ...prev, [id]: [] }));
       });
     }
-  }, [detailsRefreshId]);
+  }, [detailsRefreshId, expandedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleToggle = useCallback(async (itemId: number) => {
     if (expandedId === itemId) {
@@ -391,6 +365,42 @@ function WorkItemListPanel({
   useEffect(() => {
     setDetailsCache({});
   }, [customer?.id]);
+
+  // isActive 패널에서만 키보드 네비게이션 처리
+  useEffect(() => {
+    if (!isActive) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      switch (e.key) {
+        case "ArrowUp":
+          e.preventDefault();
+          setHighlightedIdx((prev) => Math.max(0, prev - 1));
+          break;
+        case "ArrowDown":
+          e.preventDefault();
+          setHighlightedIdx((prev) => Math.min(sortedItems.length - 1, prev + 1));
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          { const item = sortedItems[highlightedIdx]; if (item) handleToggle(item.id); }
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          if (expandedId !== null) { handleToggle(expandedId); }
+          else { onGoToPreviousPanel(); }
+          break;
+        case "Enter": {
+          e.preventDefault();
+          const item = sortedItems[highlightedIdx];
+          if (item) onEdit(item.id);
+          break;
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isActive, sortedItems, highlightedIdx, expandedId, handleToggle, onGoToPreviousPanel, onEdit]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!customer) {
     return (
@@ -492,6 +502,10 @@ function WorkItemListPanel({
               return (
                 <Fragment key={item.id}>
                   <tr
+                    ref={(el) => {
+                      if (el) rowRefs.current.set(item.id, el);
+                      else rowRefs.current.delete(item.id);
+                    }}
                     onClick={() => handleToggle(item.id)}
                     className={`hover:bg-surface-elevated transition-colors cursor-pointer ${isExpanded ? "bg-primary-50/60 dark:bg-primary-950/40" : ""} ${isHighlighted ? "ring-2 ring-inset ring-primary-400" : ""}`}
                   >
@@ -597,6 +611,18 @@ export function CustomersPage() {
   const location = useLocation();
   const [activePanel, setActivePanel] = useState<"customers" | "workItems">("customers");
   const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  // 고객 검색 필터 (CustomerListPanel과 키보드 네비게이션 공유)
+  const [searchKeyword, setSearchKeyword] = useState("");
+  const filteredCustomers = useMemo(() => {
+    if (!searchKeyword) return customers;
+    const kw = searchKeyword.toLowerCase();
+    return customers.filter(
+      (c) =>
+        c.name.toLowerCase().includes(kw) ||
+        (c.phoneNumber && c.phoneNumber.includes(kw)),
+    );
+  }, [searchKeyword, customers]);
 
   // Floating Card 상태
   const [cardOpen, setCardOpen] = useState(false);
@@ -746,14 +772,14 @@ export function CustomersPage() {
       switch (e.key) {
         case "ArrowUp": {
           e.preventDefault();
-          const idx = customers.findIndex((c) => c.id === selectedCustomer?.id);
-          if (idx > 0) select(customers[idx - 1]);
+          const idx = filteredCustomers.findIndex((c) => c.id === selectedCustomer?.id);
+          if (idx > 0) select(filteredCustomers[idx - 1]);
           break;
         }
         case "ArrowDown": {
           e.preventDefault();
-          const idx = customers.findIndex((c) => c.id === selectedCustomer?.id);
-          if (idx < customers.length - 1) select(customers[idx + 1]);
+          const idx = filteredCustomers.findIndex((c) => c.id === selectedCustomer?.id);
+          if (idx < filteredCustomers.length - 1) select(filteredCustomers[idx + 1]);
           break;
         }
         case "ArrowRight":
@@ -764,7 +790,7 @@ export function CustomersPage() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [customers, selectedCustomer, activePanel, select]);
+  }, [filteredCustomers, selectedCustomer, activePanel, select]);
 
   return (
     <div className="h-full flex gap-4">
@@ -775,6 +801,9 @@ export function CustomersPage() {
         onEdit={handleEdit}
         onDelete={handleDelete}
         scrollToId={scrollToCustomerId}
+        searchKeyword={searchKeyword}
+        onSearchChange={setSearchKeyword}
+        filtered={filteredCustomers}
       />
       <WorkItemListPanel
         customer={selectedCustomer}
