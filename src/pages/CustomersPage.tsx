@@ -157,7 +157,7 @@ function CustomerListPanel({
             placeholder="이름 / 전화번호 검색"
             value={searchKeyword}
             onChange={(e) => setSearchKeyword(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 border border-border-default rounded text-sm bg-surface-card text-on-surface placeholder:text-on-surface-muted focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+            className={`w-full pl-9 py-2 border border-border-default rounded text-sm bg-surface-card text-on-surface placeholder:text-on-surface-muted focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 ${searchKeyword ? "pr-8" : "pr-3"}`}
           />
           {searchKeyword && (
             <button
@@ -205,15 +205,15 @@ function CustomerListPanel({
                   : "hover:bg-surface-elevated border-l-4 border-l-transparent"
               }`}
             >
-              <div className="flex justify-between items-center mb-1">
+      <div className="flex justify-between items-center mb-1">
                 <span
-                  className={`font-medium ${
+                  className={`font-medium truncate min-w-0 flex-1 mr-2 ${
                     isSelected ? "text-primary-700 dark:text-primary-300" : "text-on-surface"
                   }`}
                 >
                   {c.name}
                 </span>
-                <span className="text-sm text-on-surface-muted">{c.phoneNumber || "-"}</span>
+                <span className="text-sm text-on-surface-muted shrink-0">{c.phoneNumber || "-"}</span>
               </div>
               <div className="flex justify-between items-center">
                 <div
@@ -423,7 +423,7 @@ function WorkItemListPanel({
             <tr>
               {(["status", "receivedAt", "pickedUpAt", "description", "price"] as const).map((col) => {
                 const labels: Record<string, string> = { status: "상태", receivedAt: "접수", pickedUpAt: "수령", description: "작업내용", price: "결제" };
-                const widths: Record<string, string> = { status: "px-3 py-3 text-center w-20", receivedAt: "px-2 py-3 w-14", pickedUpAt: "px-2 py-3 w-14", description: "px-3 py-3", price: "px-3 py-3 w-24" };
+                const widths: Record<string, string> = { status: "px-3 py-3 text-center w-28", receivedAt: "px-2 py-3 w-20", pickedUpAt: "px-2 py-3 w-20", description: "px-3 py-3", price: "px-3 py-3 w-28" };
                 const isActive = sortCol === col;
                 return (
                   <th
