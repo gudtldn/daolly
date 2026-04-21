@@ -2,16 +2,20 @@ import { create } from "zustand";
 import type {
   Category,
   PriceItem,
+  PriceOption,
   CreateCategory,
   UpdateCategory,
   CreatePriceItem,
   UpdatePriceItem,
+  CreatePriceOption,
+  UpdatePriceOption,
 } from "@/types";
-import { categoryApi, priceItemApi } from "@/bindings";
+import { categoryApi, priceItemApi, priceOptionApi } from "@/bindings";
 
 interface PriceState {
   categories: Category[];
   priceItems: PriceItem[];
+  priceOptions: PriceOption[];
   selectedCategoryId: number | null;
   isLoading: boolean;
 }
@@ -19,6 +23,7 @@ interface PriceState {
 interface PriceActions {
   loadCategories: () => Promise<void>;
   loadPriceItems: (categoryId?: number | null) => Promise<void>;
+  loadPriceOptions: () => Promise<void>;
   selectCategory: (id: number | null) => void;
   createCategory: (data: CreateCategory) => Promise<Category>;
   updateCategory: (id: number, data: UpdateCategory) => Promise<Category>;
@@ -26,6 +31,9 @@ interface PriceActions {
   createPriceItem: (data: CreatePriceItem) => Promise<PriceItem>;
   updatePriceItem: (id: number, data: UpdatePriceItem) => Promise<PriceItem>;
   deletePriceItem: (id: number) => Promise<void>;
+  createPriceOption: (data: CreatePriceOption) => Promise<PriceOption>;
+  updatePriceOption: (id: number, data: UpdatePriceOption) => Promise<PriceOption>;
+  deletePriceOption: (id: number) => Promise<void>;
 }
 
 type PriceStore = PriceState & PriceActions;
@@ -33,6 +41,7 @@ type PriceStore = PriceState & PriceActions;
 export const usePriceStore = create<PriceStore>((set, get) => ({
   categories: [],
   priceItems: [],
+  priceOptions: [],
   selectedCategoryId: null,
   isLoading: false,
 
@@ -50,6 +59,11 @@ export const usePriceStore = create<PriceStore>((set, get) => ({
     } finally {
       set({ isLoading: false });
     }
+  },
+
+  loadPriceOptions: async () => {
+    const priceOptions = await priceOptionApi.list();
+    set({ priceOptions });
   },
 
   selectCategory: (id) => {
@@ -97,6 +111,27 @@ export const usePriceStore = create<PriceStore>((set, get) => ({
     await priceItemApi.delete(id);
     set((s) => ({
       priceItems: s.priceItems.filter((p) => p.id !== id),
+    }));
+  },
+
+  createPriceOption: async (data) => {
+    const opt = await priceOptionApi.create(data);
+    set((s) => ({ priceOptions: [...s.priceOptions, opt] }));
+    return opt;
+  },
+
+  updatePriceOption: async (id, data) => {
+    const updated = await priceOptionApi.update(id, data);
+    set((s) => ({
+      priceOptions: s.priceOptions.map((o) => (o.id === id ? updated : o)),
+    }));
+    return updated;
+  },
+
+  deletePriceOption: async (id) => {
+    await priceOptionApi.delete(id);
+    set((s) => ({
+      priceOptions: s.priceOptions.filter((o) => o.id !== id),
     }));
   },
 }));

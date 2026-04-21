@@ -11,6 +11,8 @@ interface DialogConfig {
   confirmText?: string;
   cancelText?: string;
   isDestructive?: boolean;
+  /** custom type 전용: true이면 다이얼로그 하단 footer(취소/확인 버튼)를 숨깁니다. */
+  hideFooter?: boolean;
 }
 
 interface DialogState {

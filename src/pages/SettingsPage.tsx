@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Settings, Wrench, Info, Database } from "lucide-react";
+import { Settings, Wrench, Info, Database, Tag } from "lucide-react";
 import { GeneralSettings } from "@/pages/settings/GeneralSettings";
 import { AppInfoSettings } from "@/pages/settings/AppInfoSettings";
 import { DatabaseSettings } from "@/pages/settings/DatabaseSettings";
+import { PriceSettings } from "@/pages/settings/PriceSettings";
 
 const categories = [
   { id: "general", label: "일반 설정", icon: Wrench },
+  { id: "pricing", label: "단가표 관리", icon: Tag },
   { id: "database", label: "데이터 관리", icon: Database },
   { id: "appinfo", label: "앱 정보", icon: Info },
 ] as const;
@@ -14,6 +16,7 @@ type CategoryId = (typeof categories)[number]["id"];
 
 const categoryComponents: Record<CategoryId, React.FC> = {
   general: GeneralSettings,
+  pricing: PriceSettings,
   database: DatabaseSettings,
   appinfo: AppInfoSettings,
 };

@@ -375,9 +375,17 @@ mod tests {
     async fn update_status_sets_completed_at() {
         let db = setup_test_db().await.unwrap();
         let cid = create_test_customer(&db).await;
-        let wi = create(&db, cid, Some("테스트".to_owned()), 1000, None, None, vec![])
-            .await
-            .unwrap();
+        let wi = create(
+            &db,
+            cid,
+            Some("테스트".to_owned()),
+            1000,
+            None,
+            None,
+            vec![],
+        )
+        .await
+        .unwrap();
 
         let updated = update_status(&db, wi, WorkItemStatus::Completed)
             .await
@@ -397,9 +405,17 @@ mod tests {
             quantity: 1,
             options_memo: None,
         }];
-        let wi = create(&db, cid, Some("테스트".to_owned()), 1000, None, None, details)
-            .await
-            .unwrap();
+        let wi = create(
+            &db,
+            cid,
+            Some("테스트".to_owned()),
+            1000,
+            None,
+            None,
+            details,
+        )
+        .await
+        .unwrap();
 
         // 기존 1개 -> 새로 2개로 교체
         let new_details = vec![

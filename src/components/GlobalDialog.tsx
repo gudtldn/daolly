@@ -67,27 +67,29 @@ export function GlobalDialog() {
           {config?.type === "custom" ? config.customContent : <p>{config?.message}</p>}
         </div>
 
-        {/* footer */}
-        <div className="px-6 py-4 bg-surface-elevated flex justify-end space-x-3 rounded-b-xl border-t border-border-default">
-          {config?.type !== "alert" && (
+        {/* footer - hideFooter: true 이면 렌더링 생략 */}
+        {!config?.hideFooter && (
+          <div className="px-6 py-4 bg-surface-elevated flex justify-end space-x-3 rounded-b-xl border-t border-border-default">
+            {config?.type !== "alert" && (
+              <button
+                onClick={() => close(false)}
+                className="px-4 py-2 text-sm font-medium text-on-surface bg-surface-card border border-border-default rounded-lg hover:bg-surface-elevated transition-colors cursor-pointer"
+              >
+                {config?.cancelText || "취소"}
+              </button>
+            )}
             <button
-              onClick={() => close(false)}
-              className="px-4 py-2 text-sm font-medium text-on-surface bg-surface-card border border-border-default rounded-lg hover:bg-surface-elevated transition-colors cursor-pointer"
+              onClick={() => close(true)}
+              className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                config?.isDestructive
+                  ? "bg-danger-600 hover:bg-danger-700 focus:ring-danger-500"
+                  : "bg-primary-600 hover:bg-primary-700 focus:ring-primary-500"
+              }`}
             >
-              {config?.cancelText || "취소"}
+              {config?.confirmText || "확인"}
             </button>
-          )}
-          <button
-            onClick={() => close(true)}
-            className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-              config?.isDestructive
-                ? "bg-danger-600 hover:bg-danger-700 focus:ring-danger-500"
-                : "bg-primary-600 hover:bg-primary-700 focus:ring-primary-500"
-            }`}
-          >
-            {config?.confirmText || "확인"}
-          </button>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
