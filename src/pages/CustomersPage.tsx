@@ -551,7 +551,12 @@ function WorkItemListPanel({
                             <tbody className="divide-y divide-border-default/50">
                               {details.map((d) => (
                                 <tr key={d.id}>
-                                  <td className="py-1.5 text-on-surface">{d.itemName}</td>
+                                  <td className="py-1.5 text-on-surface">
+                                    <span>{d.itemName}</span>
+                                    {d.optionsMemo && (
+                                      <p className="mt-0.5 text-[11px] text-on-surface-muted">{d.optionsMemo}</p>
+                                    )}
+                                  </td>
                                   <td className="py-1.5 text-center text-on-surface-muted">{d.quantity}</td>
                                   <td className="py-1.5 text-right text-on-surface-muted">{d.unitPrice.toLocaleString()}원</td>
                                   <td className="py-1.5 text-right font-medium text-on-surface">{(d.quantity * d.unitPrice).toLocaleString()}원</td>

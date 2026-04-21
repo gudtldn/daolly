@@ -15,6 +15,22 @@ function fromLocalInput(local: string): string {
   return new Date(local).toISOString();
 }
 
+// 결제 수단 키 -> 한글 표시 변환 (POS는 영문 key 저장, 고객관리는 한글 저장)
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  cash: "현금",
+  card: "카드",
+  credit: "외상",
+  transfer: "계좌이체",
+  "현금": "현금",
+  "카드": "카드",
+  "계좌이체": "계좌이체",
+  "기타": "기타",
+};
+function paymentMethodLabel(method: string | null | undefined): string {
+  if (!method) return "-";
+  return PAYMENT_METHOD_LABELS[method] ?? method;
+}
+
 type Tab = "info" | "payment";
 
 interface Props {
@@ -433,6 +449,9 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                           placeholder="품목명"
                           className="w-full px-2 py-1 border border-border-default rounded text-sm bg-surface-card text-on-surface focus:outline-none focus:border-primary-500"
                         />
+                        {d.optionsMemo && (
+                          <p className="mt-0.5 text-[11px] text-on-surface-muted truncate px-1">{d.optionsMemo}</p>
+                        )}
                       </td>
                       <td className="px-2 py-1.5">
                         <input
@@ -614,7 +633,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                                   {new Date(p.paidAt).toLocaleDateString("ko-KR")} {new Date(p.paidAt).toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit", hour12: true })}
                                 </td>
                                 <td className="px-3 py-2 text-right font-medium text-on-surface">{p.amount.toLocaleString()}원</td>
-                                <td className="px-3 py-2 text-on-surface-muted">{p.method || "-"}</td>
+                      <td className="px-3 py-2 text-on-surface-muted">{paymentMethodLabel(p.method)}</td>
                                 <td className="px-1 py-2 text-center">
                                   <div className="flex gap-0.5 justify-center">
                                     <button
