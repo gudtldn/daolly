@@ -449,9 +449,16 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                           placeholder="품목명"
                           className="w-full px-2 py-1 border border-border-default rounded text-sm bg-surface-card text-on-surface focus:outline-none focus:border-primary-500"
                         />
-                        {d.optionsMemo && (
-                          <p className="mt-0.5 text-[11px] text-on-surface-muted truncate px-1">{d.optionsMemo}</p>
-                        )}
+                        <div className="mt-1 flex items-center gap-1">
+                          <span className="text-[11px] text-on-surface-muted/60 shrink-0">&#8627;</span>
+                          <input
+                            type="text"
+                            value={d.optionsMemo ?? ""}
+                            onChange={(e) => updateDetail(d._key, "optionsMemo", e.target.value)}
+                            placeholder="옵션 메모 (선택)"
+                            className="flex-1 px-2 py-0.5 border border-border-default rounded text-[11px] bg-surface text-on-surface-muted placeholder:text-on-surface-muted/50 focus:outline-none focus:border-primary-400"
+                          />
+                        </div>
                       </td>
                       <td className="px-2 py-1.5">
                         <input

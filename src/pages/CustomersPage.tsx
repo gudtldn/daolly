@@ -568,7 +568,7 @@ function WorkItemListPanel({
                                   <td className="py-1.5 text-on-surface">
                                     <span>{d.itemName}</span>
                                     {d.optionsMemo && (
-                                      <p className="mt-0.5 text-[11px] text-on-surface-muted">{d.optionsMemo}</p>
+                                      <p className="mt-0.5 text-[11px] text-on-surface-muted">&#8627; {d.optionsMemo}</p>
                                     )}
                                   </td>
                                   <td className="py-1.5 text-center text-on-surface-muted">{d.quantity}</td>
