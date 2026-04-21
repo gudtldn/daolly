@@ -8,7 +8,7 @@ describe("Sidebar", () => {
   it("로고와 앱 이름을 렌더링한다", () => {
     renderWithRouter(<Sidebar />);
     // 로고 영역의 h1
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Sidekick");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("다올리");
   });
 
   it("메인 네비게이션 메뉴 4개를 렌더링한다", () => {

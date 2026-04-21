@@ -35,7 +35,7 @@ pub async fn get_db_path(app: tauri::AppHandle) -> DbResult<String> {
         .path()
         .app_data_dir()
         .map_err(|e| format!("failed to resolve app data dir: {e}"))?;
-    Ok(dir.join("sidekick.db").to_string_lossy().into_owned())
+    Ok(dir.join("daolly.db").to_string_lossy().into_owned())
 }
 
 /// 현재 DB를 backups/ 폴더에 타임스탬프 파일명으로 복사합니다.
@@ -46,7 +46,7 @@ pub async fn backup_db(app: tauri::AppHandle) -> DbResult<String> {
         .path()
         .app_data_dir()
         .map_err(|e| format!("failed to resolve app data dir: {e}"))?;
-    let db_path = dir.join("sidekick.db");
+    let db_path = dir.join("daolly.db");
     if !db_path.exists() {
         return Err("DB file not found".to_owned());
     }
@@ -56,7 +56,7 @@ pub async fn backup_db(app: tauri::AppHandle) -> DbResult<String> {
         .map_err(|e| format!("failed to create backups dir: {e}"))?;
 
     let now = Local::now().format("%Y%m%d_%H%M%S");
-    let filename = format!("sidekick_{now}.db");
+    let filename = format!("daolly_{now}.db");
     let dest = backups_dir.join(&filename);
 
     std::fs::copy(&db_path, &dest).map_err(|e| format!("backup failed: {e}"))?;
@@ -85,7 +85,7 @@ pub async fn list_backups(app: tauri::AppHandle) -> DbResult<Vec<BackupInfo>> {
             }
             let metadata = std::fs::metadata(&path).ok()?;
             let filename = path.file_name()?.to_string_lossy().into_owned();
-            // 파일명에서 날짜 파싱: sidekick_YYYYMMDD_HHMMSS.db
+            // 파일명에서 날짜 파싱: daolly_YYYYMMDD_HHMMSS.db
             let created_at =
                 parse_timestamp_from_filename(&filename).unwrap_or_else(|| "알 수 없음".to_owned());
             Some(BackupInfo {
@@ -96,7 +96,7 @@ pub async fn list_backups(app: tauri::AppHandle) -> DbResult<Vec<BackupInfo>> {
         })
         .collect();
 
-    // 최신순 정렬 (파일명 기준: sidekick_YYYYMMDD_HHMMSS)
+    // 최신순 정렬 (파일명 기준: daolly_YYYYMMDD_HHMMSS)
     backups.sort_by(|a, b| b.filename.cmp(&a.filename));
     Ok(backups)
 }
@@ -119,16 +119,16 @@ pub async fn restore_db(app: tauri::AppHandle, filename: String) -> DbResult<()>
     }
 
     // 복원 대상 파일을 pending 파일로 복사 (다음 시작 시 적용)
-    let pending = dir.join("sidekick.db.pending_restore");
+    let pending = dir.join("daolly.db.pending_restore");
     std::fs::copy(&backup_path, &pending).map_err(|e| format!("failed to stage restore: {e}"))?;
 
     // 앱 재시작 (재시작 후 pending restore 적용)
     app.restart();
 }
 
-/// 파일명 `sidekick_YYYYMMDD_HHMMSS.db`에서 사람이 읽을 수 있는 날짜 문자열 추출
+/// 파일명 `daolly_YYYYMMDD_HHMMSS.db`에서 사람이 읽을 수 있는 날짜 문자열 추옵
 fn parse_timestamp_from_filename(filename: &str) -> Option<String> {
-    // sidekick_20250104_153045.db -> "2025.01.04 15:30:45"
+    // daolly_20250104_153045.db -> "2025.01.04 15:30:45"
     let stem = filename.strip_suffix(".db")?;
     let parts: Vec<&str> = stem.splitn(3, '_').collect();
     if parts.len() != 3 {

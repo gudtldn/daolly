@@ -20,9 +20,9 @@ pub fn run() {
                 .expect("failed to resolve app data directory");
 
             // pending restore가 있으면 DB 초기화 전에 적용
-            let pending = app_data_dir.join("sidekick.db.pending_restore");
+            let pending = app_data_dir.join("daolly.db.pending_restore");
             if pending.exists() {
-                let db_path = app_data_dir.join("sidekick.db");
+                let db_path = app_data_dir.join("daolly.db");
                 std::fs::rename(&pending, &db_path).expect("failed to apply pending restore");
             }
 

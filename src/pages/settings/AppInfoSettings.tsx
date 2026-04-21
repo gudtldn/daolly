@@ -18,7 +18,7 @@ export function AppInfoSettings() {
 
       <div className="space-y-6">
         <section className="bg-surface-card rounded-lg border border-border-default p-5">
-          <h4 className="text-sm font-semibold text-on-surface mb-4">Sidekick</h4>
+          <h4 className="text-sm font-semibold text-on-surface mb-4">다올리</h4>
           <dl className="space-y-3 text-sm">
             <div className="flex">
               <dt className="w-24 text-on-surface-muted shrink-0">버전</dt>

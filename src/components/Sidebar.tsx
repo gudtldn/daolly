@@ -48,7 +48,7 @@ export function Sidebar() {
             <div className="flex items-center min-w-0 flex-1 whitespace-nowrap overflow-hidden">
               <Shirt className="w-6 h-6 text-primary-400 shrink-0" />
               <h1 className="text-xl font-bold tracking-wider ml-3">
-                Sidekick
+                다올리
               </h1>
             </div>
             <button
@@ -118,7 +118,7 @@ export function Sidebar() {
         {!collapsed && (
           <div className="ml-3">
             <p className="text-sm font-semibold">관리자</p>
-            <p className="text-xs text-secondary-500">Sidekick</p>
+            <p className="text-xs text-secondary-500">다올리</p>
           </div>
         )}
       </div>
