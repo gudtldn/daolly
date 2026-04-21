@@ -77,15 +77,21 @@ fn build_description(details: &[DetailInput]) -> String {
         return "직접 입력".to_owned();
     }
     let first = details[0].item_name.trim();
-    if details.len() == 1 {
-        if details[0].quantity > 1 {
-            format!("{} x{}", first, details[0].quantity)
-        } else {
-            first.to_owned()
+    match details.len() {
+        1 => {
+            if details[0].quantity > 1 {
+                format!("{} x{}", first, details[0].quantity)
+            } else {
+                first.to_owned()
+            }
         }
-    } else {
-        let rest_qty: i32 = details[1..].iter().map(|d| d.quantity).sum();
-        format!("{} 외 {}건", first, rest_qty)
+        2 => {
+            let second = details[1].item_name.trim();
+            format!("{}, {}", first, second)
+        }
+        n => {
+            format!("{} 외 {}가지", first, n - 1)
+        }
     }
 }
 
@@ -347,7 +353,7 @@ mod tests {
         let wi = create(
             &db,
             cid,
-            Some("와이셔츠 외 1건".to_owned()),
+            Some("와이셔츠, 바지".to_owned()),
             10000,
             None,
             None,
