@@ -703,9 +703,11 @@ export function CustomersPage() {
   // 초기 로드
   useEffect(() => {
     load().then(() => {
-      // 로드 완료 후 미수금 조회 + 첫 고객 자동 선택
-      const { customers: loaded } = useCustomerStore.getState();
-      if (loaded.length > 0) select(loaded[0]);
+      // selectedCustomer가 없을 때만 첫 번째 고객 자동 선택 (POS 등 외부 진입 시 기존 선택 유지)
+      const { customers: loaded, selectedCustomer: current } = useCustomerStore.getState();
+      if (!current && loaded.length > 0) select(loaded[0]);
+      const target = useCustomerStore.getState().selectedCustomer;
+      if (target) setScrollToCustomerId(target.id);
       useCustomerStore.getState().loadUnpaid();
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
