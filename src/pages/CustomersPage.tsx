@@ -24,7 +24,7 @@ import { WorkItemFormCard } from "@/pages/customers/WorkItemFormCard";
 function formatDateShort(iso: string | null): string {
   if (!iso) return "-";
   const d = new Date(iso);
-  return `${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
+  return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
 function formatDateFull(iso: string | null): string | undefined {
@@ -472,7 +472,7 @@ function WorkItemListPanel({
             <tr>
               {(["status", "receivedAt", "pickedUpAt", "description", "price"] as const).map((col) => {
                 const labels: Record<string, string> = { status: "상태", receivedAt: "접수", pickedUpAt: "수령", description: "작업내용", price: "결제" };
-                const widths: Record<string, string> = { status: "px-2 py-3 text-center w-24", receivedAt: "px-2 py-3 w-14", pickedUpAt: "px-2 py-3 w-14", description: "px-3 py-3", price: "px-3 py-3 w-24" };
+                const widths: Record<string, string> = { status: "px-2 py-3 text-center w-24", receivedAt: "px-2 py-3 w-12 whitespace-nowrap", pickedUpAt: "px-2 py-3 w-12 whitespace-nowrap", description: "px-3 py-3", price: "px-3 py-3 w-24" };
                 const isSortActive = sortCol === col;
                 return (
                   <th
