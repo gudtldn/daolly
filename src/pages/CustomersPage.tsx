@@ -22,6 +22,9 @@ import { workItemApi } from "@/bindings";
 import { CustomerFormCard } from "@/pages/customers/CustomerFormCard";
 import { WorkItemFormCard } from "@/pages/customers/WorkItemFormCard";
 
+// 조작 수단 타입
+type InteractionSource = "mouse" | "keyboard";
+
 // 날짜 포맷 헬퍼
 function formatDateShort(iso: string | null): string {
   if (!iso) return "-";
@@ -120,6 +123,8 @@ function CustomerListPanel({
   onSearchChange,
   filtered,
   isActive,
+  lastSource,
+  onMouseMove,
 }: {
   selectedId: number | null;
   onSelect: (c: Customer) => void;
@@ -131,6 +136,8 @@ function CustomerListPanel({
   onSearchChange: (kw: string) => void;
   filtered: Customer[];
   isActive?: boolean;
+  lastSource: InteractionSource;
+  onMouseMove: () => void;
 }) {
   const { unpaidMap, loadMore, hasMore, isLoading } = useCustomerStore();
   const virtuosoRef = useRef<VirtuosoHandle>(null);
@@ -197,7 +204,7 @@ function CustomerListPanel({
       </div>
 
       {/* 리스트 */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden" onMouseMove={onMouseMove}>
         <Virtuoso
           ref={virtuosoRef}
           data={filtered}
@@ -214,7 +221,11 @@ function CustomerListPanel({
                 className={`p-4 cursor-pointer transition-colors border-b border-border-default ${
                   isSelected
                     ? "bg-primary-50 dark:bg-primary-950 border-l-4 border-l-primary-500"
-                    : "hover:bg-surface-elevated border-l-4 border-l-transparent"
+                    : "border-l-4 border-l-transparent"
+                } ${
+                  lastSource === "mouse" ? "hover:bg-surface-elevated" : ""
+                } ${
+                  lastSource === "keyboard" && isSelected && isActive ? "ring-2 ring-inset ring-primary-400" : ""
                 }`}
               >
                 <div className="flex justify-between items-center mb-1">
@@ -279,6 +290,8 @@ function WorkItemListPanel({
   detailsRefreshId,
   onGoToPreviousPanel,
   focusWorkItemId,
+  lastSource,
+  onMouseMove,
 }: {
   customer: Customer | null;
   expandedId: number | null;
@@ -293,6 +306,8 @@ function WorkItemListPanel({
   detailsRefreshId: { id: number; nonce: number } | null;
   onGoToPreviousPanel: () => void;
   focusWorkItemId?: number | null;
+  lastSource: InteractionSource;
+  onMouseMove: () => void;
 }) {
   const { workItems } = useWorkItemStore();
 
@@ -369,8 +384,6 @@ function WorkItemListPanel({
   const [detailsCache, setDetailsCache] = useState<Record<number, WorkItemDetail[]>>({});
 
   // 수정 완료 시 해당 캐시 항목 무효화 -> 다음 열기 때 재로드
-  // nonce를 포함한 객체를 사용해 같은 ID를 연속 저장해도 effect 항상 재실행
-  // 현재 열려있는 행이면 즉시 재조회
   useEffect(() => {
     if (detailsRefreshId === null) return;
     const { id } = detailsRefreshId;
@@ -394,7 +407,6 @@ function WorkItemListPanel({
       return;
     }
     setExpandedId(itemId);
-    // 캐시에 없으면 로드
     if (!detailsCache[itemId]) {
       try {
         const full = await workItemApi.get(itemId);
@@ -413,13 +425,8 @@ function WorkItemListPanel({
   // focusWorkItemId가 있으면 자동으로 해당 항목 expand + 스크롤
   useEffect(() => {
     if (!focusWorkItemId) return;
-    
-    // 데이터 로딩 대기 후 처리
     const timer = setTimeout(async () => {
-      // 토글 대신 직접 ID 설정 (무한 반복 방지)
       setExpandedId(focusWorkItemId);
-      
-      // 캐시 데이터가 없으면 미리 로드 (handleToggle의 lazy load 로직 모사)
       if (!detailsCache[focusWorkItemId]) {
         try {
           const full = await workItemApi.get(focusWorkItemId);
@@ -428,13 +435,9 @@ function WorkItemListPanel({
           console.error("Failed to lazy load details for focus item:", e);
         }
       }
-
       const el = rowRefs.current.get(focusWorkItemId);
-      if (el) {
-        el.scrollIntoView({ block: "center", behavior: "smooth" });
-      }
+      if (el) { el.scrollIntoView({ block: "center", behavior: "smooth" }); }
     }, 300);
-    
     return () => clearTimeout(timer);
   }, [focusWorkItemId, setExpandedId, detailsCache]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -484,14 +487,10 @@ function WorkItemListPanel({
   }
 
   const totalAmount = workItems.reduce((sum, item) => sum + item.price, 0);
-  const totalUnpaid = workItems.reduce(
-    (sum, item) => sum + (item.price - item.paidAmount),
-    0
-  );
+  const totalUnpaid = workItems.reduce((sum, item) => sum + (item.price - item.paidAmount), 0);
 
   return (
     <div className="flex-1 bg-surface-card rounded-lg shadow-sm flex flex-col overflow-hidden border border-border-default transition-colors">
-      {/* 헤더 */}
       <div className="bg-secondary-800 dark:bg-secondary-900 text-white px-4 py-3 flex items-center shrink-0">
         <ClipboardList className="w-5 h-5 mr-2 text-secondary-300" />
         <h2 className="font-medium">
@@ -500,44 +499,30 @@ function WorkItemListPanel({
         </h2>
       </div>
 
-      {/* 요약 + 버튼 */}
       <div className="p-3 border-b border-border-default flex justify-between items-center shrink-0">
         <div className="flex space-x-6 px-2 text-sm">
           <span className="text-on-surface-muted">
             청구 합계:{" "}
-            <strong className="text-on-surface text-base ml-1">
-              {totalAmount.toLocaleString()}원
-            </strong>
+            <strong className="text-on-surface text-base ml-1">{totalAmount.toLocaleString()}원</strong>
           </span>
           <span className="text-on-surface-muted">
             미수금:{" "}
-            <strong className="text-danger-600 text-base ml-1">
-              {totalUnpaid.toLocaleString()}원
-            </strong>
+            <strong className="text-danger-600 text-base ml-1">{totalUnpaid.toLocaleString()}원</strong>
           </span>
         </div>
         <div className="flex space-x-2">
-          <button
-            onClick={onAdd}
-            className="flex items-center px-3 py-2 bg-primary-600 text-white rounded text-sm font-medium hover:bg-primary-700 transition-colors cursor-pointer">
+          <button onClick={onAdd} className="flex items-center px-3 py-2 bg-primary-600 text-white rounded text-sm font-medium hover:bg-primary-700 transition-colors cursor-pointer">
             <Plus className="w-4 h-4 mr-1" /> 추가
           </button>
-          <button
-            onClick={() => activeWorkItemId && onEdit(activeWorkItemId)}
-            disabled={!activeWorkItemId}
-            className="p-2 border border-border-default rounded text-on-surface-muted hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+          <button onClick={() => activeWorkItemId && onEdit(activeWorkItemId)} disabled={!activeWorkItemId} className="p-2 border border-border-default rounded text-on-surface-muted hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
             <Pencil className="w-4 h-4" />
           </button>
-          <button
-            onClick={() => activeWorkItemId && onDelete(activeWorkItemId)}
-            disabled={!activeWorkItemId}
-            className="p-2 border border-danger-200 dark:border-danger-800 rounded text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+          <button onClick={() => activeWorkItemId && onDelete(activeWorkItemId)} disabled={!activeWorkItemId} className="p-2 border border-danger-200 dark:border-danger-800 rounded text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* 테이블 */}
       <div className="flex-1 overflow-auto">
         <table className="w-full text-sm text-left">
           <thead className="bg-surface-elevated sticky top-0 border-b border-border-default text-on-surface-muted z-10">
@@ -547,11 +532,7 @@ function WorkItemListPanel({
                 const widths: Record<string, string> = { status: "px-2 py-3 text-center w-24", receivedAt: "px-2 py-3 w-12 whitespace-nowrap", pickedUpAt: "px-2 py-3 w-12 whitespace-nowrap", description: "px-3 py-3", price: "px-3 py-3 w-24" };
                 const isSortActive = sortCol === col;
                 return (
-                  <th
-                    key={col}
-                    onClick={() => handleSortClick(col)}
-                    className={`${widths[col]} font-medium cursor-pointer select-none hover:text-on-surface transition-colors group`}
-                  >
+                  <th key={col} onClick={() => handleSortClick(col)} className={`${widths[col]} font-medium cursor-pointer select-none hover:text-on-surface transition-colors group`}>
                     <span className="inline-flex items-center gap-1">
                       {labels[col]}
                       {isSortActive && sortDir === "asc" && <ChevronUp className="w-3.5 h-3.5 text-primary-500" />}
@@ -565,21 +546,19 @@ function WorkItemListPanel({
               <th className="w-10"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border-default">
+          <tbody className="divide-y divide-border-default" onMouseMove={onMouseMove}>
             {sortedItems.map((item, itemIdx) => {
               const isUnpaid = item.price > item.paidAmount;
               const isExpanded = expandedId === item.id;
-              const isHighlighted = isActive && highlightedIdx === itemIdx;
+              const isHighlighted = highlightedIdx === itemIdx;
               const details = detailsCache[item.id];
               return (
                 <Fragment key={item.id}>
                   <tr
-                    ref={(el) => {
-                      if (el) rowRefs.current.set(item.id, el);
-                      else rowRefs.current.delete(item.id);
-                    }}
+                    ref={(el) => { if (el) rowRefs.current.set(item.id, el); else rowRefs.current.delete(item.id); }}
                     onClick={() => handleToggle(item.id)}
-                    className={`hover:bg-surface-elevated transition-colors cursor-pointer ${isExpanded ? "bg-primary-50/60 dark:bg-primary-950/40" : ""} ${isHighlighted ? "ring-2 ring-inset ring-primary-400" : ""}`}
+                    onMouseEnter={() => lastSource === "mouse" && setHighlightedIdx(itemIdx)}
+                    className={`transition-colors cursor-pointer ${isExpanded ? "bg-primary-50/60 dark:bg-primary-950/40" : ""} ${lastSource === "mouse" ? "hover:bg-surface-elevated" : ""} ${lastSource === "keyboard" && isHighlighted && isActive ? "ring-2 ring-inset ring-primary-400" : ""}`}
                   >
                     <td className="px-3 py-3 text-center">
                       <StatusDropdown status={item.status} onChangeStatus={(s) => onChangeStatus(item.id, s)} />
@@ -590,31 +569,20 @@ function WorkItemListPanel({
                     <td className="px-2 py-3 text-on-surface-muted font-mono text-[13px] tracking-tighter" title={formatDateFull(item.pickedUpAt)}>
                       {formatDateShort(item.pickedUpAt)}
                     </td>
-                    <td className="px-3 py-3 font-bold text-on-surface">
-                      {item.description}
-                    </td>
+                    <td className="px-3 py-3 font-bold text-on-surface">{item.description}</td>
                     <td className="px-3 py-3">
                       <div className="flex flex-col items-start gap-1">
-                        <span className="text-base font-bold text-on-surface leading-none">
-                          {item.price.toLocaleString()}원
-                        </span>
+                        <span className="text-base font-bold text-on-surface leading-none">{item.price.toLocaleString()}원</span>
                         {isUnpaid ? (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); onPayment(item.id); }}
-                            className="px-2 py-0.5 bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 text-danger-600 dark:text-danger-400 rounded text-xs font-bold whitespace-nowrap leading-none cursor-pointer hover:bg-danger-100 dark:hover:bg-danger-900 transition-colors"
-                          >
+                          <button onClick={(e) => { e.stopPropagation(); onPayment(item.id); }} className="px-2 py-0.5 bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 text-danger-600 dark:text-danger-400 rounded text-xs font-bold whitespace-nowrap leading-none cursor-pointer hover:bg-danger-100 dark:hover:bg-danger-900 transition-colors">
                             미수금 {(item.price - item.paidAmount).toLocaleString()}원
                           </button>
                         ) : (
-                          <span className="px-2 py-0.5 bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800 text-primary-600 dark:text-primary-400 rounded text-xs font-bold whitespace-nowrap leading-none">
-                            완납
-                          </span>
+                          <span className="px-2 py-0.5 bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800 text-primary-600 dark:text-primary-400 rounded text-xs font-bold whitespace-nowrap leading-none">완납</span>
                         )}
                       </div>
                     </td>
-                    <td className="px-3 py-3 text-on-surface-muted text-[13px] max-w-[112px] truncate" title={item.note || ""}>
-                      {item.note || ""}
-                    </td>
+                    <td className="px-3 py-3 text-on-surface-muted text-[13px] max-w-[112px] truncate" title={item.note || ""}>{item.note || ""}</td>
                     <td className="px-2 py-3 text-center">
                       <ChevronDown className={`w-4 h-4 text-on-surface-muted transition-transform inline-block ${isExpanded ? "rotate-180" : ""}`} />
                     </td>
@@ -660,11 +628,7 @@ function WorkItemListPanel({
               );
             })}
             {workItems.length === 0 && (
-              <tr>
-                <td colSpan={7} className="p-12 text-center text-on-surface-muted">
-                  등록된 작업 항목이 없습니다.
-                </td>
-              </tr>
+              <tr><td colSpan={7} className="p-12 text-center text-on-surface-muted">등록된 작업 항목이 없습니다.</td></tr>
             )}
           </tbody>
         </table>
@@ -684,19 +648,15 @@ export function CustomersPage() {
   const [activePanel, setActivePanel] = useState<"customers" | "workItems">("customers");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [focusWorkItemId, setFocusWorkItemId] = useState<number | null>(null);
+  const [lastSource, setLastSource] = useState<InteractionSource>("keyboard");
 
-  // 고객 검색 (서버 사이드 API 호출)
+  // 고객 검색
   const [searchKeyword, setSearchKeyword] = useState("");
   const isInitialMount = useRef(true);
 
   useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-    const timer = setTimeout(() => {
-      load(searchKeyword.trim()).then(() => loadUnpaid());
-    }, 300);
+    if (isInitialMount.current) { isInitialMount.current = false; return; }
+    const timer = setTimeout(() => { load(searchKeyword.trim()).then(() => loadUnpaid()); }, 300);
     return () => clearTimeout(timer);
   }, [searchKeyword, load, loadUnpaid]);
 
@@ -742,22 +702,11 @@ export function CustomersPage() {
   const [wiCardMode, setWiCardMode] = useState<"create" | "edit">("create");
   const [editingWorkItem, setEditingWorkItem] = useState<WorkItemFull | null>(null);
 
-  const handleWiAdd = () => {
-    if (!selectedCustomer) return;
-    setWiCardMode("create");
-    setEditingWorkItem(null);
-    setWiCardOpen(true);
-  };
-
+  const handleWiAdd = () => { if (!selectedCustomer) return; setWiCardMode("create"); setEditingWorkItem(null); setWiCardOpen(true); };
   const handleWiDelete = async (id: number) => {
     const item = workItems.find((w) => w.id === id);
     if (!item) return;
-    const confirmed = await showConfirm({
-      title: "작업 삭제",
-      message: `"${item.description}" 작업을 삭제하시겠습니까?`,
-      confirmText: "삭제",
-      isDestructive: true,
-    });
+    const confirmed = await showConfirm({ title: "작업 삭제", message: `"${item.description}" 작업을 삭제하시겠습니까?`, confirmText: "삭제", isDestructive: true });
     if (!confirmed) return;
     await useWorkItemStore.getState().delete(id);
     loadUnpaid();
@@ -768,7 +717,6 @@ export function CustomersPage() {
     loadUnpaid();
   };
 
-  // 미수금 뱃지 클릭 -> 결제 탭으로 열기
   const [wiInitialTab, setWiInitialTab] = useState<"info" | "payment">("info");
   const [detailsRefreshId, setDetailsRefreshId] = useState<{ id: number; nonce: number } | null>(null);
 
@@ -791,21 +739,12 @@ export function CustomersPage() {
   const handleWiCardSave = async (data: CreateWorkItem | UpdateWorkItem, details?: DetailInput[], status?: WorkItemStatus, pickedUpAtOverride?: string) => {
     if (wiCardMode === "create") {
       const created = await useWorkItemStore.getState().create(data as CreateWorkItem);
-      if (status) {
-        await useWorkItemStore.getState().updateStatus(created.id, status);
-      }
-      if (pickedUpAtOverride) {
-        await useWorkItemStore.getState().update(created.id, { pickedUpAt: pickedUpAtOverride });
-      }
+      if (status) await useWorkItemStore.getState().updateStatus(created.id, status);
+      if (pickedUpAtOverride) await useWorkItemStore.getState().update(created.id, { pickedUpAt: pickedUpAtOverride });
     } else if (editingWorkItem) {
-      // 순서 중요: updateStatus가 날짜를 자동 설정하므로 먼저 호출, 그 후 update로 날짜 덜어쓰기
-      if (status) {
-        await useWorkItemStore.getState().updateStatus(editingWorkItem.id, status);
-      }
+      if (status) await useWorkItemStore.getState().updateStatus(editingWorkItem.id, status);
       await useWorkItemStore.getState().update(editingWorkItem.id, data as UpdateWorkItem);
-      if (details) {
-        await workItemApi.replaceDetails(editingWorkItem.id, details);
-      }
+      if (details) await workItemApi.replaceDetails(editingWorkItem.id, details);
       setDetailsRefreshId({ id: editingWorkItem.id, nonce: Date.now() });
     }
     loadUnpaid();
@@ -819,13 +758,11 @@ export function CustomersPage() {
     load().then(async () => {
       const { customers: loaded, selectedCustomer: current } = useCustomerStore.getState();
       if (focusId) {
-        // POS에서 '지난 접수 확인'으로 진입한 경우 해당 고객 포커싱
         const target = loaded.find((c) => c.id === focusId);
         if (target) {
           select(target);
           setScrollToCustomerId(target.id);
           setTimeout(() => setScrollToCustomerId(null), 100);
-          // 작업 항목 로드를 기다린 후 포커싱 (setTimeout 타이밍 했 제거)
           if (focusItemId) {
             await useWorkItemStore.getState().setFilter({ customerId: target.id });
             setFocusWorkItemId(focusItemId);
@@ -842,18 +779,17 @@ export function CustomersPage() {
 
   // 고객 선택 시 작업 항목 로드 + 아코디언 초기화
   useEffect(() => {
-    if (selectedCustomer) {
-      setFilter({ customerId: selectedCustomer.id });
-    }
+    if (selectedCustomer) setFilter({ customerId: selectedCustomer.id });
     setExpandedId(null);
   }, [selectedCustomer?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 키보드 네비게이션 (customers 패널 전용; workItems 패널은 WorkItemListPanel 내부 처리)
+  // 키보드 네비게이션 (customers 패널)
   useEffect(() => {
     if (activePanel !== "customers") return;
     const handleKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (["ArrowUp", "ArrowDown", "ArrowRight"].includes(e.key)) setLastSource("keyboard");
       switch (e.key) {
         case "ArrowUp": {
           e.preventDefault();
@@ -867,10 +803,7 @@ export function CustomersPage() {
           if (idx < filteredCustomers.length - 1) select(filteredCustomers[idx + 1]);
           break;
         }
-        case "ArrowRight":
-          e.preventDefault();
-          setActivePanel("workItems");
-          break;
+        case "ArrowRight": e.preventDefault(); setActivePanel("workItems"); break;
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -890,6 +823,8 @@ export function CustomersPage() {
         onSearchChange={setSearchKeyword}
         filtered={filteredCustomers}
         isActive={activePanel === "customers"}
+        lastSource={lastSource}
+        onMouseMove={() => setLastSource("mouse")}
       />
       <WorkItemListPanel
         customer={selectedCustomer}
@@ -905,24 +840,11 @@ export function CustomersPage() {
         detailsRefreshId={detailsRefreshId}
         onGoToPreviousPanel={() => setActivePanel("customers")}
         focusWorkItemId={focusWorkItemId}
+        lastSource={lastSource}
+        onMouseMove={() => setLastSource("mouse")}
       />
-      <CustomerFormCard
-        open={cardOpen}
-        mode={cardMode}
-        customer={selectedCustomer}
-        onSave={handleCardSave}
-        onClose={() => setCardOpen(false)}
-      />
-      <WorkItemFormCard
-        open={wiCardOpen}
-        mode={wiCardMode}
-        customerId={selectedCustomer?.id ?? 0}
-        workItem={editingWorkItem}
-        initialTab={wiInitialTab}
-        onSave={handleWiCardSave}
-        onClose={() => setWiCardOpen(false)}
-        onPaymentChange={() => { useWorkItemStore.getState().load(); loadUnpaid(); }}
-      />
+      <CustomerFormCard open={cardOpen} mode={cardMode} customer={selectedCustomer} onSave={handleCardSave} onClose={() => setCardOpen(false)} />
+      <WorkItemFormCard open={wiCardOpen} mode={wiCardMode} customerId={selectedCustomer?.id ?? 0} workItem={editingWorkItem} initialTab={wiInitialTab} onSave={handleWiCardSave} onClose={() => setWiCardOpen(false)} onPaymentChange={() => { useWorkItemStore.getState().load(); loadUnpaid(); }} />
     </div>
   );
 }
