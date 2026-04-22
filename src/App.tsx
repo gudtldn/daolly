@@ -3,6 +3,7 @@ import { MemoryRouter, Routes, Route, Navigate } from "react-router";
 import { Toaster } from "sonner";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { RefreshCw, Download, AlertCircle } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GlobalDialog } from "@/components/GlobalDialog";
@@ -19,13 +20,19 @@ function UpdateSplashScreen({
   status,
   progress,
   error,
+  isClosing,
 }: {
   status: string;
   progress?: number;
   error?: string;
+  isClosing: boolean;
 }) {
   return (
-    <div className="fixed inset-0 z-[9999] bg-surface-container flex flex-col items-center justify-center p-6">
+    <div
+      className={`fixed inset-0 z-[9999] bg-surface-container flex flex-col items-center justify-center p-6 transition-all duration-700 ease-in-out ${
+        isClosing ? "opacity-0 scale-105 pointer-events-none" : "opacity-100"
+      }`}
+    >
       <div className="w-full max-w-xs space-y-8 text-center">
         <div className="space-y-2">
           <h1 className="text-3xl font-black tracking-tighter text-primary-600 dark:text-primary-400">
@@ -102,13 +109,24 @@ function App() {
     progress: number;
     error?: string;
   }>({ status: "checking", progress: 0 });
+  const [isClosing, setIsClosing] = useState(false);
+  const [showApp, setShowApp] = useState(false);
 
   useEffect(() => {
     const runUpdate = async () => {
+      // 앱이 준비되면 윈도우 노출
+      try {
+        await getCurrentWindow().show();
+      } catch (e) {
+        console.error("Failed to show window:", e);
+      }
+
       try {
         const update = await check();
         if (!update?.available) {
-          setUpdateStatus((s) => ({ ...s, status: "done" }));
+          // 업데이트가 없으면 바로 페이드아웃 시작
+          setIsClosing(true);
+          setTimeout(() => setShowApp(true), 700); // 애니메이션 시간(700ms) 후 앱 노출
           return;
         }
 
@@ -131,7 +149,6 @@ function App() {
               }
               break;
             case "Finished":
-              setUpdateStatus({ status: "done", progress: 100 });
               relaunch();
               break;
           }
@@ -143,27 +160,29 @@ function App() {
           progress: 0,
           error: "업데이트를 확인하지 못했습니다.",
         });
-        // 에러 발생 시 2초 후 앱 진입 (사용자 경험 방해 최소화)
-        setTimeout(() => setUpdateStatus((s) => ({ ...s, status: "done" })), 2000);
+        // 에러 시에도 페이드아웃 후 진입
+        setTimeout(() => setIsClosing(true), 1500);
+        setTimeout(() => setShowApp(true), 2200);
       }
     };
 
     runUpdate();
   }, []);
 
-  if (updateStatus.status !== "done") {
-    return (
-      <UpdateSplashScreen
-        status={updateStatus.status}
-        progress={updateStatus.progress}
-        error={updateStatus.error}
-      />
-    );
-  }
-
   return (
     <ErrorBoundary>
-      <AppContent />
+      {!showApp && (
+        <UpdateSplashScreen
+          status={updateStatus.status}
+          progress={updateStatus.progress}
+          error={updateStatus.error}
+          isClosing={isClosing}
+        />
+      )}
+      {/* 본문은 항상 뒤에 렌더링해두어 페이드아웃 시 자연스럽게 보이게 함 */}
+      <div className={`h-full bg-surface transition-opacity duration-700 ${isClosing ? "opacity-100" : "opacity-0"}`}>
+        <AppContent />
+      </div>
       <GlobalDialog />
       <Toaster
         position="top-center"
