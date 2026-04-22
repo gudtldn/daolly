@@ -2,8 +2,12 @@ import { invoke } from "@tauri-apps/api/core";
 import type { Customer, CreateCustomer, UpdateCustomer } from "@/types";
 
 export const customerApi = {
-  list(search?: string | null): Promise<Customer[]> {
-    return invoke("list_customers", { search: search ?? null });
+  list(search?: string | null, page?: number, pageSize?: number): Promise<Customer[]> {
+    return invoke("list_customers", {
+      search: search ?? null,
+      page: page ?? null,
+      pageSize: pageSize ?? null,
+    });
   },
 
   get(id: number): Promise<Customer> {

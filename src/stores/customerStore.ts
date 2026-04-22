@@ -7,10 +7,14 @@ interface CustomerState {
   selectedCustomer: Customer | null;
   isLoading: boolean;
   unpaidMap: Record<number, number>;
+  page: number;
+  hasMore: boolean;
+  searchKeyword: string | null;
 }
 
 interface CustomerActions {
   load: (search?: string | null) => Promise<void>;
+  loadMore: () => Promise<void>;
   select: (customer: Customer | null) => void;
   create: (data: CreateCustomer) => Promise<Customer>;
   update: (id: number, data: UpdateCustomer) => Promise<Customer>;
@@ -20,17 +24,38 @@ interface CustomerActions {
 
 type CustomerStore = CustomerState & CustomerActions;
 
-export const useCustomerStore = create<CustomerStore>((set) => ({
+export const useCustomerStore = create<CustomerStore>((set, get) => ({
   customers: [],
   selectedCustomer: null,
   isLoading: false,
   unpaidMap: {},
+  page: 1,
+  hasMore: true,
+  searchKeyword: null,
 
   load: async (search) => {
+    set({ isLoading: true, searchKeyword: search ?? null, page: 1, hasMore: true });
+    try {
+      const customers = await customerApi.list(search ?? null, 1, 50);
+      set({ customers, hasMore: customers.length === 50 });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  loadMore: async () => {
+    const { isLoading, hasMore, page, searchKeyword, customers } = get();
+    if (isLoading || !hasMore) return;
+
     set({ isLoading: true });
     try {
-      const customers = await customerApi.list(search ?? null);
-      set({ customers });
+      const nextPage = page + 1;
+      const newCustomers = await customerApi.list(searchKeyword, nextPage, 50);
+      set({
+        customers: [...customers, ...newCustomers],
+        page: nextPage,
+        hasMore: newCustomers.length === 50,
+      });
     } finally {
       set({ isLoading: false });
     }

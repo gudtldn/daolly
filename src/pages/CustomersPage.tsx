@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from "react";
+import { Virtuoso } from "react-virtuoso";
+import type { VirtuosoHandle } from "react-virtuoso";
 import { useLocation } from "react-router";
 import {
   Search,
@@ -130,15 +132,17 @@ function CustomerListPanel({
   filtered: Customer[];
   isActive?: boolean;
 }) {
-  const { unpaidMap } = useCustomerStore();
-  const itemRefs = useRef<Map<number, HTMLLIElement>>(new Map());
+  const { unpaidMap, loadMore, hasMore, isLoading } = useCustomerStore();
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
 
   // scrollToId 변경 시 해당 항목으로 스크롤
   useEffect(() => {
     if (scrollToId == null) return;
-    const el = itemRefs.current.get(scrollToId);
-    if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [scrollToId]);
+    const index = filtered.findIndex((c) => c.id === scrollToId);
+    if (index !== -1 && virtuosoRef.current) {
+      virtuosoRef.current.scrollToIndex({ index, align: "center", behavior: "smooth" });
+    }
+  }, [scrollToId, filtered]);
 
   return (
     <div className={`w-[380px] bg-surface-card rounded-lg shadow-sm flex flex-col overflow-hidden shrink-0 border transition-colors ${isActive ? "border-primary-400/70" : "border-border-default"}`}>
@@ -193,56 +197,67 @@ function CustomerListPanel({
       </div>
 
       {/* 리스트 */}
-      <ul className="flex-1 overflow-y-auto divide-y divide-border-default">
-        {filtered.map((c) => {
-          const isSelected = selectedId === c.id;
-          return (
-            <li
-              key={c.id}
-              ref={(el) => {
-                if (el) itemRefs.current.set(c.id, el);
-                else itemRefs.current.delete(c.id);
-              }}
-              onClick={() => onSelect(c)}
-              className={`p-4 cursor-pointer transition-colors ${
-                isSelected
-                  ? "bg-primary-50 dark:bg-primary-950 border-l-4 border-l-primary-500"
-                  : "hover:bg-surface-elevated border-l-4 border-l-transparent"
-              }`}
-            >
-      <div className="flex justify-between items-center mb-1">
-                <span
-                  className={`font-medium truncate min-w-0 flex-1 mr-2 ${
-                    isSelected ? "text-primary-700 dark:text-primary-300" : "text-on-surface"
-                  }`}
-                >
-                  {c.name}
-                </span>
-                <span className="text-sm text-on-surface-muted shrink-0">{c.phoneNumber || "-"}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <div
-                  className={`text-sm truncate flex-1 ${
-                    isSelected ? "text-primary-500/80 dark:text-primary-400/80" : "text-on-surface-muted"
-                  }`}
-                >
-                  {c.note || "\u00A0"}
-                </div>
-                {unpaidMap[c.id] && (
-                  <span className="text-xs font-bold text-danger-600 dark:text-danger-400 whitespace-nowrap ml-2">
-                    미수금 {unpaidMap[c.id].toLocaleString()}원
+      <div className="flex-1 overflow-hidden">
+        <Virtuoso
+          ref={virtuosoRef}
+          data={filtered}
+          endReached={() => {
+            if (hasMore && !isLoading) {
+              loadMore();
+            }
+          }}
+          itemContent={(_index: number, c: Customer) => {
+            const isSelected = selectedId === c.id;
+            return (
+              <div
+                onClick={() => onSelect(c)}
+                className={`p-4 cursor-pointer transition-colors border-b border-border-default ${
+                  isSelected
+                    ? "bg-primary-50 dark:bg-primary-950 border-l-4 border-l-primary-500"
+                    : "hover:bg-surface-elevated border-l-4 border-l-transparent"
+                }`}
+              >
+                <div className="flex justify-between items-center mb-1">
+                  <span
+                    className={`font-medium truncate min-w-0 flex-1 mr-2 ${
+                      isSelected ? "text-primary-700 dark:text-primary-300" : "text-on-surface"
+                    }`}
+                  >
+                    {c.name}
                   </span>
-                )}
+                  <span className="text-sm text-on-surface-muted shrink-0">{c.phoneNumber || "-"}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div
+                    className={`text-sm truncate flex-1 ${
+                      isSelected ? "text-primary-500/80 dark:text-primary-400/80" : "text-on-surface-muted"
+                    }`}
+                  >
+                    {c.note || "\u00A0"}
+                  </div>
+                  {unpaidMap[c.id] && (
+                    <span className="text-xs font-bold text-danger-600 dark:text-danger-400 whitespace-nowrap ml-2">
+                      미수금 {unpaidMap[c.id].toLocaleString()}원
+                    </span>
+                  )}
+                </div>
               </div>
-            </li>
-          );
-        })}
-        {filtered.length === 0 && (
-          <div className="p-8 text-center text-on-surface-muted text-sm">
-            {searchKeyword ? "검색 결과가 없습니다." : "등록된 고객이 없습니다."}
-          </div>
-        )}
-      </ul>
+            );
+          }}
+          components={{
+            EmptyPlaceholder: () => (
+              <div className="p-8 text-center text-on-surface-muted text-sm">
+                {searchKeyword ? "검색 결과가 없습니다." : "등록된 고객이 없습니다."}
+              </div>
+            ),
+            Footer: () => (
+              isLoading && hasMore ? (
+                <div className="p-4 text-center text-sm text-on-surface-muted">로딩 중...</div>
+              ) : null
+            )
+          }}
+        />
+      </div>
     </div>
   );
 }
