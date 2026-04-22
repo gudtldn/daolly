@@ -1,35 +1,57 @@
-name: Release
+name: Release Build
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
-  release:
-    permissions:
-      contents: write
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version from tauri.conf.json
+        id: get-version
+        run: |
+          VERSION=$(grep '"version"' src-tauri/tauri.conf.json | head -1 | sed 's/.*"\([^"]*\)".*/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Release version: $VERSION"
+
+  build-tauri:
+    needs: prepare
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: windows-latest
+            target: x86_64-pc-windows-msvc
             args: ''
           - platform: macos-latest
-            args: '--target aarch64-apple-darwin'
-          - platform: macos-latest
+            target: x86_64-apple-darwin
             args: '--target x86_64-apple-darwin'
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            args: '--target aarch64-apple-darwin'
           - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
             args: ''
 
     runs-on: ${{ matrix.platform }}
-
+    
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: 'lts/*'
           cache: 'npm'
@@ -37,7 +59,7 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.target }}
 
       - name: Rust Cache
         uses: swatinem/rust-cache@v2
@@ -60,10 +82,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: v__VERSION__
-          releaseName: 'daolly v__VERSION__'
-          generateReleaseNotes: true
+          tagName: v${{ needs.prepare.outputs.version }}
+          releaseName: 'daolly v${{ needs.prepare.outputs.version }}'
           releaseDraft: false
           prerelease: false
-          uploadUpdaterJson: true
+          includeUpdaterJson: true
           args: ${{ matrix.args }}
