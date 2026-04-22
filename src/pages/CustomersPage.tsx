@@ -111,6 +111,7 @@ function CustomerListPanel({
   searchKeyword,
   onSearchChange,
   filtered,
+  isActive,
 }: {
   selectedId: number | null;
   onSelect: (c: Customer) => void;
@@ -121,6 +122,7 @@ function CustomerListPanel({
   searchKeyword: string;
   onSearchChange: (kw: string) => void;
   filtered: Customer[];
+  isActive?: boolean;
 }) {
   const { unpaidMap } = useCustomerStore();
   const itemRefs = useRef<Map<number, HTMLLIElement>>(new Map());
@@ -133,13 +135,15 @@ function CustomerListPanel({
   }, [scrollToId]);
 
   return (
-    <div className="w-[380px] bg-surface-card rounded-lg shadow-sm border border-border-default flex flex-col overflow-hidden shrink-0">
+    <div className={`w-[380px] bg-surface-card rounded-lg shadow-sm flex flex-col overflow-hidden shrink-0 border transition-colors ${isActive ? "border-primary-400/70" : "border-border-default"}`}>
       {/* 헤더 */}
       <div className="bg-secondary-800 dark:bg-secondary-900 text-white px-4 py-3 flex items-center shrink-0">
         <Users className="w-5 h-5 mr-2 text-secondary-300" />
         <h2 className="font-medium">
           고객 목록{" "}
-          <span className="text-secondary-400 ml-1">({filtered.length}명)</span>
+          <span className="text-secondary-400 ml-1">
+            {searchKeyword ? `검색 ${filtered.length}명` : `${filtered.length}명`}
+          </span>
         </h2>
       </div>
 
@@ -220,7 +224,7 @@ function CustomerListPanel({
                 </div>
                 {unpaidMap[c.id] && (
                   <span className="text-xs font-bold text-danger-600 dark:text-danger-400 whitespace-nowrap ml-2">
-                    미수 {unpaidMap[c.id].toLocaleString()}원
+                    미수금 {unpaidMap[c.id].toLocaleString()}원
                   </span>
                 )}
               </div>
@@ -250,7 +254,7 @@ function WorkItemListPanel({
   onDelete,
   onChangeStatus,
   onPayment,
-  selectedWorkItemId,
+  activeWorkItemId,
   detailsRefreshId,
   onGoToPreviousPanel,
   focusWorkItemId,
@@ -264,7 +268,7 @@ function WorkItemListPanel({
   onDelete: (id: number) => void;
   onChangeStatus: (id: number, status: WorkItemStatus) => void;
   onPayment: (id: number) => void;
-  selectedWorkItemId: number | null;
+  activeWorkItemId: number | null;
   detailsRefreshId: { id: number; nonce: number } | null;
   onGoToPreviousPanel: () => void;
   focusWorkItemId?: number | null;
@@ -426,7 +430,7 @@ function WorkItemListPanel({
   );
 
   return (
-    <div className="flex-1 bg-surface-card rounded-lg shadow-sm border border-border-default flex flex-col overflow-hidden">
+    <div className={`flex-1 bg-surface-card rounded-lg shadow-sm flex flex-col overflow-hidden border transition-colors ${isActive ? "border-primary-400/70" : "border-border-default"}`}>
       {/* 헤더 */}
       <div className="bg-secondary-800 dark:bg-secondary-900 text-white px-4 py-3 flex items-center shrink-0">
         <ClipboardList className="w-5 h-5 mr-2 text-secondary-300" />
@@ -459,14 +463,14 @@ function WorkItemListPanel({
             <Plus className="w-4 h-4 mr-1" /> 추가
           </button>
           <button
-            onClick={() => selectedWorkItemId && onEdit(selectedWorkItemId)}
-            disabled={!selectedWorkItemId}
+            onClick={() => activeWorkItemId && onEdit(activeWorkItemId)}
+            disabled={!activeWorkItemId}
             className="p-2 border border-border-default rounded text-on-surface-muted hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
             <Pencil className="w-4 h-4" />
           </button>
           <button
-            onClick={() => selectedWorkItemId && onDelete(selectedWorkItemId)}
-            disabled={!selectedWorkItemId}
+            onClick={() => activeWorkItemId && onDelete(activeWorkItemId)}
+            disabled={!activeWorkItemId}
             className="p-2 border border-danger-200 dark:border-danger-800 rounded text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
             <Trash2 className="w-4 h-4" />
           </button>
@@ -479,7 +483,7 @@ function WorkItemListPanel({
           <thead className="bg-surface-elevated sticky top-0 border-b border-border-default text-on-surface-muted z-10">
             <tr>
               {(["status", "receivedAt", "pickedUpAt", "description", "price"] as const).map((col) => {
-                const labels: Record<string, string> = { status: "상태", receivedAt: "접수", pickedUpAt: "수령", description: "작업내용", price: "결제" };
+                const labels: Record<string, string> = { status: "상태", receivedAt: "접수", pickedUpAt: "수령", description: "작업내용", price: "금액" };
                 const widths: Record<string, string> = { status: "px-2 py-3 text-center w-24", receivedAt: "px-2 py-3 w-12 whitespace-nowrap", pickedUpAt: "px-2 py-3 w-12 whitespace-nowrap", description: "px-3 py-3", price: "px-3 py-3 w-24" };
                 const isSortActive = sortCol === col;
                 return (
@@ -539,7 +543,7 @@ function WorkItemListPanel({
                             onClick={(e) => { e.stopPropagation(); onPayment(item.id); }}
                             className="px-2 py-0.5 bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 text-danger-600 dark:text-danger-400 rounded text-xs font-bold whitespace-nowrap leading-none cursor-pointer hover:bg-danger-100 dark:hover:bg-danger-900 transition-colors"
                           >
-                            미수 {(item.price - item.paidAmount).toLocaleString()}
+                            미수금 {(item.price - item.paidAmount).toLocaleString()}원
                           </button>
                         ) : (
                           <span className="px-2 py-0.5 bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800 text-primary-600 dark:text-primary-400 rounded text-xs font-bold whitespace-nowrap leading-none">
@@ -747,7 +751,7 @@ export function CustomersPage() {
     const state = location.state as { focusCustomerId?: number; focusWorkItemId?: number } | null;
     const focusId = state?.focusCustomerId;
     const focusItemId = state?.focusWorkItemId;
-    load().then(() => {
+    load().then(async () => {
       const { customers: loaded, selectedCustomer: current } = useCustomerStore.getState();
       if (focusId) {
         // POS에서 '지난 접수 확인'으로 진입한 경우 해당 고객 포커싱
@@ -756,11 +760,10 @@ export function CustomersPage() {
           select(target);
           setScrollToCustomerId(target.id);
           setTimeout(() => setScrollToCustomerId(null), 100);
-          // 작업 항목 자동 expand: 고객 workItems 로드 후 처리
+          // 작업 항목 로드를 기다린 후 포커싱 (setTimeout 타이밍 했 제거)
           if (focusItemId) {
-            setTimeout(() => {
-              setFocusWorkItemId(focusItemId);
-            }, 300);
+            await useWorkItemStore.getState().setFilter({ customerId: target.id });
+            setFocusWorkItemId(focusItemId);
           }
         }
       } else if (!current && loaded.length > 0) {
@@ -821,6 +824,7 @@ export function CustomersPage() {
         searchKeyword={searchKeyword}
         onSearchChange={setSearchKeyword}
         filtered={filteredCustomers}
+        isActive={activePanel === "customers"}
       />
       <WorkItemListPanel
         customer={selectedCustomer}
@@ -832,7 +836,7 @@ export function CustomersPage() {
         onDelete={handleWiDelete}
         onChangeStatus={handleWiChangeStatus}
         onPayment={handleWiPayment}
-        selectedWorkItemId={expandedId}
+        activeWorkItemId={expandedId}
         detailsRefreshId={detailsRefreshId}
         onGoToPreviousPanel={() => setActivePanel("customers")}
         focusWorkItemId={focusWorkItemId}

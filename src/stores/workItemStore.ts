@@ -18,7 +18,7 @@ interface WorkItemState {
 
 interface WorkItemActions {
   load: () => Promise<void>;
-  setFilter: (filter: { customerId?: number | null; status?: WorkItemStatus | null }) => void;
+  setFilter: (filter: { customerId?: number | null; status?: WorkItemStatus | null }) => Promise<void>;
   select: (id: number) => Promise<void>;
   clearSelection: () => void;
   create: (data: CreateWorkItem) => Promise<WorkItem>;
@@ -52,7 +52,7 @@ export const useWorkItemStore = create<WorkItemStore>((set, get) => ({
       filterCustomerId: filter.customerId !== undefined ? filter.customerId : s.filterCustomerId,
       filterStatus: filter.status !== undefined ? filter.status : s.filterStatus,
     }));
-    get().load();
+    return get().load();
   },
 
   select: async (id) => {
