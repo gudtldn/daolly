@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router";
 import {
   TrendingUp,
   CreditCard,
@@ -6,6 +7,7 @@ import {
   Clock,
   Receipt,
   Search,
+  ExternalLink,
 } from "lucide-react";
 import { DateRangePicker } from "@/pages/sales/DateRangePicker";
 import { salesApi } from "@/bindings/sales";
@@ -22,6 +24,7 @@ import {
 // SummaryTab
 // ============================================================
 export function SummaryTab() {
+  const navigate = useNavigate();
   const [period, setPeriod] = useState<PresetId>("today");
   const [customRange, setCustomRange] = useState<DateRange | null>(null);
   const [search, setSearch] = useState("");
@@ -121,6 +124,15 @@ export function SummaryTab() {
       return { date: iso.slice(5, 10).replace("-", "/"), time: iso.slice(11, 16), isToday: false };
     }
   }
+
+  const handleGoToCustomer = (r: SalesRecord) => {
+    navigate("/customers", { 
+      state: { 
+        focusCustomerId: r.customerId, 
+        focusWorkItemId: r.workItemId 
+      } 
+    });
+  };
 
   return (
     <div className="h-full flex flex-col gap-4 min-h-0">
@@ -322,12 +334,13 @@ export function SummaryTab() {
                   <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted">결제 내용</th>
                   <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted text-center w-24">결제 수단</th>
                   <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted text-right w-28">금액</th>
+                  <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-12"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-default">
                 {filteredTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-on-surface-muted text-sm">
+                    <td colSpan={7} className="px-4 py-10 text-center text-on-surface-muted text-sm">
                       거래 내역이 없습니다.
                     </td>
                   </tr>
@@ -337,7 +350,7 @@ export function SummaryTab() {
                     return (
                       <tr
                         key={r.workItemId}
-                        className="hover:bg-surface-elevated transition-colors"
+                        className="hover:bg-surface-elevated transition-colors group"
                       >
                         <td className={`px-4 py-3 text-xs text-center border-r border-border-default/50 ${isToday ? "text-primary-600 font-bold dark:text-primary-400" : "text-on-surface-muted"}`}>
                           {date}
@@ -350,8 +363,17 @@ export function SummaryTab() {
                         <td className="px-4 py-3 text-center">
                           <PaymentMethodBadge method={r.paymentMethod ?? "credit"} />
                         </td>
-                        <td className="px-4 py-3 text-right font-bold text-on-surface">
+                        <td className="px-4 py-3 text-right font-bold text-on-surface whitespace-nowrap">
                           {r.price.toLocaleString()}원
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => handleGoToCustomer(r)}
+                            title="고객 관리에서 보기"
+                            className="p-1.5 rounded-md text-on-surface-muted hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-950 transition-colors cursor-pointer group-hover:text-primary-500"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </button>
                         </td>
                       </tr>
                     );
