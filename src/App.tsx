@@ -5,6 +5,7 @@ import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { RefreshCw, Download, AlertCircle } from "lucide-react";
+import { Logo } from "@/components/Logo";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GlobalDialog } from "@/components/GlobalDialog";
 import { Layout } from "@/components/Layout";
@@ -35,9 +36,7 @@ function UpdateSplashScreen({
     >
       <div className="w-full max-w-xs space-y-8 text-center">
         <div className="space-y-2">
-          <h1 className="text-3xl font-black tracking-tighter text-primary-600 dark:text-primary-400">
-            DAOLLY
-          </h1>
+          <Logo size="lg" />
           <p className="text-sm text-on-surface-muted">최신 버전을 준비하고 있습니다</p>
         </div>
 

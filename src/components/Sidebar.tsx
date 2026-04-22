@@ -11,6 +11,7 @@ import {
   PanelLeftOpen,
 } from "lucide-react";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { Logo } from "@/components/Logo";
 
 const mainNavItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "대시보드" },
@@ -46,10 +47,7 @@ export function Sidebar() {
         ) : (
           <>
             <div className="flex items-center min-w-0 flex-1 whitespace-nowrap overflow-hidden">
-              <Shirt className="w-6 h-6 text-primary-400 shrink-0" />
-              <h1 className="text-xl font-bold tracking-wider ml-3">
-                다올리
-              </h1>
+              <Logo size="md" />
             </div>
             <button
               onClick={toggleSidebar}
