@@ -56,25 +56,31 @@ export function TransactionsTab() {
    */
   function formatSmartDateTime(iso: string): { date: string; time: string; isToday: boolean } {
     try {
-      const d = new Date(iso);
+      // iso: "2026-04-22T00:01:00" (Local time saved by backend)
+      // Directly parse YYYY, MM, DD, HH, mm to avoid browser timezone interpretation issues
+      const datePart = iso.split("T")[0]; // "2026-04-22"
+      const timePart = iso.split("T")[1] || "00:00:00"; // "00:01:00"
+      
+      const [year, month, day] = datePart.split("-").map(Number);
+      const [hour, minute] = timePart.split(":").map(Number);
+      
+      const d = new Date(year, month - 1, day, hour, minute);
       const now = new Date();
-      const isToday = d.toDateString() === now.toDateString();
+      
+      const isToday = d.getFullYear() === now.getFullYear() && 
+                      d.getMonth() === now.getMonth() && 
+                      d.getDate() === now.getDate();
       const isCurrentYear = d.getFullYear() === now.getFullYear();
       
-      const timeStr = d.toLocaleTimeString("ko-KR", { 
-        hour: "2-digit", 
-        minute: "2-digit", 
-        hour12: false 
-      });
+      const timeStr = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
 
       if (isToday) {
         return { date: "오늘", time: timeStr, isToday: true };
       }
 
-      // 올해가 아니면 연도까지 표시 (YYYY/M/D), 올해면 M/D
       const dateStr = isCurrentYear 
-        ? `${d.getMonth() + 1}/${d.getDate()}`
-        : `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+        ? `${month}/${day}`
+        : `${year}/${month}/${day}`;
 
       return { date: dateStr, time: timeStr, isToday: false };
     } catch {

@@ -48,12 +48,20 @@ pub async fn list_sales_records(
     let mut query = work_item::Entity::find();
 
     if let Some(f) = from {
+        // "YYYY-MM-DD" is treated as "YYYY-MM-DD 00:00:00" in string comparison.
         query = query.filter(work_item::Column::ReceivedAt.gte(f));
     }
     if let Some(t) = to {
-        // Include the full last day (cover sub-second timestamps).
-        let to_end = format!("{}T23:59:59.9999", t);
-        query = query.filter(work_item::Column::ReceivedAt.lte(to_end));
+        // To include the entire 'to' day, we find everything strictly less than the next day.
+        if let Ok(date) = NaiveDate::parse_from_str(t, "%Y-%m-%d") {
+            let next_day = date + Duration::days(1);
+            let next_day_str = next_day.format("%Y-%m-%d").to_string();
+            query = query.filter(work_item::Column::ReceivedAt.lt(next_day_str));
+        } else {
+            // Fallback for non-standard formats (though we expect YYYY-MM-DD)
+            let to_end = format!("{}T23:59:59.999", t);
+            query = query.filter(work_item::Column::ReceivedAt.lte(to_end));
+        }
     }
 
     let work_items = query
@@ -253,8 +261,14 @@ pub async fn list_top_items(
         query = query.filter(work_item::Column::ReceivedAt.gte(f));
     }
     if let Some(t) = to {
-        let to_end = format!("{}T23:59:59.9999", t);
-        query = query.filter(work_item::Column::ReceivedAt.lte(to_end));
+        if let Ok(date) = NaiveDate::parse_from_str(t, "%Y-%m-%d") {
+            let next_day = date + Duration::days(1);
+            let next_day_str = next_day.format("%Y-%m-%d").to_string();
+            query = query.filter(work_item::Column::ReceivedAt.lt(next_day_str));
+        } else {
+            let to_end = format!("{}T23:59:59.999", t);
+            query = query.filter(work_item::Column::ReceivedAt.lte(to_end));
+        }
     }
     let work_items = query.all(db).await?;
 
