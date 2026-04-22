@@ -229,8 +229,12 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
 
   // 품목 행 변경
   const updateDetail = (key: number, field: keyof DetailInput, value: string | number) => {
+    let finalValue = value;
+    if (field === "unitPrice") {
+      finalValue = Math.max(0, typeof value === "number" ? value : parseInt(value, 10) || 0);
+    }
     setDetails((prev) =>
-      prev.map((d) => (d._key === key ? { ...d, [field]: value } : d))
+      prev.map((d) => (d._key === key ? { ...d, [field]: finalValue } : d))
     );
   };
 
@@ -519,8 +523,9 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
               {manualPrice ? (
                 <input
                   type="number"
+                  min={0}
                   value={priceInput}
-                  onChange={(e) => setPriceInput(e.target.value)}
+                  onChange={(e) => setPriceInput(Math.max(0, parseInt(e.target.value, 10) || 0).toString())}
                   placeholder="가격 직접 입력"
                   className={inputCls}
                 />
@@ -691,8 +696,9 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                         <label className="block text-xs text-on-surface-muted mb-1">금액</label>
                         <input
                           type="number"
+                          min={0}
                           value={payAmount}
-                          onChange={(e) => setPayAmount(e.target.value)}
+                          onChange={(e) => setPayAmount(Math.max(0, parseInt(e.target.value, 10) || 0).toString())}
                           placeholder="결제 금액"
                           className={inputCls}
                         />
