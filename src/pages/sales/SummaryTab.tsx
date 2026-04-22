@@ -100,25 +100,18 @@ export function SummaryTab() {
    */
   function formatSmartDateTime(iso: string): { date: string; time: string; isToday: boolean } {
     try {
-      const d = new Date(iso);
+      const datePart = iso.split("T")[0];
+      const timePart = iso.split("T")[1] || "00:00:00";
+      const [year, month, day] = datePart.split("-").map(Number);
+      const [hour, minute] = timePart.split(":").map(Number);
+      const d = new Date(year, month - 1, day, hour, minute);
       const now = new Date();
-      const isToday = d.toDateString() === now.toDateString();
+      const isToday = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
       const isCurrentYear = d.getFullYear() === now.getFullYear();
-      
-      const timeStr = d.toLocaleTimeString("ko-KR", { 
-        hour: "2-digit", 
-        minute: "2-digit", 
-        hour12: false 
-      });
+      const timeStr = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
 
-      if (isToday) {
-        return { date: "오늘", time: timeStr, isToday: true };
-      }
-
-      const dateStr = isCurrentYear 
-        ? `${d.getMonth() + 1}/${d.getDate()}`
-        : `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
-
+      if (isToday) return { date: "오늘", time: timeStr, isToday: true };
+      const dateStr = isCurrentYear ? `${month}/${day}` : `${year}/${month}/${day}`;
       return { date: dateStr, time: timeStr, isToday: false };
     } catch {
       return { date: iso.slice(5, 10).replace("-", "/"), time: iso.slice(11, 16), isToday: false };
@@ -169,19 +162,19 @@ export function SummaryTab() {
       {/* KPI 카드 4개 */}
       <div className="grid grid-cols-4 gap-4 shrink-0">
         {/* 총 매출 */}
-        <div className="bg-surface-card border border-border-default p-5 rounded-lg shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-3 opacity-10">
-            <TrendingUp className="w-14 h-14 text-primary-600" />
+        <div className="bg-surface-card border border-border-default p-5 rounded-xl shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-10">
+            <TrendingUp className="w-16 h-16 text-primary-600" />
           </div>
-          <p className="text-xs font-bold text-on-surface-muted mb-1.5">총 매출</p>
+          <p className="text-sm font-bold text-on-surface-muted mb-2">선택 기간 총 매출</p>
           <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-extrabold text-on-surface tracking-tight">
+            <h3 className="text-3xl font-extrabold text-on-surface tracking-tight">
               {totalSales.toLocaleString()}
-            </span>
-            <span className="text-sm text-on-surface-muted">원</span>
+            </h3>
+            <span className="text-lg font-medium text-on-surface-muted">원</span>
           </div>
-          <div className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-on-surface-muted">
-            {paidRecords.length}건
+          <div className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-on-surface-muted bg-surface-elevated px-2 py-0.5 rounded border border-border-default shadow-inner-sm">
+            {paidRecords.length}건 결제됨
           </div>
         </div>
 
@@ -370,9 +363,9 @@ export function SummaryTab() {
                           <button
                             onClick={() => handleGoToCustomer(r)}
                             title="고객 관리에서 보기"
-                            className="p-1.5 rounded-md text-on-surface-muted hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-950 transition-colors cursor-pointer group-hover:text-primary-500"
+                            className="p-1.5 rounded-md text-on-surface-muted bg-surface-elevated border border-border-default hover:bg-primary-600 hover:text-white dark:hover:bg-primary-500 hover:border-primary-600 transition-all cursor-pointer shadow-sm group/btn"
                           >
-                            <ExternalLink className="w-4 h-4" />
+                            <ExternalLink className="w-4 h-4 transition-colors" />
                           </button>
                         </td>
                       </tr>

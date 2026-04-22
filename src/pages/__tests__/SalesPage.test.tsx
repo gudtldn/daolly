@@ -30,7 +30,7 @@ describe("SalesPage", () => {
   it("기본 탭에서 KPI 카드들이 표시된다", () => {
     renderWithRouter(<SalesPage />);
     // KPI 카드 헤더 텍스트 기준으로 확인 (selector: "p" 로 카드 제목만 지정)
-    expect(screen.getByText("총 매출", { selector: "p" })).toBeInTheDocument();
+    expect(screen.getByText("선택 기간 총 매출", { selector: "p" })).toBeInTheDocument();
     expect(screen.getByText("카드", { selector: "p" })).toBeInTheDocument();
     expect(screen.getByText("현금 / 이체", { selector: "p" })).toBeInTheDocument();
     expect(screen.getByText("외상 발생", { selector: "p" })).toBeInTheDocument();

@@ -56,32 +56,18 @@ export function TransactionsTab() {
    */
   function formatSmartDateTime(iso: string): { date: string; time: string; isToday: boolean } {
     try {
-      // iso: "2026-04-22T00:01:00" (Local time saved by backend)
-      // Directly parse YYYY, MM, DD, HH, mm to avoid browser timezone interpretation issues
-      const datePart = iso.split("T")[0]; // "2026-04-22"
-      const timePart = iso.split("T")[1] || "00:00:00"; // "00:01:00"
-      
+      const datePart = iso.split("T")[0];
+      const timePart = iso.split("T")[1] || "00:00:00";
       const [year, month, day] = datePart.split("-").map(Number);
       const [hour, minute] = timePart.split(":").map(Number);
-      
       const d = new Date(year, month - 1, day, hour, minute);
       const now = new Date();
-      
-      const isToday = d.getFullYear() === now.getFullYear() && 
-                      d.getMonth() === now.getMonth() && 
-                      d.getDate() === now.getDate();
+      const isToday = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
       const isCurrentYear = d.getFullYear() === now.getFullYear();
-      
       const timeStr = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
 
-      if (isToday) {
-        return { date: "오늘", time: timeStr, isToday: true };
-      }
-
-      const dateStr = isCurrentYear 
-        ? `${month}/${day}`
-        : `${year}/${month}/${day}`;
-
+      if (isToday) return { date: "오늘", time: timeStr, isToday: true };
+      const dateStr = isCurrentYear ? `${month}/${day}` : `${year}/${month}/${day}`;
       return { date: dateStr, time: timeStr, isToday: false };
     } catch {
       return { date: iso.slice(5, 10).replace("-", "/"), time: iso.slice(11, 16), isToday: false };
@@ -163,8 +149,8 @@ export function TransactionsTab() {
           <table className="w-full text-sm text-left">
             <thead className="bg-surface-elevated sticky top-0 border-b border-border-default z-10">
               <tr>
-                <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-24 text-center">날짜</th>
-                <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-16 text-center">시간</th>
+                <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-24 text-center border-r border-border-default/50">날짜</th>
+                <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-16 text-center border-r border-border-default/50">시간</th>
                 <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-28">고객명</th>
                 <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted">결제 내용</th>
                 <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted text-center w-24">결제 수단</th>
