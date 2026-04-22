@@ -5,7 +5,6 @@ import {
   Users,
   TrendingUp,
   Settings,
-  Shirt,
   User,
   PanelLeftClose,
   PanelLeftOpen,

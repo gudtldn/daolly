@@ -2,8 +2,8 @@ use sea_orm::DatabaseConnection;
 use tauri::State;
 
 use crate::commands::CmdResult;
-use crate::services::sales::{ChartDay, SalesRecord, TopItem, UnpaidRecord};
 use crate::services;
+use crate::services::sales::{ChartDay, SalesRecord, TopItem, UnpaidRecord};
 
 #[tauri::command]
 pub async fn list_sales_records(
@@ -11,12 +11,7 @@ pub async fn list_sales_records(
     from: Option<String>,
     to: Option<String>,
 ) -> CmdResult<Vec<SalesRecord>> {
-    Ok(services::sales::list_sales_records(
-        db.inner(),
-        from.as_deref(),
-        to.as_deref(),
-    )
-    .await?)
+    Ok(services::sales::list_sales_records(db.inner(), from.as_deref(), to.as_deref()).await?)
 }
 
 #[tauri::command]
@@ -27,9 +22,7 @@ pub async fn list_unpaid_records(
 }
 
 #[tauri::command]
-pub async fn list_weekly_chart(
-    db: State<'_, DatabaseConnection>,
-) -> CmdResult<Vec<ChartDay>> {
+pub async fn list_weekly_chart(db: State<'_, DatabaseConnection>) -> CmdResult<Vec<ChartDay>> {
     Ok(services::sales::list_weekly_chart(db.inner()).await?)
 }
 
@@ -39,11 +32,5 @@ pub async fn list_top_items(
     from: Option<String>,
     to: Option<String>,
 ) -> CmdResult<Vec<TopItem>> {
-    Ok(services::sales::list_top_items(
-        db.inner(),
-        from.as_deref(),
-        to.as_deref(),
-        5,
-    )
-    .await?)
+    Ok(services::sales::list_top_items(db.inner(), from.as_deref(), to.as_deref(), 5).await?)
 }

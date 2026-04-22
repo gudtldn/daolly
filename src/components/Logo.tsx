@@ -13,7 +13,7 @@ export function Logo({ className = "", size = "md" }: LogoProps) {
 
   return (
     <span
-      className={`font-black tracking-tighter text-primary-600 dark:text-primary-400 select-none ${sizeClasses[size]} ${className}`}
+      className={`font-black tracking-tighter text-primary-600 select-none ${sizeClasses[size]} ${className}`}
     >
       DAOLLY
     </span>

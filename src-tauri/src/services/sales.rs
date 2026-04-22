@@ -119,10 +119,7 @@ pub async fn list_sales_records(
 /// Returns all work_items where paid_amount < price, with customer info.
 pub async fn list_unpaid_records(db: &DatabaseConnection) -> Result<Vec<UnpaidRecord>, DbErr> {
     let work_items = work_item::Entity::find()
-        .filter(
-            Expr::col(work_item::Column::PaidAmount)
-                .lt(Expr::col(work_item::Column::Price)),
-        )
+        .filter(Expr::col(work_item::Column::PaidAmount).lt(Expr::col(work_item::Column::Price)))
         .order_by_desc(work_item::Column::ReceivedAt)
         .all(db)
         .await?;

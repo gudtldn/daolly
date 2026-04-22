@@ -5,11 +5,12 @@ import { renderWithRouter } from "@/test/test-utils";
 import { Sidebar } from "@/components/Sidebar";
 
 describe("Sidebar", () => {
-  it("로고와 앱 이름을 렌더링한다", () => {
+  it("로고가 정상적으로 렌더링된다", () => {
     renderWithRouter(<Sidebar />);
-    // 로고 영역의 h1
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("다올리");
+    // 로고 텍스트 확인
+    expect(screen.getByText("DAOLLY")).toBeInTheDocument();
   });
+
 
   it("메인 네비게이션 메뉴 4개를 렌더링한다", () => {
     renderWithRouter(<Sidebar />);
