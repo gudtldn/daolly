@@ -53,7 +53,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE0MkRGNjBDNEIzNzI1NUEKUldSYUpUZExEUFl0RkJPTDZxWTVOVlM5UXdoS01wQldFdjBpbFZYZ0lGWS9Ody90QjhKcXE5T0QK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNEMUMzQkU3OEUyRjBEMkUKUldRdURTK081enNjUFQrY1BIN3pIaHM3cnFOaVFiblgzUkg2cjBYbmppNkdtWHMzeCtXaDd2R1YK",
       "endpoints": [
         "https://github.com/gudtldn/daolly/releases/latest/download/latest.json"
       ],
