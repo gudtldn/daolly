@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "daolly",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "identifier": "dev.gudtldn.daolly",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -34,7 +34,19 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "macOS": {
+      "frameworks": [],
+      "minimumSystemVersion": "10.13",
+      "exceptionDomain": "",
+      "signingIdentity": null,
+      "entitlements": null
+    },
+    "windows": {
+      "wix": {
+        "language": ["ko-KR"]
+      }
+    }
   },
   "plugins": {
     "updater": {

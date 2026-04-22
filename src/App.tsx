@@ -122,6 +122,14 @@ function App() {
       }
 
       try {
+        // 개발 모드에서는 업데이트 확인을 건너뜀
+        if (import.meta.env.DEV) {
+          console.log("Development mode: skipping update check");
+          setIsClosing(true);
+          setTimeout(() => setShowApp(true), 100);
+          return;
+        }
+
         const update = await check();
         if (!update?.available) {
           // 업데이트가 없으면 바로 페이드아웃 시작
