@@ -43,7 +43,7 @@ export const workItemApi = {
     return invoke("delete_work_item", { id });
   },
 
-  getUnpaidAmounts(customerIds: number[]): Promise<Record<number, number>> {
-    return invoke("get_unpaid_amounts", { customerIds });
+  getAllUnpaidAmounts(): Promise<Record<number, number>> {
+    return invoke("get_all_unpaid_amounts");
   },
 };

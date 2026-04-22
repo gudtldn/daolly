@@ -19,7 +19,7 @@ vi.mock("@/bindings", () => ({
     updateStatus: vi.fn(),
     replaceDetails: vi.fn(),
     delete: vi.fn(),
-    getUnpaidAmounts: vi.fn().mockResolvedValue({}),
+    getAllUnpaidAmounts: vi.fn().mockResolvedValue({}),
   },
 }));
 

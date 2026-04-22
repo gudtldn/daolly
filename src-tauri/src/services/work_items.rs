@@ -268,18 +268,11 @@ pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<u64, DbErr> {
     Ok(res.rows_affected)
 }
 
-/// 고객 ID 목록에 대해 미수금(price - paid_amount) 합계를 반환합니다.
-pub async fn get_unpaid_by_customers(
-    db: &DatabaseConnection,
-    customer_ids: Vec<i32>,
-) -> Result<HashMap<i32, i64>, DbErr> {
-    if customer_ids.is_empty() {
-        return Ok(HashMap::new());
-    }
-
+/// 모든 고객에 대해 미수금(price - paid_amount) 합계를 반환합니다.
+pub async fn get_all_unpaid_amounts(db: &DatabaseConnection) -> Result<HashMap<i32, i64>, DbErr> {
     use sea_orm::{
         prelude::Expr,
-        sea_query::{Func, SimpleExpr},
+        sea_query::{ExprTrait, Func, SimpleExpr},
         FromQueryResult,
     };
 
@@ -298,8 +291,13 @@ pub async fn get_unpaid_by_customers(
             )),
             "unpaid",
         )
-        .filter(work_item::Column::CustomerId.is_in(customer_ids))
         .group_by(work_item::Column::CustomerId)
+        .having(
+            SimpleExpr::from(Func::sum(
+                Expr::col(work_item::Column::Price).sub(Expr::col(work_item::Column::PaidAmount)),
+            ))
+            .gt(0),
+        )
         .into_model::<UnpaidRow>()
         .all(db)
         .await?;
@@ -462,5 +460,36 @@ mod tests {
             .unwrap();
         assert_eq!(received.len(), 1);
         assert_eq!(received[0].description, Some("접수2".to_owned()));
+    }
+
+    #[tokio::test]
+    async fn get_all_unpaid_amounts_works() {
+        let db = setup_test_db().await.unwrap();
+        let cid1 = create_test_customer(&db).await;
+        let cid2 = create_test_customer(&db).await;
+
+        create(
+            &db,
+            cid1,
+            Some("미수금".to_owned()),
+            1000,
+            None,
+            None,
+            vec![],
+        )
+        .await
+        .unwrap();
+
+        let wi2 = create(&db, cid2, Some("완납".to_owned()), 2000, None, None, vec![])
+            .await
+            .unwrap();
+        let mut active_wi2: work_item::ActiveModel = wi2.into();
+        active_wi2.paid_amount = Set(2000);
+        active_wi2.update(&db).await.unwrap();
+
+        let unpaid = get_all_unpaid_amounts(&db).await.unwrap();
+        assert_eq!(unpaid.len(), 1);
+        assert_eq!(unpaid.get(&cid1), Some(&1000));
+        assert_eq!(unpaid.get(&cid2), None);
     }
 }

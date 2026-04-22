@@ -56,7 +56,7 @@ function CustomerPanel({
 
   useEffect(() => {
     if (!selectedCustomer) { setUnpaid(0); return; }
-    workItemApi.getUnpaidAmounts([selectedCustomer.id]).then((m) => {
+    workItemApi.getAllUnpaidAmounts().then((m) => {
       setUnpaid(m[selectedCustomer.id] ?? 0);
     }).catch(() => {});
   }, [selectedCustomer]);

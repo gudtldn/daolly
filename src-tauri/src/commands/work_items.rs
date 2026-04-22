@@ -157,9 +157,8 @@ pub async fn delete_work_item(db: State<'_, DatabaseConnection>, id: i32) -> Cmd
 }
 
 #[tauri::command]
-pub async fn get_unpaid_amounts(
+pub async fn get_all_unpaid_amounts(
     db: State<'_, DatabaseConnection>,
-    customer_ids: Vec<i32>,
 ) -> CmdResult<HashMap<i32, i64>> {
-    Ok(services::work_items::get_unpaid_by_customers(db.inner(), customer_ids).await?)
+    Ok(services::work_items::get_all_unpaid_amounts(db.inner()).await?)
 }

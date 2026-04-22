@@ -20,7 +20,7 @@ interface CustomerActions {
 
 type CustomerStore = CustomerState & CustomerActions;
 
-export const useCustomerStore = create<CustomerStore>((set, get) => ({
+export const useCustomerStore = create<CustomerStore>((set) => ({
   customers: [],
   selectedCustomer: null,
   isLoading: false,
@@ -66,12 +66,7 @@ export const useCustomerStore = create<CustomerStore>((set, get) => ({
   },
 
   loadUnpaid: async () => {
-    const ids = get().customers.map((c) => c.id);
-    if (ids.length === 0) {
-      set({ unpaidMap: {} });
-      return;
-    }
-    const unpaidMap = await workItemApi.getUnpaidAmounts(ids);
+    const unpaidMap = await workItemApi.getAllUnpaidAmounts();
     set({ unpaidMap });
   },
 }));
