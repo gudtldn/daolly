@@ -378,11 +378,33 @@ function WorkItemListPanel({
     setDetailsCache({});
   }, [customer?.id]);
 
-  // focusWorkItemId가 있으면 자동으로 해당 항목 expand
+  // focusWorkItemId가 있으면 자동으로 해당 항목 expand + 스크롤
   useEffect(() => {
     if (!focusWorkItemId) return;
-    handleToggle(focusWorkItemId);
-  }, [focusWorkItemId]); // eslint-disable-line react-hooks/exhaustive-deps
+    
+    // 데이터 로딩 대기 후 처리
+    const timer = setTimeout(async () => {
+      // 토글 대신 직접 ID 설정 (무한 반복 방지)
+      setExpandedId(focusWorkItemId);
+      
+      // 캐시 데이터가 없으면 미리 로드 (handleToggle의 lazy load 로직 모사)
+      if (!detailsCache[focusWorkItemId]) {
+        try {
+          const full = await workItemApi.get(focusWorkItemId);
+          setDetailsCache((prev) => ({ ...prev, [focusWorkItemId]: full.details }));
+        } catch (e) {
+          console.error("Failed to lazy load details for focus item:", e);
+        }
+      }
+
+      const el = rowRefs.current.get(focusWorkItemId);
+      if (el) {
+        el.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [focusWorkItemId, setExpandedId, detailsCache]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // isActive 패널에서만 키보드 네비게이션 처리
   useEffect(() => {
