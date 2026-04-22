@@ -28,12 +28,15 @@ interface PriceActions {
   createCategory: (data: CreateCategory) => Promise<Category>;
   updateCategory: (id: number, data: UpdateCategory) => Promise<Category>;
   deleteCategory: (id: number) => Promise<void>;
+  reorderCategories: (reordered: Category[]) => void;
   createPriceItem: (data: CreatePriceItem) => Promise<PriceItem>;
   updatePriceItem: (id: number, data: UpdatePriceItem) => Promise<PriceItem>;
   deletePriceItem: (id: number) => Promise<void>;
+  reorderPriceItems: (categoryId: number, reordered: PriceItem[]) => void;
   createPriceOption: (data: CreatePriceOption) => Promise<PriceOption>;
   updatePriceOption: (id: number, data: UpdatePriceOption) => Promise<PriceOption>;
   deletePriceOption: (id: number) => Promise<void>;
+  reorderPriceOptions: (reordered: PriceOption[]) => void;
 }
 
 type PriceStore = PriceState & PriceActions;
@@ -93,6 +96,10 @@ export const usePriceStore = create<PriceStore>((set, get) => ({
     }));
   },
 
+  reorderCategories: (reordered) => {
+    set({ categories: reordered });
+  },
+
   createPriceItem: async (data) => {
     const item = await priceItemApi.create(data);
     set((s) => ({ priceItems: [...s.priceItems, item] }));
@@ -111,6 +118,15 @@ export const usePriceStore = create<PriceStore>((set, get) => ({
     await priceItemApi.delete(id);
     set((s) => ({
       priceItems: s.priceItems.filter((p) => p.id !== id),
+    }));
+  },
+
+  reorderPriceItems: (categoryId, reordered) => {
+    set((s) => ({
+      priceItems: [
+        ...s.priceItems.filter((p) => p.categoryId !== categoryId),
+        ...reordered,
+      ],
     }));
   },
 
@@ -133,5 +149,9 @@ export const usePriceStore = create<PriceStore>((set, get) => ({
     set((s) => ({
       priceOptions: s.priceOptions.filter((o) => o.id !== id),
     }));
+  },
+
+  reorderPriceOptions: (reordered) => {
+    set({ priceOptions: reordered });
   },
 }));

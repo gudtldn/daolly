@@ -1,4 +1,4 @@
-import { Wrench, Sun, Moon, Monitor, Type } from "lucide-react";
+import { Wrench, Sun, Moon, Monitor } from "lucide-react";
 import { useSettingsStore } from "@/stores/settingsStore";
 import type { AppSettings, FontSize } from "@/types/settings";
 
@@ -25,7 +25,7 @@ export function GeneralSettings() {
   const setFontSize = useSettingsStore((s) => s.setFontSize);
 
   return (
-    <div>
+    <div className="h-full overflow-y-auto">
       <div className="flex items-center gap-2 mb-6">
         <Wrench className="w-5 h-5 text-on-surface-muted" />
         <h3 className="text-lg font-bold text-on-surface">일반 설정</h3>
@@ -55,10 +55,7 @@ export function GeneralSettings() {
 
         {/* 글꼴 크기 */}
         <section className="bg-surface-card rounded-lg border border-border-default p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <Type className="w-4 h-4 text-on-surface-muted" />
-            <h4 className="text-sm font-semibold text-on-surface">글꼴 크기</h4>
-          </div>
+          <h4 className="text-sm font-semibold text-on-surface mb-3">글꼴 크기</h4>
           <div className="flex gap-3">
             {fontSizeOptions.map((opt) => (
               <button

@@ -52,7 +52,7 @@ export function SettingsPage() {
       </aside>
 
       {/* 우측 콘텐츠 영역 */}
-      <main className="flex-1 overflow-y-auto p-6">
+      <main className="flex-1 overflow-hidden p-6">
         <ActiveComponent />
       </main>
     </div>

@@ -10,7 +10,7 @@ export function AppInfoSettings() {
   }, []);
 
   return (
-    <div>
+    <div className="h-full overflow-y-auto">
       <div className="flex items-center gap-2 mb-6">
         <Info className="w-5 h-5 text-on-surface-muted" />
         <h3 className="text-lg font-bold text-on-surface">앱 정보</h3>
@@ -23,14 +23,6 @@ export function AppInfoSettings() {
             <div className="flex">
               <dt className="w-24 text-on-surface-muted shrink-0">버전</dt>
               <dd className="text-on-surface">{version}</dd>
-            </div>
-            <div className="flex">
-              <dt className="w-24 text-on-surface-muted shrink-0">프레임워크</dt>
-              <dd className="text-on-surface">Tauri v2</dd>
-            </div>
-            <div className="flex">
-              <dt className="w-24 text-on-surface-muted shrink-0">프론트엔드</dt>
-              <dd className="text-on-surface">React 19 + TypeScript</dd>
             </div>
           </dl>
         </section>

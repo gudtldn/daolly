@@ -31,6 +31,12 @@ export function DatabaseSettings() {
     loadBackups();
   }, []);
 
+  useEffect(() => {
+    if (!success) return;
+    const timer = setTimeout(() => setSuccess(""), 4000);
+    return () => clearTimeout(timer);
+  }, [success]);
+
   const loadBackups = async () => {
     setLoading(true);
     try {
@@ -100,7 +106,7 @@ export function DatabaseSettings() {
   };
 
   return (
-    <div>
+    <div className="h-full overflow-y-auto">
       <div className="flex items-center gap-2 mb-6">
         <Database className="w-5 h-5 text-on-surface-muted" />
         <h3 className="text-lg font-bold text-on-surface">데이터 관리</h3>
@@ -156,24 +162,21 @@ export function DatabaseSettings() {
               백업 파일이 없습니다.
             </p>
           ) : (
-            <div className="border border-border-default rounded-lg overflow-hidden">
+            <div className="border border-border-default rounded-lg overflow-hidden max-h-[280px] overflow-y-auto">
               <table className="w-full text-sm">
-                <thead className="bg-surface-elevated text-on-surface-muted">
+                <thead className="sticky top-0 bg-surface-elevated text-on-surface-muted z-10">
                   <tr>
                     <th className="px-3 py-2 text-left font-medium">생성 일시</th>
-                    <th className="px-3 py-2 text-right font-medium">크기</th>
+                    <th className="px-3 py-2 text-right font-medium w-20">크기</th>
                     <th className="w-20"></th>
                   </tr>
                 </thead>
-              </table>
-              <div className="max-h-[240px] overflow-y-auto">
-                <table className="w-full text-sm">
-                  <tbody className="divide-y divide-border-default">
-                    {backups.map((b) => (
-                      <tr key={b.filename}>
-                        <td className="px-3 py-2 text-on-surface">{b.createdAt}</td>
-                        <td className="px-3 py-2 text-right text-on-surface-muted">{formatBytes(b.sizeBytes)}</td>
-                        <td className="px-2 py-2 text-center">
+                <tbody className="divide-y divide-border-default">
+                  {backups.map((b) => (
+                    <tr key={b.filename}>
+                      <td className="px-3 py-2 text-on-surface">{b.createdAt}</td>
+                      <td className="px-3 py-2 text-right text-on-surface-muted w-20">{formatBytes(b.sizeBytes)}</td>
+                      <td className="px-2 py-2 text-center w-20">
                         <button
                           onClick={() => handleRestoreClick(b.filename)}
                           className="flex items-center gap-1 px-2 py-1 text-xs border border-border-default rounded hover:bg-surface-elevated transition-colors cursor-pointer mx-auto"
@@ -181,23 +184,15 @@ export function DatabaseSettings() {
                           <UploadCloud className="w-3.5 h-3.5" />
                           복원
                         </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </section>
 
-        {/* 마이그레이션 안내 */}
-        <section className="bg-surface-card rounded-lg border border-border-default p-5">
-          <h4 className="text-sm font-semibold text-on-surface mb-3">마이그레이션</h4>
-          <p className="text-sm text-on-surface-muted">
-            마이그레이션은 앱 시작 시 자동으로 실행됩니다. 별도 작업이 필요하지 않습니다.
-          </p>
-        </section>
       </div>
     </div>
   );

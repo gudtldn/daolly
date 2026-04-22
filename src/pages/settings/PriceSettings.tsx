@@ -407,12 +407,15 @@ export function PriceSettings() {
     createCategory,
     updateCategory,
     deleteCategory,
+    reorderCategories,
     createPriceItem,
     updatePriceItem,
     deletePriceItem,
+    reorderPriceItems,
     createPriceOption,
     updatePriceOption,
     deletePriceOption,
+    reorderPriceOptions,
   } = usePriceStore();
 
   const { showCustom, showConfirm } = useDialogStore();
@@ -425,6 +428,7 @@ export function PriceSettings() {
   useEffect(() => {
     loadCategories();
     loadPriceOptions();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // select first category once categories are loaded
@@ -484,9 +488,7 @@ export function PriceSettings() {
     const oldIndex = categories.findIndex((c) => c.id === active.id);
     const newIndex = categories.findIndex((c) => c.id === over.id);
     const reordered = arrayMove(categories, oldIndex, newIndex);
-    // optimistic update
-    usePriceStore.setState({ categories: reordered });
-    // persist new sortOrders (only changed items)
+    reorderCategories(reordered);
     await Promise.all(
       reordered.map((cat, i) =>
         cat.sortOrder !== i ? updateCategory(cat.id, { name: cat.name, sortOrder: i }) : Promise.resolve(cat),
@@ -547,10 +549,7 @@ export function PriceSettings() {
     const oldIndex = activeItems.findIndex((i) => i.id === active.id);
     const newIndex = activeItems.findIndex((i) => i.id === over.id);
     const reordered = arrayMove(activeItems, oldIndex, newIndex);
-    // optimistic update: merge reordered items back into priceItems
-    const otherItems = priceItems.filter((p) => p.categoryId !== selectedCategoryId);
-    usePriceStore.setState({ priceItems: [...otherItems, ...reordered] });
-    // persist
+    if (selectedCategoryId !== null) reorderPriceItems(selectedCategoryId, reordered);
     await Promise.all(
       reordered.map((item, i) =>
         item.sortOrder !== i ? updatePriceItem(item.id, { sortOrder: i }) : Promise.resolve(item),
@@ -605,7 +604,7 @@ export function PriceSettings() {
     const oldIndex = priceOptions.findIndex((o) => o.id === active.id);
     const newIndex = priceOptions.findIndex((o) => o.id === over.id);
     const reordered = arrayMove(priceOptions, oldIndex, newIndex);
-    usePriceStore.setState({ priceOptions: reordered });
+    reorderPriceOptions(reordered);
     await Promise.all(
       reordered.map((opt, i) =>
         opt.sortOrder !== i ? updatePriceOption(opt.id, { sortOrder: i }) : Promise.resolve(opt),
@@ -667,10 +666,12 @@ export function PriceSettings() {
           <div className="flex-1 bg-surface-card border border-border-default rounded-lg flex flex-col overflow-hidden shadow-sm min-h-0">
             <div className="px-4 py-3 bg-surface-elevated border-b border-border-default flex items-center justify-between shrink-0">
               <h4 className="text-sm font-semibold text-on-surface">
-                <span className="text-primary-600 dark:text-primary-400 mr-1.5">
-                  [{activeCat?.name ?? "선택 안됨"}]
-                </span>
                 세부 품목 단가표
+                {activeCat && (
+                  <span className="ml-1.5 text-primary-600 dark:text-primary-400 font-normal">
+                    [{activeCat.name}]
+                  </span>
+                )}
               </h4>
               <button
                 onClick={handleAddItem}
@@ -747,7 +748,7 @@ export function PriceSettings() {
               </div>
               <button
                 onClick={handleAddOption}
-                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-on-surface bg-surface-card border border-border-default rounded hover:bg-surface-elevated transition-colors cursor-pointer self-start"
+                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800 rounded hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors cursor-pointer self-start"
               >
                 <Plus className="w-3.5 h-3.5" />
                 옵션 추가
