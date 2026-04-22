@@ -653,17 +653,22 @@ export function CustomersPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [focusWorkItemId, setFocusWorkItemId] = useState<number | null>(null);
 
-  // 고객 검색 필터 (CustomerListPanel과 키보드 네비게이션 공유)
+  // 고객 검색 (서버 사이드 API 호출)
   const [searchKeyword, setSearchKeyword] = useState("");
-  const filteredCustomers = useMemo(() => {
-    if (!searchKeyword) return customers;
-    const kw = searchKeyword.toLowerCase();
-    return customers.filter(
-      (c) =>
-        c.name.toLowerCase().includes(kw) ||
-        (c.phoneNumber && c.phoneNumber.includes(kw)),
-    );
-  }, [searchKeyword, customers]);
+  const isInitialMount = useRef(true);
+
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      load(searchKeyword.trim()).then(() => loadUnpaid());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchKeyword, load, loadUnpaid]);
+
+  const filteredCustomers = customers;
 
   // Floating Card 상태
   const [cardOpen, setCardOpen] = useState(false);

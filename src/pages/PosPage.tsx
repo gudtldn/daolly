@@ -29,30 +29,22 @@ function CustomerPanel({
   onViewHistory: (customerId: number) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
   const [results, setResults] = useState<Customer[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [unpaid, setUnpaid] = useState(0);
   const [highlightIdx, setHighlightIdx] = useState(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    customerApi.list().then(setAllCustomers).catch(() => {});
-  }, []);
-
   const handleSearch = (q: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!q.trim()) { setResults([]); setShowDropdown(false); return; }
     debounceRef.current = setTimeout(() => {
-      const lower = q.trim().toLowerCase();
-      const filtered = allCustomers.filter((c) => {
-        const phone = (c.phoneNumber ?? "").replace(/-/g, "");
-        return c.name.toLowerCase().includes(lower) || phone.endsWith(lower);
-      });
-      setResults(filtered);
-      setHighlightIdx(0);
-      setShowDropdown(true);
-    }, 150);
+      customerApi.list(q.trim()).then((fetched) => {
+        setResults(fetched);
+        setHighlightIdx(0);
+        setShowDropdown(true);
+      }).catch(() => {});
+    }, 300);
   };
 
   const handleSelect = (c: Customer) => {
@@ -651,11 +643,12 @@ export function PosPage() {
   useEffect(() => {
     const storedId = useCartStore.getState().customerId;
     if (storedId && !selectedCustomer) {
-      customerApi.list().then((all) => {
-        const found = all.find((c) => c.id === storedId);
-        if (found) setSelectedCustomer(found);
-        else useCartStore.getState().setCustomer(null); // stale id cleanup
-      }).catch((e) => { console.warn("Failed to restore customer from cart store:", e); });
+      customerApi.get(storedId).then((found) => {
+        setSelectedCustomer(found);
+      }).catch((e) => {
+        console.warn("Failed to restore customer from cart store:", e);
+        useCartStore.getState().setCustomer(null); // stale id cleanup
+      });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -10,7 +10,7 @@ interface CustomerState {
 }
 
 interface CustomerActions {
-  load: () => Promise<void>;
+  load: (search?: string | null) => Promise<void>;
   select: (customer: Customer | null) => void;
   create: (data: CreateCustomer) => Promise<Customer>;
   update: (id: number, data: UpdateCustomer) => Promise<Customer>;
@@ -26,10 +26,10 @@ export const useCustomerStore = create<CustomerStore>((set, get) => ({
   isLoading: false,
   unpaidMap: {},
 
-  load: async () => {
+  load: async (search) => {
     set({ isLoading: true });
     try {
-      const customers = await customerApi.list(null);
+      const customers = await customerApi.list(search ?? null);
       set({ customers });
     } finally {
       set({ isLoading: false });
