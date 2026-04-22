@@ -57,7 +57,10 @@
       "endpoints": [
         "https://github.com/gudtldn/daolly/releases/latest/download/latest.json"
       ],
-      "dialog": false
+      "dialog": false,
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }

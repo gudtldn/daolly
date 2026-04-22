@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { MemoryRouter, Routes, Route, Navigate } from "react-router";
 import { Toaster } from "sonner";
 import { check } from "@tauri-apps/plugin-updater";
-import { relaunch } from "@tauri-apps/plugin-process";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { RefreshCw, Download, AlertCircle } from "lucide-react";
 import { Logo } from "@/components/Logo";
@@ -120,6 +119,7 @@ function App() {
         console.error("Failed to show window:", e);
       }
 
+      // 윈도우 노출 직후 업데이트 확인 시작
       try {
         // 개발 모드에서는 업데이트 확인을 건너뜀
         if (import.meta.env.DEV) {
@@ -156,7 +156,9 @@ function App() {
               }
               break;
             case "Finished":
-              relaunch();
+              // Windows에서는 설치 프로그램이 자동으로 앱을 종료하고 교체 후 다시 띄움
+              // relaunch()를 직접 호출하면 구버전이 다시 실행되어 파일 잠금이 발생할 수 있음
+              console.log("Update finished. The installer will now handle the relaunch.");
               break;
           }
         });
