@@ -5,6 +5,8 @@ import { workItemApi, paymentApi } from "@/bindings";
 export type PaymentMethod = "card" | "cash" | "transfer" | "credit";
 
 export interface CartItem {
+  /** Stable unique id for React key - not persisted to DB */
+  uid: string;
   /** null = 직접 입력 */
   priceItemId: number | null;
   name: string;
@@ -51,7 +53,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
         updated[existing] = { ...updated[existing], quantity: updated[existing].quantity + 1 };
         return { items: updated };
       }
-      return { items: [...s.items, { ...item, quantity: 1, optionsMemo: item.optionsMemo ?? "" }] };
+      return { items: [...s.items, { ...item, uid: crypto.randomUUID(), quantity: 1, optionsMemo: item.optionsMemo ?? "" }] };
     });
   },
 

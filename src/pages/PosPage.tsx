@@ -209,7 +209,7 @@ function DirectInputForm({
       <input
         type="text"
         inputMode="numeric"
-        value={price}
+        value={price ? Number(price).toLocaleString("ko-KR") : ""}
         onChange={(e) => setPrice(e.target.value.replace(/[^0-9]/g, ""))}
         onKeyDown={handleKey}
         placeholder="가격"
@@ -255,6 +255,11 @@ function OrderPanel({
   const [activeCatId, setActiveCatId] = useState<number | null>(null);
   const [showDirectInput, setShowDirectInput] = useState(false);
   const [selectedOptionIds, setSelectedOptionIds] = useState<Set<number>>(new Set());
+
+  // Reset selected options when switching category to prevent accidental carry-over.
+  useEffect(() => {
+    setSelectedOptionIds(new Set());
+  }, [activeCatId]);
   const { showCustom } = useDialogStore();
   const memoRef = useRef<string>("");
   const catTabsRef = useRef<HTMLDivElement>(null);
@@ -341,7 +346,7 @@ function OrderPanel({
       </div>
 
       {/* 단가 버튼 그리드 */}
-      <div className="p-4 grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-3 shrink-0 bg-surface border-b border-border-default overflow-y-auto max-h-40">
+      <div className="p-4 grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-3 shrink-0 bg-surface border-b border-border-default overflow-y-auto max-h-56">
         {catItems.map((item) => (
           <button
             key={item.id}
@@ -429,7 +434,7 @@ function OrderPanel({
           </thead>
           <tbody className="divide-y divide-border-default">
             {items.map((item, index) => (
-              <tr key={index} className="hover:bg-surface transition-colors">
+              <tr key={item.uid} className="hover:bg-surface transition-colors">
                 <td className="px-4 py-3">
                   <div className="font-bold text-on-surface">{item.name}</div>
                   {item.optionsMemo && (
@@ -540,10 +545,6 @@ function PaymentPanel({
             <span className="text-on-surface-muted">총 수량</span>
             <span className="font-bold text-on-surface">{totalQty} 개</span>
           </div>
-          <div className="flex justify-between items-center text-sm">
-            <span className="text-on-surface-muted">합계 금액</span>
-            <span className="font-bold text-on-surface">{total.toLocaleString()} 원</span>
-          </div>
           <div className="pt-3 border-t border-border-default flex justify-between items-end">
             <span className="font-bold text-on-surface text-sm">최종 결제 금액</span>
             <span className="text-3xl font-bold text-primary-600 tracking-tighter leading-none">
@@ -627,7 +628,8 @@ export function PosPage() {
       customerApi.list().then((all) => {
         const found = all.find((c) => c.id === storedId);
         if (found) setSelectedCustomer(found);
-      });
+        else useCartStore.getState().setCustomer(null); // stale id cleanup
+      }).catch((e) => { console.warn("Failed to restore customer from cart store:", e); });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
