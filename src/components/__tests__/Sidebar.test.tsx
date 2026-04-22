@@ -46,11 +46,6 @@ describe("Sidebar", () => {
     expect(inactiveLink?.className).toContain("text-secondary-400");
   });
 
-  it("하단에 사용자 정보를 렌더링한다", () => {
-    renderWithRouter(<Sidebar />);
-    expect(screen.getByText("관리자")).toBeInTheDocument();
-  });
-
   it("토글 버튼 클릭 시 사이드바가 접힌다", async () => {
     const user = userEvent.setup();
     renderWithRouter(<Sidebar />);

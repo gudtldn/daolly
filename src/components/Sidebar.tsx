@@ -5,7 +5,6 @@ import {
   Users,
   TrendingUp,
   Settings,
-  User,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
@@ -59,7 +58,7 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* 네비게이션 */}
+      {/* 메인 네비게이션 */}
       <nav className="flex-1 py-2 space-y-1 overflow-y-auto overflow-x-hidden">
         {mainNavItems.map((item) => (
           <NavLink
@@ -70,29 +69,7 @@ export function Sidebar() {
                 collapsed ? "justify-center px-0 py-3" : "px-5 py-3"
               } transition-colors ${
                 isActive
-                  ? "bg-primary-600 text-white"
-                  : "text-secondary-400 hover:bg-secondary-800 hover:text-white"
-              }`
-            }
-          >
-            <item.icon className={`w-5 h-5 shrink-0 ${collapsed ? "" : "mr-3"}`} />
-            {!collapsed && <span className="text-sm">{item.label}</span>}
-          </NavLink>
-        ))}
-
-        {/* 구분선 */}
-        <div className={`${collapsed ? "mx-3" : "mx-5"} my-4 border-t border-secondary-800`} />
-
-        {bottomNavItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              `flex items-center whitespace-nowrap ${
-                collapsed ? "justify-center px-0 py-3" : "px-5 py-3"
-              } transition-colors ${
-                isActive
-                  ? "bg-primary-600 text-white"
+                  ? "bg-primary-600 text-white font-bold"
                   : "text-secondary-400 hover:bg-secondary-800 hover:text-white"
               }`
             }
@@ -103,21 +80,26 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* 사용자 정보 */}
-      <div
-        className={`p-4 border-t border-secondary-800 flex items-center whitespace-nowrap overflow-hidden ${
-          collapsed ? "justify-center" : ""
-        }`}
-      >
-        <div className="w-9 h-9 rounded-full bg-secondary-700 flex items-center justify-center shrink-0">
-          <User className="w-5 h-5 text-secondary-400" />
-        </div>
-        {!collapsed && (
-          <div className="ml-3">
-            <p className="text-sm font-semibold">관리자</p>
-            <p className="text-xs text-secondary-500">다올리</p>
-          </div>
-        )}
+      {/* 하단 고정 메뉴 (환경 설정) */}
+      <div className="border-t border-secondary-800 py-2">
+        {bottomNavItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            className={({ isActive }) =>
+              `flex items-center whitespace-nowrap ${
+                collapsed ? "justify-center px-0 py-3" : "px-5 py-3"
+              } transition-colors ${
+                isActive
+                  ? "bg-primary-600 text-white font-bold"
+                  : "text-secondary-400 hover:bg-secondary-800 hover:text-white"
+              }`
+            }
+          >
+            <item.icon className={`w-5 h-5 shrink-0 ${collapsed ? "" : "mr-3"}`} />
+            {!collapsed && <span className="text-sm">{item.label}</span>}
+          </NavLink>
+        ))}
       </div>
     </aside>
   );
