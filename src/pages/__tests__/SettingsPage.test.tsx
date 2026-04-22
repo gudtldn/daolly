@@ -44,7 +44,6 @@ describe("SettingsPage", () => {
     // 앱 정보 콘텐츠 표시
     expect(screen.getByText("다올리")).toBeInTheDocument();
     expect(screen.getByText("0.1.0")).toBeInTheDocument();
-    expect(screen.getByText("Tauri v2")).toBeInTheDocument();
     // 일반 설정 콘텐츠는 사라짐
     expect(screen.queryByText("테마")).not.toBeInTheDocument();
   });

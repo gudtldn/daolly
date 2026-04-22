@@ -35,17 +35,20 @@ describe("App", () => {
     vi.useRealTimers();
   });
 
-  it("초기 라우트로 고객 관리 페이지를 표시한다", () => {
+  it("초기 라우트로 고객 관리 페이지를 표시한다", async () => {
     render(<App />);
-    // Header의 h2 제목으로 확인 (header 요소 내부)
-    const header = document.querySelector("header");
+    // 업데이트 스플래시 화면이 사라지고 본문이 나타날 때까지 대기
+    const header = await screen.findByRole("banner"); // <header>
     expect(header).toBeInTheDocument();
-    expect(header!.querySelector("h2")).toHaveTextContent("고객 관리");
+    expect(header.querySelector("h2")).toHaveTextContent("고객 관리");
   });
 
   it("사이드바 메뉴 클릭 시 페이지가 전환된다", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
+
+    // 업데이트 스플래시 이후 본문 노출 대기
+    await screen.findByRole("banner");
 
     // 사이드바의 "대시보드" 링크 클릭
     const dashboardLink = screen.getByText("대시보드").closest("a")!;
@@ -56,8 +59,10 @@ describe("App", () => {
     expect(header!.querySelector("h2")).toHaveTextContent("대시보드");
   });
 
-  it("고객 관리 메뉴가 초기 활성 상태이다", () => {
+  it("고객 관리 메뉴가 초기 활성 상태이다", async () => {
     render(<App />);
+    await screen.findByRole("banner");
+
     // 사이드바 nav 내의 "고객 관리" 링크
     const nav = document.querySelector("nav")!;
     const customerLink = Array.from(nav.querySelectorAll("a")).find(

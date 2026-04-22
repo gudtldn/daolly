@@ -123,7 +123,7 @@ describe("cartStore", () => {
 
   describe("clear", () => {
     it("모든 상태 초기화", () => {
-      useCartStore.setState({ customerId: 5, items: [{ ...sampleItem, quantity: 1, optionsMemo: "" }] });
+      useCartStore.setState({ customerId: 5, items: [{ ...sampleItem, uid: "test-uid", quantity: 1, optionsMemo: "" }] });
       useCartStore.getState().clear();
       expect(useCartStore.getState().customerId).toBeNull();
       expect(useCartStore.getState().items).toHaveLength(0);

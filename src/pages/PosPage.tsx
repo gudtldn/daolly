@@ -270,7 +270,7 @@ function OrderPanel({
   onUpdateMemo,
 }: {
   items: CartItem[];
-  onAddItem: (item: Omit<CartItem, "quantity"> & { optionsMemo?: string }) => void;
+  onAddItem: (item: Omit<CartItem, "uid" | "quantity"> & { optionsMemo?: string }) => void;
   onRemoveItem: (i: number) => void;
   onUpdateQty: (i: number, qty: number) => void;
   onUpdateMemo: (i: number, memo: string) => void;

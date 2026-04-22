@@ -22,7 +22,7 @@ interface CartState {
 
 interface CartActions {
   setCustomer: (id: number | null) => void;
-  addItem: (item: Omit<CartItem, "quantity" | "optionsMemo"> & { optionsMemo?: string }) => void;
+  addItem: (item: Omit<CartItem, "uid" | "quantity" | "optionsMemo"> & { optionsMemo?: string }) => void;
   removeItem: (index: number) => void;
   updateQuantity: (index: number, quantity: number) => void;
   updateOptionsMemo: (index: number, memo: string) => void;
