@@ -1,8 +1,4 @@
 import { CreditCard, Banknote, Clock, Landmark } from "lucide-react";
-import type { PaymentMethod } from "@/types";
-
-// Displayed payment method includes "credit" as the visual label for null (unpaid) records.
-type DisplayMethod = PaymentMethod | "credit";
 
 export interface DateRange {
   from: string;
@@ -48,33 +44,56 @@ export function getDateRange(period: PresetId): DateRange {
   }
 }
 
-export function PaymentMethodBadge({ method }: { method: DisplayMethod }) {
-  switch (method) {
-    case "card":
-      return (
-        <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300">
-          <CreditCard className="w-3 h-3" /> 카드
-        </span>
-      );
-    case "cash":
-      return (
-        <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded bg-success-50 text-success-700 dark:bg-success-900/40 dark:text-success-300">
-          <Banknote className="w-3 h-3" /> 현금
-        </span>
-      );
-    case "transfer":
-      return (
-        <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded bg-secondary-100 text-secondary-600 dark:bg-secondary-700 dark:text-secondary-300">
-          <Landmark className="w-3 h-3" /> 이체
-        </span>
-      );
-    case "credit":
-      return (
-        <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded bg-warning-50 text-warning-700 dark:bg-warning-900/40 dark:text-warning-300">
-          <Clock className="w-3 h-3" /> 외상
-        </span>
-      );
-    default:
-      return null;
+export function PaymentMethodBadge({ method }: { method: string }) {
+  // 여러 결제 수단이 쉼표로 합쳐져 있는 경우 (예: "card, cash" 또는 "카드, 현금")
+  if (method.includes(",")) {
+    const methods = Array.from(new Set(method.split(",").map((m) => m.trim()))); // 중복 제거
+    return (
+      <div className="flex items-center justify-center gap-0.5 flex-nowrap">
+        {methods.map((m, i) => (
+          <PaymentMethodBadge key={`${m}-${i}`} method={m} />
+        ))}
+      </div>
+    );
   }
+
+  const m = method.toLowerCase();
+  const baseClass = "inline-flex items-center gap-1 font-bold px-1.5 py-0.5 rounded border whitespace-nowrap";
+  const smallText = "text-[11px]";
+
+  if (m === "card" || m === "카드") {
+    return (
+      <span className={`${baseClass} ${smallText} bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300 border-primary-200/50 dark:border-primary-800/50`}>
+        <CreditCard className="w-3 h-3" /> 카드
+      </span>
+    );
+  }
+  if (m === "cash" || m === "현금") {
+    return (
+      <span className={`${baseClass} ${smallText} bg-success-50 text-success-700 dark:bg-success-900/40 dark:text-success-300 border-success-200/50 dark:border-success-800/50`}>
+        <Banknote className="w-3 h-3" /> 현금
+      </span>
+    );
+  }
+  if (m === "transfer" || m === "이체") {
+    return (
+      <span className={`${baseClass} ${smallText} bg-secondary-100 text-secondary-600 dark:bg-secondary-700 dark:text-secondary-300 border-secondary-200/50`}>
+        <Landmark className="w-3 h-3" /> 이체
+      </span>
+    );
+  }
+  if (m === "credit" || m === "외상") {
+    return (
+      <span className={`${baseClass} ${smallText} bg-warning-50 text-warning-700 dark:bg-warning-900/40 dark:text-warning-300 border-warning-200/50 dark:border-warning-800/50`}>
+        <Clock className="w-3 h-3" /> 외상
+      </span>
+    );
+  }
+
+  // 매칭되는 것이 없으면 텍스트라도 표시
+  return (
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-surface-elevated text-on-surface-muted border border-border-default text-[10px] font-bold whitespace-nowrap">
+      {method}
+    </span>
+  );
 }

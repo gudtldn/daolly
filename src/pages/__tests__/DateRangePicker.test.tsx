@@ -33,7 +33,7 @@ describe("DateRangePicker", () => {
         onClear={vi.fn()}
       />
     );
-    expect(screen.getByText("4/1 - 4/22")).toBeInTheDocument();
+    expect(screen.getByText("4/1 ~ 4/22")).toBeInTheDocument();
   });
 
   it("버튼 클릭 시 팝오버가 열린다", async () => {

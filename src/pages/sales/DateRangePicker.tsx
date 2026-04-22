@@ -16,8 +16,23 @@ interface Props {
 function formatDisplay(range: DateRange): string {
   const from = new Date(range.from);
   const to = new Date(range.to);
-  const fmt = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
-  return `${fmt(from)} - ${fmt(to)}`;
+  const currentYear = new Date().getFullYear();
+
+  const fmtFull = (d: Date) =>
+    `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+  const fmtShort = (d: Date) =>
+    `${d.getMonth() + 1}/${d.getDate()}`;
+
+  // 시작일이나 종료일이 올해가 아니거나, 두 날짜의 연도가 다르면 연도 포함 표시
+  if (
+    from.getFullYear() !== currentYear ||
+    to.getFullYear() !== currentYear ||
+    from.getFullYear() !== to.getFullYear()
+  ) {
+    return `${fmtFull(from)} ~ ${fmtFull(to)}`;
+  }
+
+  return `${fmtShort(from)} ~ ${fmtShort(to)}`;
 }
 
 export function DateRangePicker({ value, onApply, onClear }: Props) {

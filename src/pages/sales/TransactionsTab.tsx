@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { Receipt, Search } from "lucide-react";
+import { Receipt, Search, ExternalLink } from "lucide-react";
+import { useNavigate } from "react-router";
 import { DateRangePicker } from "@/pages/sales/DateRangePicker";
 import { salesApi } from "@/bindings/sales";
 import type { SalesRecord } from "@/types";
@@ -15,6 +16,7 @@ import {
 // TransactionsTab
 // ============================================================
 export function TransactionsTab() {
+  const navigate = useNavigate();
   const [period, setPeriod] = useState<PresetId>("today");
   const [customRange, setCustomRange] = useState<DateRange | null>(null);
   const [search, setSearch] = useState("");
@@ -45,30 +47,59 @@ export function TransactionsTab() {
       (r.description ?? "").includes(search)
   );
 
-  // Total for the selected period, independent of search filter.
-  // Search only narrows the visible rows; the period total stays fixed.
   const totalAmount = records
     .filter((r) => r.paymentMethod !== null)
     .reduce((sum, r) => sum + r.price, 0);
 
-  function toDateTimeStr(iso: string): { date: string; time: string } {
+  /**
+   * 오늘 날짜와 비교하여 스마트한 날짜/시간 문자열 반환
+   */
+  function formatSmartDateTime(iso: string): { date: string; time: string; isToday: boolean } {
     try {
       const d = new Date(iso);
-      return {
-        date: d.toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\. /g, "-").replace(".", ""),
-        time: d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false }),
-      };
+      const now = new Date();
+      const isToday = d.toDateString() === now.toDateString();
+      const isCurrentYear = d.getFullYear() === now.getFullYear();
+      
+      const timeStr = d.toLocaleTimeString("ko-KR", { 
+        hour: "2-digit", 
+        minute: "2-digit", 
+        hour12: false 
+      });
+
+      if (isToday) {
+        return { date: "오늘", time: timeStr, isToday: true };
+      }
+
+      // 올해가 아니면 연도까지 표시 (YYYY/M/D), 올해면 M/D
+      const dateStr = isCurrentYear 
+        ? `${d.getMonth() + 1}/${d.getDate()}`
+        : `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+
+      return { date: dateStr, time: timeStr, isToday: false };
     } catch {
-      return { date: iso.slice(0, 10), time: iso.slice(11, 16) };
+      return { date: iso.slice(5, 10).replace("-", "/"), time: iso.slice(11, 16), isToday: false };
     }
   }
 
+  const handleGoToCustomer = (r: SalesRecord) => {
+    navigate("/customers", { 
+      state: { 
+        focusCustomerId: r.customerId, 
+        focusWorkItemId: r.workItemId 
+      } 
+    });
+  };
+
   return (
-    <div className="h-full flex flex-col gap-4 min-h-0">      {error && (
+    <div className="h-full flex flex-col gap-4 min-h-0">
+      {error && (
         <div className="shrink-0 px-4 py-2.5 rounded-lg bg-danger-50 border border-danger-200 text-danger-700 text-sm dark:bg-danger-950/30 dark:border-danger-900/40 dark:text-danger-400">
           {error}
         </div>
-      )}      {/* 컨트롤 바 */}
+      )}
+
+      {/* 컨트롤 바 */}
       <div className="flex items-center justify-between bg-surface-card border border-border-default p-3 rounded-lg shadow-sm shrink-0">
         <div className="flex items-center gap-2">
           <div className={`flex items-center gap-1 bg-surface-elevated p-1 rounded-md border border-border-default transition-opacity ${customRange ? "opacity-40 pointer-events-none" : ""}`}>
@@ -122,39 +153,51 @@ export function TransactionsTab() {
           <span className="ml-auto text-xs text-on-surface-muted">{filtered.length}건</span>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto font-sans">
           <table className="w-full text-sm text-left">
             <thead className="bg-surface-elevated sticky top-0 border-b border-border-default z-10">
               <tr>
-                <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-28">날짜</th>
-                <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-14">시간</th>
+                <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-24 text-center">날짜</th>
+                <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-16 text-center">시간</th>
                 <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-28">고객명</th>
                 <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted">결제 내용</th>
                 <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted text-center w-24">결제 수단</th>
-                <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted text-right w-28">금액</th>
+                <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted text-right w-24">금액</th>
+                <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-12"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-on-surface-muted text-sm">
+                  <td colSpan={7} className="px-4 py-12 text-center text-on-surface-muted text-sm">
                     거래 내역이 없습니다.
                   </td>
                 </tr>
               ) : (
                 filtered.map((r) => {
-                  const { date, time } = toDateTimeStr(r.receivedAt);
+                  const { date, time, isToday } = formatSmartDateTime(r.receivedAt);
                   return (
-                    <tr key={r.workItemId} className="hover:bg-surface-elevated transition-colors">
-                      <td className="px-4 py-3 text-xs text-on-surface-muted">{date}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-on-surface-muted">{time}</td>
+                    <tr key={r.workItemId} className="hover:bg-surface-elevated/50 transition-colors group">
+                      <td className={`px-4 py-3 text-xs text-center border-r border-border-default/50 ${isToday ? "text-primary-600 font-bold dark:text-primary-400" : "text-on-surface-muted"}`}>
+                        {date}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-on-surface-muted text-center border-r border-border-default/50">{time}</td>
                       <td className="px-4 py-3 font-semibold text-on-surface">{r.customerName}</td>
-                      <td className="px-4 py-3 text-on-surface">{r.description ?? "-"}</td>
+                      <td className="px-4 py-3 text-on-surface max-w-[200px] truncate">{r.description ?? "-"}</td>
                       <td className="px-4 py-3 text-center">
                         <PaymentMethodBadge method={r.paymentMethod ?? "credit"} />
                       </td>
-                      <td className="px-4 py-3 text-right font-bold text-on-surface">
+                      <td className="px-4 py-3 text-right font-bold text-on-surface whitespace-nowrap">
                         {r.price.toLocaleString()}원
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => handleGoToCustomer(r)}
+                          title="고객 관리에서 보기"
+                          className="p-1.5 rounded-md text-on-surface-muted hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-950 transition-colors cursor-pointer group-hover:text-primary-500"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   );

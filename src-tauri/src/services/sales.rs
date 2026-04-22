@@ -76,16 +76,24 @@ pub async fn list_sales_records(
     let customer_map: HashMap<i32, String> =
         customers.into_iter().map(|c| (c.id, c.name)).collect();
 
-    // Fetch the first payment per work_item (ordered by paid_at ascending).
+    // Fetch all payments per work_item.
     let payments = payment::Entity::find()
         .filter(payment::Column::WorkItemId.is_in(work_item_ids))
         .order_by_asc(payment::Column::PaidAt)
         .all(db)
         .await?;
 
-    let mut method_map: HashMap<i32, Option<String>> = HashMap::new();
+    let mut method_map: HashMap<i32, String> = HashMap::new();
     for p in payments {
-        method_map.entry(p.work_item_id).or_insert(p.method);
+        if let Some(m) = p.method {
+            let entry = method_map.entry(p.work_item_id).or_default();
+            if !entry.contains(&m) {
+                if !entry.is_empty() {
+                    entry.push_str(", ");
+                }
+                entry.push_str(&m);
+            }
+        }
     }
 
     let records = work_items
@@ -95,7 +103,7 @@ pub async fn list_sales_records(
                 .get(&wi.customer_id)
                 .cloned()
                 .unwrap_or_default(),
-            payment_method: method_map.get(&wi.id).cloned().unwrap_or(None),
+            payment_method: method_map.get(&wi.id).cloned(),
             work_item_id: wi.id,
             customer_id: wi.customer_id,
             description: wi.description,

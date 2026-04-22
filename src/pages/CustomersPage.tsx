@@ -24,7 +24,13 @@ import { WorkItemFormCard } from "@/pages/customers/WorkItemFormCard";
 function formatDateShort(iso: string | null): string {
   if (!iso) return "-";
   const d = new Date(iso);
-  return `${d.getMonth() + 1}/${d.getDate()}`;
+  const now = new Date();
+  const isCurrentYear = d.getFullYear() === now.getFullYear();
+
+  if (isCurrentYear) {
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  }
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
 }
 
 function formatDateFull(iso: string | null): string | undefined {
