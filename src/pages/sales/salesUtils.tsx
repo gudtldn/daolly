@@ -1,4 +1,8 @@
 import { CreditCard, Banknote, Clock, Landmark } from "lucide-react";
+import type { PaymentMethod } from "@/types";
+
+// Displayed payment method includes "credit" as the visual label for null (unpaid) records.
+type DisplayMethod = PaymentMethod | "credit";
 
 export interface DateRange {
   from: string;
@@ -44,7 +48,7 @@ export function getDateRange(period: PresetId): DateRange {
   }
 }
 
-export function PaymentMethodBadge({ method }: { method: string }) {
+export function PaymentMethodBadge({ method }: { method: DisplayMethod }) {
   switch (method) {
     case "card":
       return (

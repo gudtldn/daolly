@@ -40,7 +40,15 @@ export function DateRangePicker({ value, onApply, onClear }: Props) {
     });
   };
 
-  // 외부 클릭 시 팝오버 닫기
+  // Close the popover when the window is resized to avoid position mismatch.
+  useEffect(() => {
+    if (!open) return;
+    const handler = () => setOpen(false);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, [open]);
+
+  // Close on outside click.
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {

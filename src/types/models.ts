@@ -75,6 +75,8 @@ export interface WorkItemFull extends WorkItem {
 }
 
 // Sales service DTOs
+export type PaymentMethod = "card" | "cash" | "transfer";
+
 export interface SalesRecord {
   workItemId: number;
   customerId: number;
@@ -82,8 +84,8 @@ export interface SalesRecord {
   description: string | null;
   price: number;
   paidAmount: number;
-  /** null = credit (no payment recorded) */
-  paymentMethod: string | null;
+  /** null = unpaid (no payment recorded - displayed as credit/외상) */
+  paymentMethod: PaymentMethod | null;
   receivedAt: string;
 }
 

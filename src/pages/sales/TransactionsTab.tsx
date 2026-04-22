@@ -45,8 +45,9 @@ export function TransactionsTab() {
       (r.description ?? "").includes(search)
   );
 
-  // Exclude credit items from the total amount.
-  const totalAmount = filtered
+  // Total for the selected period, independent of search filter.
+  // Search only narrows the visible rows; the period total stays fixed.
+  const totalAmount = records
     .filter((r) => r.paymentMethod !== null)
     .reduce((sum, r) => sum + r.price, 0);
 

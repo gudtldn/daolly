@@ -41,9 +41,13 @@ function groupByCustomer(records: UnpaidRecord[]): CustomerGroup[] {
 export function UnpaidTab() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [records, setRecords] = useState<UnpaidRecord[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void salesApi.listUnpaidRecords().then(setRecords);
+    void salesApi
+      .listUnpaidRecords()
+      .then(setRecords)
+      .catch(() => setError("데이터를 불러오는 중 오류가 발생했습니다."));
   }, []);
 
   const customers = groupByCustomer(records);
@@ -67,6 +71,11 @@ export function UnpaidTab() {
 
   return (
     <div className="h-full flex flex-col gap-4 min-h-0">
+      {error && (
+        <div className="shrink-0 px-4 py-2.5 rounded-lg bg-danger-50 border border-danger-200 text-danger-700 text-sm dark:bg-danger-950/30 dark:border-danger-900/40 dark:text-danger-400">
+          {error}
+        </div>
+      )}
       {/* 요약 배너 */}
       <div className="flex items-center justify-between bg-warning-50 border border-warning-200 px-5 py-4 rounded-lg shrink-0 dark:bg-warning-950/20 dark:border-warning-900/40">
         <div className="flex items-center gap-3">

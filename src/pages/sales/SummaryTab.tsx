@@ -58,7 +58,9 @@ export function SummaryTab() {
   }, []);
 
   // KPI derived from fetched records.
-  const totalSales = records.reduce((s, r) => s + r.price, 0);
+  // Exclude unpaid (credit) items from the revenue total - they are tracked separately.
+  const paidRecords = records.filter((r) => r.paymentMethod !== null);
+  const totalSales = paidRecords.reduce((s, r) => s + r.price, 0);
   const cardSales = records
     .filter((r) => r.paymentMethod === "card")
     .reduce((s, r) => s + r.price, 0);
@@ -71,6 +73,11 @@ export function SummaryTab() {
 
   const cardPct = totalSales > 0 ? Math.round((cardSales / totalSales) * 100) : 0;
   const cashTransferPct = totalSales > 0 ? Math.round((cashTransferSales / totalSales) * 100) : 0;
+
+  // Label for the active period (used in table header).
+  const periodLabel = customRange
+    ? `${customRange.from} ~ ${customRange.to}`
+    : (PERIODS.find((p) => p.id === period)?.label ?? "");
 
   // Filter today's transactions for the table (search applied).
   const filteredTransactions = records.filter(
@@ -139,7 +146,7 @@ export function SummaryTab() {
             <span className="text-sm text-on-surface-muted">원</span>
           </div>
           <div className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-on-surface-muted">
-            {records.length}건
+            {paidRecords.length}건
           </div>
         </div>
 
@@ -188,7 +195,7 @@ export function SummaryTab() {
             <span className="text-sm text-warning-600/70 dark:text-warning-400/70">원</span>
           </div>
           <p className="text-[11px] text-warning-600 mt-3 dark:text-warning-400">
-            * 수금 시 매출에 합산됩니다.
+            * 실제 수금 시 매출로 집계됩니다.
           </p>
         </div>
       </div>
@@ -200,7 +207,7 @@ export function SummaryTab() {
           <div className="flex justify-between items-center mb-4 shrink-0">
             <h3 className="text-sm font-bold text-on-surface">주간 매출 추이</h3>
             <span className="text-[11px] text-on-surface-muted bg-surface-elevated px-2 py-0.5 rounded border border-border-default">
-              최근 7일
+              최근 7일 (고정)
             </span>
           </div>
 
@@ -242,7 +249,10 @@ export function SummaryTab() {
 
           {/* 인기 품목 */}
           <div className="mt-4 pt-3 border-t border-border-default shrink-0">
-            <h4 className="text-[11px] font-bold text-on-surface-muted mb-2">많이 접수된 품목</h4>
+            <h4 className="text-[11px] font-bold text-on-surface-muted mb-2">
+              많이 접수된 품목
+              <span className="ml-1 font-normal opacity-60">· {periodLabel}</span>
+            </h4>
             <div className="space-y-1.5">
               {topItems.length === 0 ? (
                 <p className="text-xs text-on-surface-muted">데이터 없음</p>
@@ -265,7 +275,7 @@ export function SummaryTab() {
           <div className="px-4 py-3 bg-surface-elevated border-b border-border-default flex justify-between items-center shrink-0">
             <div className="flex items-center gap-2">
               <Receipt className="w-4 h-4 text-on-surface-muted" />
-              <h3 className="text-sm font-bold text-on-surface">오늘의 거래 내역</h3>
+              <h3 className="text-sm font-bold text-on-surface">{periodLabel} 거래 내역</h3>
             </div>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-secondary-400" />
