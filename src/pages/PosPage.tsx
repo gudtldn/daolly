@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import {
-  User, Plus, Search, History,
+  User, Plus, Search, History, X,
   Minus, Trash2, Pen, Keyboard, Shirt,
   CheckCircle2, CreditCard, Banknote, Landmark, Clock,
 } from "lucide-react";
@@ -20,10 +20,12 @@ import { useDialogStore } from "@/stores/dialogStore";
 function CustomerPanel({
   selectedCustomer,
   onSelect,
+  onDeselect,
   onViewHistory,
 }: {
   selectedCustomer: Customer | null;
   onSelect: (c: Customer) => void;
+  onDeselect: () => void;
   onViewHistory: (customerId: number) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -56,6 +58,7 @@ function CustomerPanel({
   const handleSelect = (c: Customer) => {
     onSelect(c);
     setQuery("");
+    setResults([]);  // Prevent stale results from triggering unintended selection.
     setShowDropdown(false);
   };
 
@@ -74,34 +77,57 @@ function CustomerPanel({
       </div>
 
       <div className="p-4 border-b border-border-default shrink-0 relative">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => { setQuery(e.target.value); handleSearch(e.target.value); }}
-            onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  if (results.length > 0) handleSelect(results[highlightIdx]);
-                } else if (e.key === "ArrowDown") {
-                  e.preventDefault();
-                  setHighlightIdx((i) => Math.min(i + 1, results.length - 1));
-                } else if (e.key === "ArrowUp") {
-                  e.preventDefault();
-                  setHighlightIdx((i) => Math.max(i - 1, 0));
-                } else if (e.key === "Escape") {
-                  setShowDropdown(false);
-                }
-              }}
-            placeholder="이름, 전화번호 뒷자리..."
-            className="w-full border border-border-default bg-surface-card rounded px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-muted focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-          />
+        {selectedCustomer ? (
+          // Customer selected: show a minimal change-customer link. Full info is in the card below.
           <button
-            onClick={() => results.length > 0 && handleSelect(results[0])}
-            className="bg-primary-600 text-white px-3 py-2 rounded hover:bg-primary-700 transition-colors shrink-0"
+            onClick={onDeselect}
+            className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-on-surface-muted hover:text-primary-600 hover:bg-surface-elevated rounded transition-colors cursor-pointer border border-dashed border-border-default"
           >
-            <Search className="w-4 h-4" />
+            <Search className="w-3.5 h-3.5" />
+            다른 고객 검색
           </button>
-        </div>
+        ) : (
+          // Search mode: input with inline clear button and search button.
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => { setQuery(e.target.value); handleSearch(e.target.value); }}
+                onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      if (results.length > 0) handleSelect(results[highlightIdx]);
+                    } else if (e.key === "ArrowDown") {
+                      e.preventDefault();
+                      setHighlightIdx((i) => Math.min(i + 1, results.length - 1));
+                    } else if (e.key === "ArrowUp") {
+                      e.preventDefault();
+                      setHighlightIdx((i) => Math.max(i - 1, 0));
+                    } else if (e.key === "Escape") {
+                      setShowDropdown(false);
+                    }
+                  }}
+                placeholder="이름, 전화번호 뒷자리..."
+                className={`w-full border border-border-default bg-surface-card rounded px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-muted focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 ${query ? "pr-8" : ""}`}
+              />
+              {query && (
+                <button
+                  onClick={() => { setQuery(""); setResults([]); setShowDropdown(false); }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-muted hover:text-on-surface transition-colors cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <button
+              onClick={() => results.length > 0 && handleSelect(results[0])}
+              disabled={!query.trim()}
+              className="bg-primary-600 text-white px-3 py-2 rounded hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+            >
+              <Search className="w-4 h-4" />
+            </button>
+          </div>
+        )}
         {showDropdown && results.length > 0 && (
           <div className="absolute left-4 right-4 top-full mt-1 bg-surface-card border border-border-default rounded-lg shadow-lg z-20 max-h-48 overflow-auto">
             {results.map((c, idx) => (
@@ -638,6 +664,11 @@ export function PosPage() {
     setCustomer(c.id);
   };
 
+  const handleDeselectCustomer = () => {
+    setSelectedCustomer(null);
+    setCustomer(null);
+  };
+
   const handleViewHistory = (customerId: number) => {
     navigate("/customers", { state: { focusCustomerId: customerId } });
   };
@@ -664,7 +695,7 @@ export function PosPage() {
 
   return (
     <div className="h-full flex gap-4 overflow-hidden">
-      <CustomerPanel selectedCustomer={selectedCustomer} onSelect={handleSelectCustomer} onViewHistory={handleViewHistory} />
+      <CustomerPanel selectedCustomer={selectedCustomer} onSelect={handleSelectCustomer} onDeselect={handleDeselectCustomer} onViewHistory={handleViewHistory} />
       {/* 고객 미선택 시 OrderPanel, PaymentPanel 비활성화 overlay */}
       <div className="flex-1 min-w-0 flex gap-4 overflow-hidden relative">
         {!selectedCustomer && (
