@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Database, FolderOpen, DownloadCloud, UploadCloud, AlertTriangle } from "lucide-react";
+import { open } from "@tauri-apps/plugin-dialog";
+import { Database, FolderOpen, DownloadCloud, UploadCloud, AlertTriangle, History } from "lucide-react";
 import { useDialogStore } from "@/stores/dialogStore";
+import { toast } from "sonner";
 
 interface BackupInfo {
   filename: string;
@@ -20,6 +22,7 @@ export function DatabaseSettings() {
   const [backups, setBackups] = useState<BackupInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [backupLoading, setBackupLoading] = useState(false);
+  const [migrationLoading, setMigrationLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const { showCustom } = useDialogStore();
@@ -95,13 +98,66 @@ export function DatabaseSettings() {
     setError("");
     try {
       await invoke("restore_db", { filename });
-      // app.restart() triggers, response may not arrive
     } catch (e: unknown) {
-      // restart() causes connection loss - ignore "Could not connect" type errors
       const msg = e instanceof Error ? e.message : String(e);
       if (!msg.includes("Could not connect") && !msg.includes("Disconnected")) {
         setError(msg);
       }
+    }
+  };
+
+  const handleLegacyMigration = async () => {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: "SQLite Database", extensions: ["db"] }],
+        title: "이전 버전 customer.db 선택",
+      });
+
+      if (!selected) return;
+
+      const confirmed = await showCustom({
+        title: "데이터 가져오기 확인",
+        isDestructive: false,
+        confirmText: "가져오기 시작",
+        cancelText: "취소",
+        customContent: (
+          <div className="space-y-3">
+            <p className="text-sm text-on-surface">
+              선택한 파일에서 데이터를 가져옵니다. 
+              기존 데이터가 있는 경우 <strong className="text-primary-600 dark:text-primary-400">자동으로 백업</strong> 후 진행됩니다.
+            </p>
+            <p className="text-xs text-on-surface-muted font-mono bg-surface-elevated px-3 py-2 rounded break-all">
+              {selected}
+            </p>
+            <div className="flex items-start gap-2 bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800 rounded-lg px-4 py-3 text-sm text-primary-700 dark:text-primary-300">
+              <History className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>가져오기 완료 후 데이터 확인을 위해 앱을 재시작하시기 바랍니다.</span>
+            </div>
+          </div>
+        ),
+      });
+
+      if (!confirmed) return;
+
+      setMigrationLoading(true);
+      setError("");
+      try {
+        await invoke("migrate_from_legacy", { legacyPath: selected });
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        // 자동 재시작으로 인한 연결 끊김은 에러로 처리하지 않음
+        if (!msg.includes("Could not connect") && !msg.includes("Disconnected")) {
+          throw e;
+        }
+      }
+      toast.success("데이터 이관 완료. 앱을 재시작합니다.");
+      await loadBackups();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+      toast.error("마이그레이션 실패");
+    } finally {
+      setMigrationLoading(false);
     }
   };
 
@@ -123,9 +179,9 @@ export function DatabaseSettings() {
         </div>
       )}
 
-      <div className="space-y-6">
+      <div className="space-y-6 pb-10">
         {/* DB 위치 */}
-        <section className="bg-surface-card rounded-lg border border-border-default p-5">
+        <section className="bg-surface-card rounded-lg border border-border-default p-5 shadow-sm">
           <h4 className="text-sm font-semibold text-on-surface mb-4">데이터베이스 위치</h4>
           <div className="flex items-center gap-3">
             <span className="flex-1 text-xs text-on-surface-muted font-mono bg-surface-elevated px-3 py-2 rounded-lg break-all">
@@ -141,14 +197,34 @@ export function DatabaseSettings() {
           </div>
         </section>
 
-        {/* 백업 */}
-        <section className="bg-surface-card rounded-lg border border-border-default p-5">
+        {/* 레거시 데이터 가져오기 */}
+        <section className="bg-surface-card rounded-lg border border-border-default p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h4 className="text-sm font-semibold text-on-surface">백업</h4>
+            <div>
+              <h4 className="text-sm font-semibold text-on-surface">이전 버전 데이터 가져오기</h4>
+              <p className="text-xs text-on-surface-muted mt-1">
+                WinForms 버전의 customer.db 파일을 선택하여 손님 및 작업 내역을 가져옵니다.
+              </p>
+            </div>
+            <button
+              onClick={handleLegacyMigration}
+              disabled={migrationLoading}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-950 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <History className="w-4 h-4" />
+              {migrationLoading ? "가져오는 중..." : "데이터 가져오기"}
+            </button>
+          </div>
+        </section>
+
+        {/* 백업 */}
+        <section className="bg-surface-card rounded-lg border border-border-default p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-sm font-semibold text-on-surface">백업 내역</h4>
             <button
               onClick={handleBackup}
               disabled={backupLoading}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors cursor-pointer disabled:opacity-50 shadow-sm"
             >
               <DownloadCloud className="w-4 h-4" />
               {backupLoading ? "백업 중..." : "지금 백업"}
@@ -156,30 +232,31 @@ export function DatabaseSettings() {
           </div>
 
           {loading ? (
-            <p className="text-sm text-on-surface-muted text-center py-4">로딩 중...</p>
+            <p className="text-sm text-on-surface-muted text-center py-8">로딩 중...</p>
           ) : backups.length === 0 ? (
-            <p className="text-sm text-on-surface-muted text-center py-4 border border-dashed border-border-default rounded-lg">
-              백업 파일이 없습니다.
-            </p>
+            <div className="py-12 border border-dashed border-border-default rounded-lg flex flex-col items-center justify-center">
+              <Database className="w-8 h-8 text-on-surface-muted/30 mb-2" />
+              <p className="text-sm text-on-surface-muted">백업 파일이 없습니다.</p>
+            </div>
           ) : (
-            <div className="border border-border-default rounded-lg overflow-hidden max-h-[280px] overflow-y-auto">
+            <div className="border border-border-default rounded-lg overflow-hidden max-h-[320px] overflow-y-auto">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-surface-elevated text-on-surface-muted z-10">
                   <tr>
-                    <th className="px-3 py-2 text-left font-medium">생성 일시</th>
-                    <th className="px-3 py-2 text-right font-medium w-20">크기</th>
-                    <th className="w-20"></th>
+                    <th className="px-4 py-3 text-left font-medium">생성 일시</th>
+                    <th className="px-4 py-3 text-right font-medium w-24">크기</th>
+                    <th className="w-24"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border-default">
+                <tbody className="divide-y divide-border-default bg-surface-card">
                   {backups.map((b) => (
-                    <tr key={b.filename}>
-                      <td className="px-3 py-2 text-on-surface">{b.createdAt}</td>
-                      <td className="px-3 py-2 text-right text-on-surface-muted w-20">{formatBytes(b.sizeBytes)}</td>
-                      <td className="px-2 py-2 text-center w-20">
+                    <tr key={b.filename} className="hover:bg-surface-elevated/50 transition-colors">
+                      <td className="px-4 py-3 text-on-surface">{b.createdAt}</td>
+                      <td className="px-4 py-3 text-right text-on-surface-muted w-24">{formatBytes(b.sizeBytes)}</td>
+                      <td className="px-4 py-3 text-center w-24">
                         <button
                           onClick={() => handleRestoreClick(b.filename)}
-                          className="flex items-center gap-1 px-2 py-1 text-xs border border-border-default rounded hover:bg-surface-elevated transition-colors cursor-pointer mx-auto"
+                          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium border border-border-default rounded hover:bg-surface-elevated transition-colors cursor-pointer"
                         >
                           <UploadCloud className="w-3.5 h-3.5" />
                           복원
@@ -192,7 +269,6 @@ export function DatabaseSettings() {
             </div>
           )}
         </section>
-
       </div>
     </div>
   );

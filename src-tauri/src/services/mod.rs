@@ -4,6 +4,7 @@
 
 pub mod categories;
 pub mod customers;
+pub mod migration;
 pub mod payments;
 pub mod price_items;
 pub mod price_options;

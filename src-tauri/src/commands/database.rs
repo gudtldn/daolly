@@ -1,6 +1,9 @@
+use crate::commands::CmdResult;
+use crate::services;
 use chrono::Local;
+use sea_orm::DatabaseConnection;
 use serde::Serialize;
-use tauri::Manager;
+use tauri::{Manager, State};
 use tauri_plugin_opener::OpenerExt;
 
 /// 백업 파일 정보
@@ -12,8 +15,28 @@ pub struct BackupInfo {
     pub size_bytes: u64,
 }
 
-// DatabaseConnection State를 주입받지 않으므로 CmdResult 대신 Result<T, String> 사용
 type DbResult<T> = Result<T, String>;
+
+/// 이전 버전 데이터(customer.db)를 현재 DB로 마이그레이션합니다.
+#[tauri::command]
+pub async fn migrate_from_legacy(
+    app: tauri::AppHandle,
+    db: State<'_, DatabaseConnection>,
+    legacy_path: std::path::PathBuf,
+) -> CmdResult<()> {
+    // 1. 현재 데이터 백업 (안전을 위해 명령 레이어에서 수행)
+    backup_db(app.clone())
+        .await
+        .map_err(|e| crate::commands::AppError::Validation(format!("이관 전 백업 실패: {e}")))?;
+
+    // 2. 서비스 레이어 호출하여 실제 마이그레이션 수행
+    services::migration::migrate_from_legacy(db.inner(), legacy_path)
+        .await
+        .map_err(|e| crate::commands::AppError::Validation(e.to_string()))?;
+
+    // 3. 앱 재시작
+    app.restart();
+}
 
 /// DB가 있는 폴더를 파일 탐색기로 엽니다.
 #[tauri::command]
@@ -39,7 +62,6 @@ pub async fn get_db_path(app: tauri::AppHandle) -> DbResult<String> {
 }
 
 /// 현재 DB를 backups/ 폴더에 타임스탬프 파일명으로 복사합니다.
-/// 성공 시 생성된 백업 파일명을 반환합니다.
 #[tauri::command]
 pub async fn backup_db(app: tauri::AppHandle) -> DbResult<String> {
     let dir = app
@@ -63,7 +85,7 @@ pub async fn backup_db(app: tauri::AppHandle) -> DbResult<String> {
     Ok(filename)
 }
 
-/// backups/ 폴더에 있는 백업 목록을 최신순으로 반환합니다.
+/// backups/ 폴더에 있는 백업 목록을 반환합니다.
 #[tauri::command]
 pub async fn list_backups(app: tauri::AppHandle) -> DbResult<Vec<BackupInfo>> {
     let dir = app
@@ -85,7 +107,6 @@ pub async fn list_backups(app: tauri::AppHandle) -> DbResult<Vec<BackupInfo>> {
             }
             let metadata = std::fs::metadata(&path).ok()?;
             let filename = path.file_name()?.to_string_lossy().into_owned();
-            // 파일명에서 날짜 파싱: daolly_YYYYMMDD_HHMMSS.db
             let created_at =
                 parse_timestamp_from_filename(&filename).unwrap_or_else(|| "알 수 없음".to_owned());
             Some(BackupInfo {
@@ -96,16 +117,13 @@ pub async fn list_backups(app: tauri::AppHandle) -> DbResult<Vec<BackupInfo>> {
         })
         .collect();
 
-    // 최신순 정렬 (파일명 기준: daolly_YYYYMMDD_HHMMSS)
     backups.sort_by(|a, b| b.filename.cmp(&a.filename));
     Ok(backups)
 }
 
-/// 지정된 백업 파일을 pending restore로 스테이징하고 앱을 재시작합니다.
-/// 재시작 후 lib.rs 초기화에서 pending restore가 있으면 DB에 적용합니다.
+/// 지정된 백업 파일로 복원을 시도합니다.
 #[tauri::command]
 pub async fn restore_db(app: tauri::AppHandle, filename: String) -> DbResult<()> {
-    // 경로 순회 방지
     if filename.contains('/') || filename.contains('\\') || filename.contains("..") {
         return Err("invalid filename".to_owned());
     }
@@ -118,24 +136,20 @@ pub async fn restore_db(app: tauri::AppHandle, filename: String) -> DbResult<()>
         return Err("backup file not found".to_owned());
     }
 
-    // 복원 대상 파일을 pending 파일로 복사 (다음 시작 시 적용)
     let pending = dir.join("daolly.db.pending_restore");
     std::fs::copy(&backup_path, &pending).map_err(|e| format!("failed to stage restore: {e}"))?;
 
-    // 앱 재시작 (재시작 후 pending restore 적용)
     app.restart();
 }
 
-/// 파일명 `daolly_YYYYMMDD_HHMMSS.db`에서 사람이 읽을 수 있는 날짜 문자열 추옵
 fn parse_timestamp_from_filename(filename: &str) -> Option<String> {
-    // daolly_20250104_153045.db -> "2025.01.04 15:30:45"
     let stem = filename.strip_suffix(".db")?;
     let parts: Vec<&str> = stem.splitn(3, '_').collect();
     if parts.len() != 3 {
         return None;
     }
-    let date = parts[1]; // YYYYMMDD
-    let time = parts[2]; // HHMMSS
+    let date = parts[1];
+    let time = parts[2];
     if date.len() != 8 || time.len() != 6 {
         return None;
     }

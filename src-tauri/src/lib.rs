@@ -14,6 +14,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .setup(|app| {
             let app_data_dir = app
@@ -78,6 +79,7 @@ pub fn run() {
             commands::database::backup_db,
             commands::database::list_backups,
             commands::database::restore_db,
+            commands::database::migrate_from_legacy,
             // sales
             commands::sales::list_sales_records,
             commands::sales::list_unpaid_records,
