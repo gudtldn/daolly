@@ -145,7 +145,7 @@ function CustomerListPanel({
   }, [scrollToId, filtered]);
 
   return (
-    <div className={`w-[380px] bg-surface-card rounded-lg shadow-sm flex flex-col overflow-hidden shrink-0 border transition-colors ${isActive ? "border-primary-400/70" : "border-border-default"}`}>
+    <div className="w-[380px] bg-surface-card rounded-lg shadow-sm flex flex-col overflow-hidden shrink-0 border border-border-default transition-colors">
       {/* 헤더 */}
       <div className="bg-secondary-800 dark:bg-secondary-900 text-white px-4 py-3 flex items-center shrink-0">
         <Users className="w-5 h-5 mr-2 text-secondary-300" />
@@ -340,12 +340,29 @@ function WorkItemListPanel({
     });
   }, [workItems, sortCol, sortDir]);
 
-  // 키보드로 하이라이트 이동 시 해당 행 스크롤
+  // 키보드로 하이라이트 이동 시 해당 행 스크롤 (헤더 가림 방지)
   useEffect(() => {
     const item = sortedItems[highlightedIdx];
     if (!item) return;
     const el = rowRefs.current.get(item.id);
-    if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    if (el) {
+      const container = el.closest(".overflow-auto");
+      if (container) {
+        const rect = el.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        // 헤더 높이 (약 40px) + 여유 공간 고려
+        const headerHeight = 44;
+        
+        const isAbove = rect.top < containerRect.top + headerHeight;
+        const isBelow = rect.bottom > containerRect.bottom;
+
+        if (isAbove) {
+          container.scrollBy({ top: rect.top - containerRect.top - headerHeight, behavior: "smooth" });
+        } else if (isBelow) {
+          container.scrollBy({ top: rect.bottom - containerRect.bottom, behavior: "smooth" });
+        }
+      }
+    }
   }, [highlightedIdx, sortedItems]);
 
   // 아코디언 상세: 열 때 lazy load, 로컬 캐시
@@ -473,7 +490,7 @@ function WorkItemListPanel({
   );
 
   return (
-    <div className={`flex-1 bg-surface-card rounded-lg shadow-sm flex flex-col overflow-hidden border transition-colors ${isActive ? "border-primary-400/70" : "border-border-default"}`}>
+    <div className="flex-1 bg-surface-card rounded-lg shadow-sm flex flex-col overflow-hidden border border-border-default transition-colors">
       {/* 헤더 */}
       <div className="bg-secondary-800 dark:bg-secondary-900 text-white px-4 py-3 flex items-center shrink-0">
         <ClipboardList className="w-5 h-5 mr-2 text-secondary-300" />
