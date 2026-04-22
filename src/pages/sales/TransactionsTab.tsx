@@ -194,9 +194,9 @@ export function TransactionsTab() {
                         <button
                           onClick={() => handleGoToCustomer(r)}
                           title="고객 관리에서 보기"
-                          className="p-1.5 rounded-md text-on-surface-muted hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-950 transition-colors cursor-pointer group-hover:text-primary-500"
+                          className="p-1.5 rounded-md text-on-surface-muted bg-surface-elevated border border-border-default hover:bg-primary-600 hover:text-white dark:hover:bg-primary-500 hover:border-primary-600 transition-all cursor-pointer shadow-sm group/btn"
                         >
-                          <ExternalLink className="w-4 h-4" />
+                          <ExternalLink className="w-4 h-4 transition-colors" />
                         </button>
                       </td>
                     </tr>

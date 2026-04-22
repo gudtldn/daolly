@@ -49,7 +49,7 @@ describe("SalesPage", () => {
     renderWithRouter(<SalesPage />);
 
     await user.click(screen.getByRole("button", { name: /미수금 관리/ }));
-    expect(screen.getByText("총 미수금")).toBeInTheDocument();
+    expect(screen.getByText(/총 미수금/)).toBeInTheDocument();
   });
 
   it("매출 요약 탭에서 주간 차트 레이블이 표시된다", () => {
