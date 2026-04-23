@@ -1,8 +1,9 @@
-import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from "react";
+import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { Virtuoso } from "react-virtuoso";
 import type { VirtuosoHandle } from "react-virtuoso";
 import { useLocation } from "react-router";
-import { useDebounce } from "@/hooks/useDebounce";
+import { useSearch } from "@/hooks/useSearch";
+import { useSortableData } from "@/hooks/useSortableData";
 import { useListInteraction, type InteractionSource } from "@/hooks/useListInteraction";
 import {
   Search,
@@ -162,7 +163,7 @@ function CustomerListPanel({
       }
       onScrollComplete?.();
     }
-  }, [scrollToId, filtered, onScrollComplete]);
+  }, [scrollToId, filtered, onScrollComplete]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="w-[380px] bg-surface-card rounded-lg shadow-sm flex flex-col overflow-hidden shrink-0 border border-border-default transition-colors">
@@ -333,6 +334,8 @@ function WorkItemListPanel({
 }) {
   const { workItems } = useWorkItemStore();
 
+  const { sortedItems, requestSort, sortConfig } = useSortableData(workItems);
+
   // 키보드 하이라이트 (sortedItems 기반으로 관리)
   const {
     highlightIdx: highlightedIdx,
@@ -369,41 +372,6 @@ function WorkItemListPanel({
   useEffect(() => {
     setHighlightedIdx(0);
   }, [customer?.id, setHighlightedIdx]);
-
-  // 컬럼 정렬 상태: null -> asc -> desc -> null (3-state)
-  type SortCol = "status" | "receivedAt" | "pickedUpAt" | "description" | "price";
-  const [sortCol, setSortCol] = useState<SortCol | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc" | null>(null);
-
-  const handleSortClick = (col: SortCol) => {
-    if (sortCol !== col) {
-      setSortCol(col);
-      setSortDir("asc");
-    } else if (sortDir === "asc") {
-      setSortDir("desc");
-    } else if (sortDir === "desc") {
-      setSortCol(null);
-      setSortDir(null);
-    }
-  };
-
-  const sortedItems = useMemo(() => {
-    if (!sortCol || !sortDir) return workItems;
-    return [...workItems].sort((a, b) => {
-      let av: string | number | null;
-      let bv: string | number | null;
-      if (sortCol === "status") { av = a.status; bv = b.status; }
-      else if (sortCol === "receivedAt") { av = a.receivedAt; bv = b.receivedAt; }
-      else if (sortCol === "pickedUpAt") { av = a.pickedUpAt; bv = b.pickedUpAt; }
-      else if (sortCol === "description") { av = a.description; bv = b.description; }
-      else { av = a.price; bv = b.price; }
-      if (av === null || av === undefined) return sortDir === "asc" ? 1 : -1;
-      if (bv === null || bv === undefined) return sortDir === "asc" ? -1 : 1;
-      if (av < bv) return sortDir === "asc" ? -1 : 1;
-      if (av > bv) return sortDir === "asc" ? 1 : -1;
-      return 0;
-    });
-  }, [workItems, sortCol, sortDir]);
 
   // 아코디언 상세: 열 때 lazy load, 로컬 캐시
   const [detailsCache, setDetailsCache] = useState<Record<number, WorkItemDetail[]>>({});
@@ -463,14 +431,14 @@ function WorkItemListPanel({
       }
       // 렌더링을 기다리기 위해 requestAnimationFrame 사용 (setTimeout 대용)
       requestAnimationFrame(() => {
-        const idx = workItems.findIndex(i => i.id === focusWorkItemId);
+        const idx = sortedItems.findIndex(i => i.id === focusWorkItemId);
         const el = rowRefs.current.get(idx);
         if (el) { el.scrollIntoView({ block: "center" }); }
       });
     };
 
     void applyFocus();
-  }, [focusWorkItemId, workItems.length, setExpandedId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [focusWorkItemId, workItems.length, setExpandedId, sortedItems]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // isActive 패널에서만 키보드 네비게이션 처리
   useEffect(() => {
@@ -566,13 +534,13 @@ function WorkItemListPanel({
               {(["status", "receivedAt", "pickedUpAt", "description", "price"] as const).map((col) => {
                 const labels: Record<string, string> = { status: "상태", receivedAt: "접수", pickedUpAt: "수령", description: "작업내용", price: "금액" };
                 const widths: Record<string, string> = { status: "px-2 py-3 text-center w-24", receivedAt: "px-2 py-3 w-12 whitespace-nowrap", pickedUpAt: "px-2 py-3 w-12 whitespace-nowrap", description: "px-3 py-3", price: "px-3 py-3 w-24" };
-                const isSortActive = sortCol === col;
+                const isSortActive = sortConfig.key === col;
                 return (
-                  <th key={col} onClick={() => handleSortClick(col)} className={`${widths[col]} font-medium cursor-pointer select-none hover:text-on-surface transition-colors group`}>
+                  <th key={col} onClick={() => requestSort(col)} className={`${widths[col]} font-medium cursor-pointer select-none hover:text-on-surface transition-colors group`}>
                     <span className="inline-flex items-center gap-1">
                       {labels[col]}
-                      {isSortActive && sortDir === "asc" && <ChevronUp className="w-3.5 h-3.5 text-primary-500" />}
-                      {isSortActive && sortDir === "desc" && <ChevronDown className="w-3.5 h-3.5 text-primary-500" />}
+                      {isSortActive && sortConfig.direction === "asc" && <ChevronUp className="w-3.5 h-3.5 text-primary-500" />}
+                      {isSortActive && sortConfig.direction === "desc" && <ChevronDown className="w-3.5 h-3.5 text-primary-500" />}
                       {!isSortActive && <ChevronsUpDown className="w-3.5 h-3.5 opacity-0 group-hover:opacity-40 transition-opacity" />}
                     </span>
                   </th>
@@ -677,8 +645,8 @@ function WorkItemListPanel({
 // 메인 레이아웃
 // ==========================================
 export function CustomersPage() {
-  const { customers, selectedCustomer, select, load, create, update, delete: deleteCustomer, loadUnpaid } = useCustomerStore();
-  const { workItems, setFilter } = useWorkItemStore();
+  const { selectedCustomer, select, create, update, delete: deleteCustomer, loadUnpaid } = useCustomerStore();
+  const { setFilter } = useWorkItemStore();
   const { showConfirm } = useDialogStore();
   const location = useLocation();
   const [activePanel, setActivePanel] = useState<"customers" | "workItems">("customers");
@@ -686,27 +654,33 @@ export function CustomersPage() {
   const [focusWorkItemId, setFocusWorkItemId] = useState<number | null>(null);
   const [lastSource, setLastSource] = useState<InteractionSource>("keyboard");
 
-  // 고객 검색
-  const [searchKeyword, setSearchKeyword] = useState("");
-  const debouncedSearchKeyword = useDebounce(searchKeyword, 300);
-  const isInitialMount = useRef(true);
-
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-    
-    load(debouncedSearchKeyword.trim()).then(() => {
+  // 고객 검색 (useSearch 통합)
+  const { customers: storeCustomers, load: loadStoreCustomers } = useCustomerStore();
+  const customerListFn = useCallback((kw: string) => loadStoreCustomers(kw).then(() => useCustomerStore.getState().customers), [loadStoreCustomers]);
+  
+  const {
+    query: searchKeyword,
+    setQuery,
+    debouncedQuery: debouncedSearchKeyword,
+    performSearch: loadCustomers,
+  } = useSearch(customerListFn, {
+    allowEmpty: true, // 초기 로딩 시 모든 고객을 가져오기 위함
+    onSuccess: () => {
       loadUnpaid();
-      // 검색어가 비워졌을 때(초기화) 선택된 고객이 있다면 그 위치로 스크롤 유도
-      if (!debouncedSearchKeyword.trim() && useCustomerStore.getState().selectedCustomer) {
-        setScrollToCustomerId(useCustomerStore.getState().selectedCustomer!.id);
-      }
-    });
-  }, [debouncedSearchKeyword, load, loadUnpaid]);
+    }
+  });
 
-  const filteredCustomers = customers;
+  const filteredCustomers = storeCustomers;
+
+  // 검색어가 비워졌을 때(초기화) 선택된 고객이 있다면 그 위치로 스크롤 유도
+  useEffect(() => {
+    if (!debouncedSearchKeyword.trim()) {
+      const currentSelected = useCustomerStore.getState().selectedCustomer;
+      if (currentSelected) {
+        setScrollToCustomerId(currentSelected.id);
+      }
+    }
+  }, [debouncedSearchKeyword]);
 
   // Floating Card 상태
   const [cardOpen, setCardOpen] = useState(false);
@@ -726,6 +700,7 @@ export function CustomersPage() {
     });
     if (!confirmed) return;
     await deleteCustomer(selectedCustomer.id);
+    await loadCustomers(searchKeyword);
     const { customers: remaining } = useCustomerStore.getState();
     if (remaining.length > 0) select(remaining[0]);
     loadUnpaid();
@@ -736,8 +711,10 @@ export function CustomersPage() {
       const created = await create(data as CreateCustomer);
       select(created);
       setScrollToCustomerId(created.id);
+      await loadCustomers(searchKeyword);
     } else if (selectedCustomer) {
       await update(selectedCustomer.id, data as UpdateCustomer);
+      await loadCustomers(searchKeyword);
     }
     loadUnpaid();
   };
@@ -749,7 +726,7 @@ export function CustomersPage() {
 
   const handleWiAdd = () => { if (!selectedCustomer) return; setWiCardMode("create"); setEditingWorkItem(null); setWiCardOpen(true); };
   const handleWiDelete = async (id: number) => {
-    const item = workItems.find((w) => w.id === id);
+    const item = useWorkItemStore.getState().workItems.find((w) => w.id === id);
     if (!item) return;
     const confirmed = await showConfirm({ title: "작업 삭제", message: `"${item.description}" 작업을 삭제하시겠습니까?`, confirmText: "삭제", isDestructive: true });
     if (!confirmed) return;
@@ -800,7 +777,7 @@ export function CustomersPage() {
     const state = location.state as { focusCustomerId?: number; focusWorkItemId?: number } | null;
     const focusId = state?.focusCustomerId;
     const focusItemId = state?.focusWorkItemId;
-    load().then(async () => {
+    loadCustomers("").then(async () => {
       const { customers: loaded, selectedCustomer: current } = useCustomerStore.getState();
       if (focusId) {
         const target = loaded.find((c) => c.id === focusId);
@@ -825,7 +802,7 @@ export function CustomersPage() {
   useEffect(() => {
     if (selectedCustomer) setFilter({ customerId: selectedCustomer.id });
     setExpandedId(null);
-  }, [selectedCustomer?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedCustomer?.id, setFilter]);
 
   // 키보드 네비게이션 (customers 패널)
   useEffect(() => {
@@ -837,14 +814,16 @@ export function CustomersPage() {
       switch (e.key) {
         case "ArrowUp": {
           e.preventDefault();
-          const idx = filteredCustomers.findIndex((c) => c.id === selectedCustomer?.id);
-          if (idx > 0) select(filteredCustomers[idx - 1]);
+          const { customers: loaded } = useCustomerStore.getState();
+          const idx = loaded.findIndex((c) => c.id === selectedCustomer?.id);
+          if (idx > 0) select(loaded[idx - 1]);
           break;
         }
         case "ArrowDown": {
           e.preventDefault();
-          const idx = filteredCustomers.findIndex((c) => c.id === selectedCustomer?.id);
-          if (idx < filteredCustomers.length - 1) select(filteredCustomers[idx + 1]);
+          const { customers: loaded } = useCustomerStore.getState();
+          const idx = loaded.findIndex((c) => c.id === selectedCustomer?.id);
+          if (idx < loaded.length - 1) select(loaded[idx + 1]);
           break;
         }
         case "ArrowRight": e.preventDefault(); setActivePanel("workItems"); break;
@@ -852,7 +831,7 @@ export function CustomersPage() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [filteredCustomers, selectedCustomer, activePanel, select]);
+  }, [selectedCustomer, activePanel, select]);
 
   return (
     <div className="h-full flex gap-4">
@@ -866,7 +845,7 @@ export function CustomersPage() {
         onScrollComplete={() => setScrollToCustomerId(null)}
         searchKeyword={searchKeyword}
         debouncedSearchKeyword={debouncedSearchKeyword}
-        onSearchChange={setSearchKeyword}
+        onSearchChange={setQuery}
         filtered={filteredCustomers}
         isActive={activePanel === "customers"}
         lastSource={lastSource}
@@ -895,3 +874,4 @@ export function CustomersPage() {
     </div>
   );
 }
+

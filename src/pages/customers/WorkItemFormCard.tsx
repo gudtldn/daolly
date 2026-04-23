@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { X, Plus, Trash2, Pencil, Check } from "lucide-react";
 import type { WorkItemFull, WorkItemStatus, CreateWorkItem, UpdateWorkItem, DetailInput, Payment } from "@/types";
 import { paymentApi } from "@/bindings";
+import { CurrencyInput } from "@/components/CurrencyInput";
 
 // datetime-local <-> ISO 변환 헬퍼
 function toLocalInput(iso: string | null): string {
@@ -60,7 +61,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
   const [note, setNote] = useState("");
   const [details, setDetails] = useState<DetailRow[]>([emptyDetail()]);
   const [manualPrice, setManualPrice] = useState(false);
-  const [priceInput, setPriceInput] = useState("");
+  const [priceInput, setPriceInput] = useState(0);
   const [status, setStatus] = useState<WorkItemStatus>("Received");
   const [receivedAt, setReceivedAt] = useState("");
   const [pickedUpAt, setPickedUpAt] = useState("");
@@ -70,19 +71,19 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
 
   // 결제 탭 상태
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [payAmount, setPayAmount] = useState("");
+  const [payAmount, setPayAmount] = useState(0);
   const [payMethod, setPayMethod] = useState("cash");
   const [payDate, setPayDate] = useState("");
   const [payLoading, setPayLoading] = useState(false);
   // 결제 인라인 편집 상태
   const [editingPaymentId, setEditingPaymentId] = useState<number | null>(null);
-  const [editAmount, setEditAmount] = useState("");
+  const [editAmount, setEditAmount] = useState(0);
   const [editMethod, setEditMethod] = useState("");
   const [editDate, setEditDate] = useState("");
 
   // 자동 합산 가격
   const autoPrice = details.reduce((sum, d) => sum + d.unitPrice * d.quantity, 0);
-  const effectivePrice = manualPrice ? (parseInt(priceInput, 10) || 0) : autoPrice;
+  const effectivePrice = manualPrice ? priceInput : autoPrice;
 
   // 열릴 때 폼 초기화
   useEffect(() => {
@@ -107,7 +108,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       // 합산과 실제 가격이 다르면 수동모드
       const sum = workItem.details.reduce((s, d) => s + d.unitPrice * d.quantity, 0);
       setManualPrice(sum !== workItem.price);
-      setPriceInput(String(workItem.price));
+      setPriceInput(workItem.price);
     } else {
       setDescription("");
       setNote("");
@@ -116,7 +117,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       setPickedUpAt("");
       setDetails([emptyDetail()]);
       setManualPrice(false);
-      setPriceInput("");
+      setPriceInput(0);
     }
     setError("");
     setSaving(false);
@@ -125,10 +126,10 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
     if (mode === "edit" && workItem) {
       setPayments(workItem.payments);
       const remaining = workItem.price - workItem.paidAmount;
-      setPayAmount(remaining > 0 ? String(remaining) : "");
+      setPayAmount(remaining > 0 ? remaining : 0);
     } else {
       setPayments([]);
-      setPayAmount("");
+      setPayAmount(0);
     }
     setPayMethod("cash");
     setPayDate(toLocalInput(new Date().toISOString()));
@@ -148,17 +149,15 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
 
   // 결제 등록
   const handleAddPayment = async () => {
-    if (!workItem) return;
-    const amount = parseInt(payAmount, 10) || 0;
-    if (amount <= 0) return;
+    if (!workItem || payAmount <= 0) return;
     setPayLoading(true);
     try {
-      await paymentApi.create({ workItemId: workItem.id, amount, method: payMethod, paidAt: payDate ? fromLocalInput(payDate) : undefined });
+      await paymentApi.create({ workItemId: workItem.id, amount: payAmount, method: payMethod, paidAt: payDate ? fromLocalInput(payDate) : undefined });
       const updated = await paymentApi.list(workItem.id);
       setPayments(updated);
       const newPaid = updated.reduce((s, p) => s + p.amount, 0);
       const remaining = workItem.price - newPaid;
-      setPayAmount(remaining > 0 ? String(remaining) : "");
+      setPayAmount(remaining > 0 ? remaining : 0);
       onPaymentChange?.();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
@@ -170,20 +169,18 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
   // 결제 수정 모드 진입
   const handleEditPayment = (p: Payment) => {
     setEditingPaymentId(p.id);
-    setEditAmount(String(p.amount));
+    setEditAmount(p.amount);
     setEditMethod(p.method ?? "cash");
     setEditDate(toLocalInput(p.paidAt));
   };
 
   // 결제 수정 저장
   const handleSaveEditPayment = async () => {
-    if (!workItem || editingPaymentId === null) return;
-    const amount = parseInt(editAmount, 10) || 0;
-    if (amount <= 0) return;
+    if (!workItem || editingPaymentId === null || editAmount <= 0) return;
     setPayLoading(true);
     try {
       await paymentApi.update(editingPaymentId, {
-        amount,
+        amount: editAmount,
         method: editMethod || null,
         paidAt: editDate ? fromLocalInput(editDate) : undefined,
       });
@@ -191,7 +188,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       setPayments(updated);
       const newPaid = updated.reduce((s, p) => s + p.amount, 0);
       const remaining = workItem.price - newPaid;
-      setPayAmount(remaining > 0 ? String(remaining) : "");
+      setPayAmount(remaining > 0 ? remaining : 0);
       setEditingPaymentId(null);
       onPaymentChange?.();
     } catch (e: unknown) {
@@ -214,7 +211,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       setPayments(updated);
       const newPaid = updated.reduce((s, p) => s + p.amount, 0);
       const remaining = workItem.price - newPaid;
-      setPayAmount(remaining > 0 ? String(remaining) : "");
+      setPayAmount(remaining > 0 ? remaining : 0);
       onPaymentChange?.();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
@@ -225,12 +222,8 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
 
   // 품목 행 변경
   const updateDetail = (key: number, field: keyof DetailInput, value: string | number) => {
-    let finalValue = value;
-    if (field === "unitPrice") {
-      finalValue = Math.max(0, typeof value === "number" ? value : parseInt(value, 10) || 0);
-    }
     setDetails((prev) =>
-      prev.map((d) => (d._key === key ? { ...d, [field]: finalValue } : d))
+      prev.map((d) => (d._key === key ? { ...d, [field]: value } : d))
     );
   };
 
@@ -463,10 +456,9 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                         </div>
                       </td>
                       <td className="px-2 py-1.5">
-                        <input
-                          type="number"
-                          value={d.unitPrice || ""}
-                          onChange={(e) => updateDetail(d._key, "unitPrice", parseInt(e.target.value, 10) || 0)}
+                        <CurrencyInput
+                          value={d.unitPrice}
+                          onChange={(val) => updateDetail(d._key, "unitPrice", val)}
                           placeholder="0"
                           className="w-full px-2 py-1 border border-border-default rounded text-sm text-right bg-surface-card text-on-surface focus:outline-none focus:border-primary-500"
                         />
@@ -510,7 +502,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                     checked={manualPrice}
                     onChange={(e) => {
                       setManualPrice(e.target.checked);
-                      if (!e.target.checked) setPriceInput("");
+                      if (!e.target.checked) setPriceInput(0);
                     }}
                     className="rounded border-border-default"
                   />
@@ -518,11 +510,9 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                 </label>
               </div>
               {manualPrice ? (
-                <input
-                  type="number"
-                  min={0}
+                <CurrencyInput
                   value={priceInput}
-                  onChange={(e) => setPriceInput(Math.max(0, parseInt(e.target.value, 10) || 0).toString())}
+                  onChange={setPriceInput}
                   placeholder="가격 직접 입력"
                   className={inputCls}
                 />
@@ -599,10 +589,9 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                                   />
                                 </td>
                                 <td className="px-2 py-1.5">
-                                  <input
-                                    type="number"
+                                  <CurrencyInput
                                     value={editAmount}
-                                    onChange={(e) => setEditAmount(e.target.value)}
+                                    onChange={setEditAmount}
                                     className="w-full text-xs border border-border-default rounded px-1.5 py-1 bg-surface-base text-on-surface text-right"
                                   />
                                 </td>
@@ -622,7 +611,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                                   <div className="flex gap-0.5 justify-center">
                                     <button
                                       onClick={handleSaveEditPayment}
-                                      disabled={payLoading || !editAmount || parseInt(editAmount, 10) <= 0}
+                                      disabled={payLoading || editAmount <= 0}
                                       className="p-1 text-primary-600 hover:text-primary-700 transition-colors cursor-pointer disabled:opacity-30"
                                     >
                                       <Check className="w-3.5 h-3.5" />
@@ -691,11 +680,9 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                       </div>
                       <div className="flex-1">
                         <label className="block text-xs text-on-surface-muted mb-1">금액</label>
-                        <input
-                          type="number"
-                          min={0}
+                        <CurrencyInput
                           value={payAmount}
-                          onChange={(e) => setPayAmount(Math.max(0, parseInt(e.target.value, 10) || 0).toString())}
+                          onChange={setPayAmount}
                           placeholder="결제 금액"
                           className={inputCls}
                         />
@@ -711,7 +698,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                       </div>
                       <button
                         onClick={handleAddPayment}
-                        disabled={payLoading || !payAmount || parseInt(payAmount, 10) <= 0}
+                        disabled={payLoading || payAmount <= 0}
                         className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                       >
                         {payLoading ? "처리 중..." : "등록"}

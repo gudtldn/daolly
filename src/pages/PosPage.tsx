@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
-import { useDebounce } from "@/hooks/useDebounce";
+import { useSearch } from "@/hooks/useSearch";
 import { useListInteraction } from "@/hooks/useListInteraction";
+import { CurrencyInput } from "@/components/CurrencyInput";
 import {
   User, Plus, Search, History, X,
   Minus, Trash2, Pen, Keyboard, Shirt,
@@ -33,9 +34,6 @@ function CustomerPanel({
   onViewHistory: (customerId: number) => void;
   onAddNew: (name: string) => void;
 }) {
-  const [query, setQuery] = useState("");
-  const debouncedQuery = useDebounce(query, 300);
-  const [results, setResults] = useState<Customer[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [unpaid, setUnpaid] = useState(0);
 
@@ -47,24 +45,21 @@ function CustomerPanel({
     setItemRef,
   } = useListInteraction();
 
+  const {
+    query,
+    setQuery,
+    results,
+    setResults,
+  } = useSearch(customerApi.list, {
+    onSuccess: () => {
+      setHighlightIdx(0);
+      setShowDropdown(true);
+    },
+    onClear: () => setShowDropdown(false),
+  });
+
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!debouncedQuery.trim()) {
-      setResults([]);
-      setShowDropdown(false);
-      return;
-    }
-    customerApi
-      .list(debouncedQuery.trim())
-      .then((fetched) => {
-        setResults(fetched);
-        setHighlightIdx(0);
-        setShowDropdown(true);
-      })
-      .catch(() => {});
-  }, [debouncedQuery, setHighlightIdx]);
 
   // 외부 클릭 시 드롭다운 닫기
   useEffect(() => {
@@ -302,14 +297,13 @@ function DirectInputForm({
   onCancel: () => void;
 }) {
   const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
+  const [price, setPrice] = useState(0);
 
   const handleSubmit = () => {
-    const p = parseInt(price.replace(/,/g, ""), 10);
-    if (!name.trim() || isNaN(p) || p <= 0) return;
-    onSubmit(name.trim(), p);
+    if (!name.trim() || price <= 0) return;
+    onSubmit(name.trim(), price);
     setName("");
-    setPrice("");
+    setPrice(0);
   };
 
   const handleKey = (e: React.KeyboardEvent) => {
@@ -328,18 +322,16 @@ function DirectInputForm({
         placeholder="품목명"
         className="flex-1 px-3 py-2 border border-border-default bg-surface-card rounded text-sm text-on-surface focus:border-primary-500 outline-none"
       />
-      <input
-        type="text"
-        inputMode="numeric"
-        value={price ? Number(price).toLocaleString("ko-KR") : ""}
-        onChange={(e) => setPrice(e.target.value.replace(/[^0-9]/g, ""))}
+      <CurrencyInput
+        value={price}
+        onChange={setPrice}
         onKeyDown={handleKey}
         placeholder="가격"
         className="w-28 px-3 py-2 border border-border-default bg-surface-card rounded text-sm text-on-surface focus:border-primary-500 outline-none text-right"
       />
       <button
         onClick={handleSubmit}
-        disabled={!name.trim() || !price.trim()}
+        disabled={!name.trim() || price <= 0}
         className="px-3 py-2 bg-primary-600 text-white rounded text-sm font-medium hover:bg-primary-700 disabled:bg-secondary-300 disabled:cursor-not-allowed transition-colors"
       >
         <Plus className="w-4 h-4" />
