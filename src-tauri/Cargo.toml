@@ -2,8 +2,8 @@
 name = "daolly"
 version = "0.1.1"
 description = "다올리 (Daolly) - 자영업 사장님들을 위한 고객 및 매출 관리 프로그램"
-authors = ["siwoohyong <me@gudtldn.dev>"]
-edition = "2021"
+authors = ["gudtldn <me@gudtldn.dev>"]
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
