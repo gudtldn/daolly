@@ -2,7 +2,7 @@ use sea_orm::{DatabaseConnection, EntityTrait};
 use serde::Deserialize;
 use tauri::State;
 
-use crate::commands::{require_non_empty, require_non_negative, AppError, CmdResult};
+use crate::commands::{AppError, CmdResult, require_non_empty, require_non_negative};
 use crate::db::entities::price_item;
 use crate::services;
 

@@ -1,4 +1,5 @@
 import { CreditCard, Banknote, Clock, Landmark } from "lucide-react";
+import { getStartOfLocalDateAsUTC, getEndOfLocalDateAsUTC } from "@/utils/dateUtils";
 
 export interface DateRange {
   from: string;
@@ -14,32 +15,38 @@ export const PERIODS = [
 
 export type PresetId = (typeof PERIODS)[number]["id"];
 
-export function toDateStr(d: Date): string {
-  return d.toLocaleDateString("sv"); // local time YYYY-MM-DD (avoids UTC offset issue)
-}
-
 export function getDateRange(period: PresetId): DateRange {
   const today = new Date();
-  const todayStr = toDateStr(today);
   switch (period) {
     case "today":
-      return { from: todayStr, to: todayStr };
+      return { 
+        from: getStartOfLocalDateAsUTC(today), 
+        to: getEndOfLocalDateAsUTC(today) 
+      };
     case "yesterday": {
       const y = new Date(today);
       y.setDate(y.getDate() - 1);
-      const s = toDateStr(y);
-      return { from: s, to: s };
+      return { 
+        from: getStartOfLocalDateAsUTC(y), 
+        to: getEndOfLocalDateAsUTC(y) 
+      };
     }
     case "week": {
       const day = today.getDay(); // 0=Sun
       const diff = day === 0 ? 6 : day - 1; // Mon=0
       const mon = new Date(today);
       mon.setDate(today.getDate() - diff);
-      return { from: toDateStr(mon), to: todayStr };
+      return { 
+        from: getStartOfLocalDateAsUTC(mon), 
+        to: getEndOfLocalDateAsUTC(today) 
+      };
     }
     case "month": {
       const first = new Date(today.getFullYear(), today.getMonth(), 1);
-      return { from: toDateStr(first), to: todayStr };
+      return { 
+        from: getStartOfLocalDateAsUTC(first), 
+        to: getEndOfLocalDateAsUTC(today) 
+      };
     }
   }
 }

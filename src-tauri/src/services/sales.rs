@@ -1,10 +1,17 @@
-use chrono::{Datelike, Duration, Local, NaiveDate};
+use chrono::{DateTime, Datelike, Duration, Local, NaiveDate, Utc};
 use sea_orm::prelude::Expr;
 use sea_orm::*;
 use serde::Serialize;
 use std::collections::HashMap;
 
 use crate::db::entities::{customer, payment, work_item, work_item_detail};
+
+/// Parses RFC3339 string and converts to local date.
+fn parse_to_local_date(iso: &str) -> Option<NaiveDate> {
+    DateTime::parse_from_rfc3339(iso)
+        .ok()
+        .map(|dt| dt.with_timezone(&Local).date_naive())
+}
 
 /// Sales record for one work_item (includes customer name and payment method).
 #[derive(Serialize)]
@@ -45,46 +52,36 @@ pub async fn list_sales_records(
     from: Option<&str>,
     to: Option<&str>,
 ) -> Result<Vec<SalesRecord>, DbErr> {
-    let mut query = work_item::Entity::find();
+    let mut query = work_item::Entity::find()
+        .join(JoinType::LeftJoin, work_item::Relation::Customer.def())
+        .select_also(customer::Entity);
 
     if let Some(f) = from {
-        // "YYYY-MM-DD" is treated as "YYYY-MM-DD 00:00:00" in string comparison.
         query = query.filter(work_item::Column::ReceivedAt.gte(f));
     }
     if let Some(t) = to {
-        // To include the entire 'to' day, we find everything strictly less than the next day.
         if let Ok(date) = NaiveDate::parse_from_str(t, "%Y-%m-%d") {
             let next_day = date + Duration::days(1);
             let next_day_str = next_day.format("%Y-%m-%d").to_string();
             query = query.filter(work_item::Column::ReceivedAt.lt(next_day_str));
         } else {
-            // Fallback for non-standard formats (though we expect YYYY-MM-DD)
             let to_end = format!("{}T23:59:59.999", t);
             query = query.filter(work_item::Column::ReceivedAt.lte(to_end));
         }
     }
 
-    let work_items = query
+    let results: Vec<(work_item::Model, Option<customer::Model>)> = query
         .order_by_desc(work_item::Column::ReceivedAt)
         .all(db)
         .await?;
 
-    if work_items.is_empty() {
+    if results.is_empty() {
         return Ok(vec![]);
     }
 
-    let customer_ids: Vec<i32> = work_items.iter().map(|wi| wi.customer_id).collect();
-    let work_item_ids: Vec<i32> = work_items.iter().map(|wi| wi.id).collect();
+    let work_item_ids: Vec<i32> = results.iter().map(|(wi, _)| wi.id).collect();
 
-    // Fetch customer names.
-    let customers = customer::Entity::find()
-        .filter(customer::Column::Id.is_in(customer_ids))
-        .all(db)
-        .await?;
-    let customer_map: HashMap<i32, String> =
-        customers.into_iter().map(|c| (c.id, c.name)).collect();
-
-    // Fetch all payments per work_item.
+    // Fetch all payments per work_item for payment_method mapping.
     let payments = payment::Entity::find()
         .filter(payment::Column::WorkItemId.is_in(work_item_ids))
         .order_by_asc(payment::Column::PaidAt)
@@ -104,20 +101,20 @@ pub async fn list_sales_records(
         }
     }
 
-    let records = work_items
+    let records = results
         .into_iter()
-        .map(|wi| SalesRecord {
-            customer_name: customer_map
-                .get(&wi.customer_id)
-                .cloned()
-                .unwrap_or_default(),
-            payment_method: method_map.get(&wi.id).cloned(),
-            work_item_id: wi.id,
-            customer_id: wi.customer_id,
-            description: wi.description,
-            price: wi.price,
-            paid_amount: wi.paid_amount,
-            received_at: wi.received_at,
+        .map(|(wi, cust)| {
+            let customer_name = cust.map(|c| c.name).unwrap_or_default();
+            SalesRecord {
+                customer_name,
+                payment_method: method_map.get(&wi.id).cloned(),
+                work_item_id: wi.id,
+                customer_id: wi.customer_id,
+                description: wi.description,
+                price: wi.price,
+                paid_amount: wi.paid_amount,
+                received_at: wi.received_at,
+            }
         })
         .collect();
 
@@ -126,35 +123,22 @@ pub async fn list_sales_records(
 
 /// Returns all work_items where paid_amount < price, with customer info.
 pub async fn list_unpaid_records(db: &DatabaseConnection) -> Result<Vec<UnpaidRecord>, DbErr> {
-    let work_items = work_item::Entity::find()
+    let results: Vec<(work_item::Model, Option<customer::Model>)> = work_item::Entity::find()
         .filter(Expr::col(work_item::Column::PaidAmount).lt(Expr::col(work_item::Column::Price)))
+        .join(JoinType::LeftJoin, work_item::Relation::Customer.def())
+        .select_also(customer::Entity)
         .order_by_desc(work_item::Column::ReceivedAt)
         .all(db)
         .await?;
 
-    if work_items.is_empty() {
+    if results.is_empty() {
         return Ok(vec![]);
     }
 
-    let customer_ids: Vec<i32> = work_items.iter().map(|wi| wi.customer_id).collect();
-
-    let customers = customer::Entity::find()
-        .filter(customer::Column::Id.is_in(customer_ids))
-        .all(db)
-        .await?;
-
-    let customer_map: HashMap<i32, (String, Option<String>)> = customers
+    let records = results
         .into_iter()
-        .map(|c| (c.id, (c.name, c.phone_number)))
-        .collect();
-
-    let records = work_items
-        .into_iter()
-        .map(|wi| {
-            let (name, phone) = customer_map
-                .get(&wi.customer_id)
-                .cloned()
-                .unwrap_or_default();
+        .map(|(wi, cust)| {
+            let (name, phone) = cust.map(|c| (c.name, c.phone_number)).unwrap_or_default();
             UnpaidRecord {
                 work_item_id: wi.id,
                 customer_id: wi.customer_id,
@@ -186,24 +170,38 @@ pub struct ChartDay {
 
 /// Returns the last 7 days (inclusive of today) as chart data, ordered oldest -> newest.
 ///
-/// Groups work_items by the date portion of `received_at` and sums their `price`.
+/// Groups work_items by the Local date portion of `received_at` and sums their `price`.
 pub async fn list_weekly_chart(db: &DatabaseConnection) -> Result<Vec<ChartDay>, DbErr> {
-    let today = Local::now().date_naive();
-    let from = today - Duration::days(6);
+    let now_local = Local::now();
+    let today = now_local.date_naive();
+    let from_local = today - Duration::days(6);
 
-    let from_str = from.format("%Y-%m-%d").to_string();
-    let to_str = format!("{}T23:59:59.9999", today.format("%Y-%m-%d"));
+    // Convert local boundaries to UTC RFC3339 for filtering.
+    let from_utc = from_local
+        .and_hms_opt(0, 0, 0)
+        .expect("valid time")
+        .and_local_timezone(Local)
+        .unwrap()
+        .with_timezone(&Utc)
+        .to_rfc3339();
 
+    let to_utc = today
+        .and_hms_opt(23, 59, 59)
+        .expect("valid time")
+        .and_local_timezone(Local)
+        .unwrap()
+        .with_timezone(&Utc)
+        .to_rfc3339();
     let items = work_item::Entity::find()
-        .filter(work_item::Column::ReceivedAt.gte(&from_str))
-        .filter(work_item::Column::ReceivedAt.lte(&to_str))
+        .filter(work_item::Column::ReceivedAt.gte(&from_utc))
+        .filter(work_item::Column::ReceivedAt.lte(&to_utc))
         .all(db)
         .await?;
 
-    // Sum price per date.
+    // Sum price per Local date.
     let mut totals: HashMap<NaiveDate, i64> = HashMap::new();
     for item in items {
-        if let Some(date) = parse_date_prefix(&item.received_at) {
+        if let Some(date) = parse_to_local_date(&item.received_at) {
             *totals.entry(date).or_insert(0) += item.price;
         }
     }
@@ -212,9 +210,8 @@ pub async fn list_weekly_chart(db: &DatabaseConnection) -> Result<Vec<ChartDay>,
 
     let mut days: Vec<ChartDay> = (0..7)
         .map(|i| {
-            let date = from + Duration::days(i as i64);
+            let date = from_local + Duration::days(i as i64);
             let total = totals.get(&date).copied().unwrap_or(0);
-            // chrono weekday: Mon=0 .. Sun=6
             let wd = date.weekday().num_days_from_monday() as usize;
             ChartDay {
                 date: date.format("%Y-%m-%d").to_string(),
@@ -224,17 +221,11 @@ pub async fn list_weekly_chart(db: &DatabaseConnection) -> Result<Vec<ChartDay>,
         })
         .collect();
 
-    // Mark the last entry as today.
     if let Some(last) = days.last_mut() {
         last.label = "오늘".to_string();
     }
 
     Ok(days)
-}
-
-/// Parses "YYYY-MM-DD..." -> NaiveDate, ignoring the time portion.
-fn parse_date_prefix(s: &str) -> Option<NaiveDate> {
-    NaiveDate::parse_from_str(s.get(..10)?, "%Y-%m-%d").ok()
 }
 
 /// Top item entry for the popular items list.
@@ -256,50 +247,47 @@ pub async fn list_top_items(
     to: Option<&str>,
     limit: usize,
 ) -> Result<Vec<TopItem>, DbErr> {
-    let mut query = work_item::Entity::find();
-    if let Some(f) = from {
-        query = query.filter(work_item::Column::ReceivedAt.gte(f));
-    }
-    if let Some(t) = to {
-        if let Ok(date) = NaiveDate::parse_from_str(t, "%Y-%m-%d") {
-            let next_day = date + Duration::days(1);
-            let next_day_str = next_day.format("%Y-%m-%d").to_string();
-            query = query.filter(work_item::Column::ReceivedAt.lt(next_day_str));
-        } else {
-            let to_end = format!("{}T23:59:59.999", t);
-            query = query.filter(work_item::Column::ReceivedAt.lte(to_end));
+    let mut query = work_item_detail::Entity::find()
+        .select_only()
+        .column(work_item_detail::Column::ItemName)
+        .column_as(Expr::col(work_item_detail::Column::Quantity).sum(), "total_quantity")
+        .group_by(work_item_detail::Column::ItemName)
+        .order_by_desc(Expr::cust("total_quantity"));
+
+    // If date filters are provided, they are expected to be UTC strings from FE.
+    if from.is_some() || to.is_some() {
+        query = query.join_rev(
+            JoinType::InnerJoin,
+            work_item::Entity::belongs_to(work_item_detail::Entity)
+                .from(work_item::Column::Id)
+                .to(work_item_detail::Column::WorkItemId)
+                .into(),
+        );
+
+        if let Some(f) = from {
+            query = query.filter(work_item::Column::ReceivedAt.gte(f));
+        }
+        if let Some(t) = to {
+            query = query.filter(work_item::Column::ReceivedAt.lte(t));
         }
     }
-    let work_items = query.all(db).await?;
 
-    if work_items.is_empty() {
-        return Ok(vec![]);
+    #[derive(FromQueryResult)]
+    struct TopItemRow {
+        item_name: String,
+        total_quantity: i64,
     }
 
-    let work_item_ids: Vec<i32> = work_items.iter().map(|wi| wi.id).collect();
+    let rows = query.into_model::<TopItemRow>().all(db).await?;
 
-    let details = work_item_detail::Entity::find()
-        .filter(work_item_detail::Column::WorkItemId.is_in(work_item_ids))
-        .all(db)
-        .await?;
-
-    // Sum quantity per item_name in Rust (avoids sea_orm GROUP BY complexity).
-    let mut totals: HashMap<String, i64> = HashMap::new();
-    for d in details {
-        *totals.entry(d.item_name).or_insert(0) += d.quantity as i64;
-    }
-
-    let mut sorted: Vec<(String, i64)> = totals.into_iter().collect();
-    sorted.sort_by(|a, b| b.1.cmp(&a.1));
-
-    let items = sorted
+    let items = rows
         .into_iter()
         .take(limit)
         .enumerate()
-        .map(|(i, (name, qty))| TopItem {
+        .map(|(i, r)| TopItem {
             rank: i + 1,
-            item_name: name,
-            total_quantity: qty,
+            item_name: r.item_name,
+            total_quantity: r.total_quantity,
         })
         .collect();
 

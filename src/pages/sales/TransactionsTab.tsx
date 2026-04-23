@@ -1,9 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Receipt, Search, ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router";
+import { TableVirtuoso } from "react-virtuoso";
 import { DateRangePicker } from "@/pages/sales/DateRangePicker";
 import { salesApi } from "@/bindings/sales";
 import type { SalesRecord } from "@/types";
+import { formatSmartDateTime } from "@/utils/dateUtils";
 import {
   DateRange,
   PERIODS,
@@ -23,7 +25,7 @@ export function TransactionsTab() {
   const [records, setRecords] = useState<SalesRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const activeRange = customRange ?? getDateRange(period);
+  const activeRange = useMemo(() => customRange ?? getDateRange(period), [customRange, period]);
 
   const loadRecords = useCallback(async () => {
     try {
@@ -40,39 +42,22 @@ export function TransactionsTab() {
     void loadRecords();
   }, [loadRecords]);
 
-  const filtered = records.filter(
-    (r) =>
-      !search ||
-      r.customerName.includes(search) ||
-      (r.description ?? "").includes(search)
+  const filtered = useMemo(() => 
+    records.filter(
+      (r) =>
+        !search ||
+        r.customerName.includes(search) ||
+        (r.description ?? "").includes(search)
+    ),
+    [records, search]
   );
 
-  const totalAmount = records
-    .filter((r) => r.paymentMethod !== null)
-    .reduce((sum, r) => sum + r.price, 0);
-
-  /**
-   * 오늘 날짜와 비교하여 스마트한 날짜/시간 문자열 반환
-   */
-  function formatSmartDateTime(iso: string): { date: string; time: string; isToday: boolean } {
-    try {
-      const datePart = iso.split("T")[0];
-      const timePart = iso.split("T")[1] || "00:00:00";
-      const [year, month, day] = datePart.split("-").map(Number);
-      const [hour, minute] = timePart.split(":").map(Number);
-      const d = new Date(year, month - 1, day, hour, minute);
-      const now = new Date();
-      const isToday = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
-      const isCurrentYear = d.getFullYear() === now.getFullYear();
-      const timeStr = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
-
-      if (isToday) return { date: "오늘", time: timeStr, isToday: true };
-      const dateStr = isCurrentYear ? `${month}/${day}` : `${year}/${month}/${day}`;
-      return { date: dateStr, time: timeStr, isToday: false };
-    } catch {
-      return { date: iso.slice(5, 10).replace("-", "/"), time: iso.slice(11, 16), isToday: false };
-    }
-  }
+  const totalAmount = useMemo(() => 
+    filtered
+      .filter((r) => r.paymentMethod !== null)
+      .reduce((sum, r) => sum + r.price, 0),
+    [filtered]
+  );
 
   const handleGoToCustomer = (r: SalesRecord) => {
     navigate("/customers", { 
@@ -145,10 +130,11 @@ export function TransactionsTab() {
           <span className="ml-auto text-xs text-on-surface-muted">{filtered.length}건</span>
         </div>
 
-        <div className="flex-1 overflow-y-auto font-sans">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-surface-elevated sticky top-0 border-b border-border-default z-10">
-              <tr>
+        <div className="flex-1 font-sans">
+          <TableVirtuoso
+            data={filtered}
+            fixedHeaderContent={() => (
+              <tr className="bg-surface-elevated border-b border-border-default">
                 <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-24 text-center border-r border-border-default/50">날짜</th>
                 <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-16 text-center border-r border-border-default/50">시간</th>
                 <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-28">고객명</th>
@@ -157,46 +143,41 @@ export function TransactionsTab() {
                 <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted text-right w-24">금액</th>
                 <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-12"></th>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-border-default">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-on-surface-muted text-sm">
-                    거래 내역이 없습니다.
+            )}
+            itemContent={(_index, r) => {
+              const { date, time, isToday } = formatSmartDateTime(r.receivedAt);
+              return (
+                <>
+                  <td className={`px-4 py-3 text-xs text-center border-r border-border-default/50 ${isToday ? "text-primary-600 font-bold dark:text-primary-400" : "text-on-surface-muted"}`}>
+                    {date}
                   </td>
-                </tr>
-              ) : (
-                filtered.map((r) => {
-                  const { date, time, isToday } = formatSmartDateTime(r.receivedAt);
-                  return (
-                    <tr key={r.workItemId} className="hover:bg-surface-elevated/50 transition-colors group">
-                      <td className={`px-4 py-3 text-xs text-center border-r border-border-default/50 ${isToday ? "text-primary-600 font-bold dark:text-primary-400" : "text-on-surface-muted"}`}>
-                        {date}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-on-surface-muted text-center border-r border-border-default/50">{time}</td>
-                      <td className="px-4 py-3 font-semibold text-on-surface">{r.customerName}</td>
-                      <td className="px-4 py-3 text-on-surface max-w-[200px] truncate">{r.description ?? "-"}</td>
-                      <td className="px-4 py-3 text-center">
-                        <PaymentMethodBadge method={r.paymentMethod ?? "credit"} />
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold text-on-surface whitespace-nowrap">
-                        {r.price.toLocaleString()}원
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => handleGoToCustomer(r)}
-                          title="고객 관리에서 보기"
-                          className="p-1.5 rounded-md text-on-surface-muted bg-surface-elevated border border-border-default hover:bg-primary-600 hover:text-white dark:hover:bg-primary-500 hover:border-primary-600 transition-all cursor-pointer shadow-sm group/btn"
-                        >
-                          <ExternalLink className="w-4 h-4 transition-colors" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                  <td className="px-4 py-3 font-mono text-xs text-on-surface-muted text-center border-r border-border-default/50">{time}</td>
+                  <td className="px-4 py-3 font-semibold text-on-surface">{r.customerName}</td>
+                  <td className="px-4 py-3 text-on-surface max-w-[200px] truncate">{r.description ?? "-"}</td>
+                  <td className="px-4 py-3 text-center">
+                    <PaymentMethodBadge method={r.paymentMethod ?? "credit"} />
+                  </td>
+                  <td className="px-4 py-3 text-right font-bold text-on-surface whitespace-nowrap">
+                    {r.price.toLocaleString()}원
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      onClick={() => handleGoToCustomer(r)}
+                      title="고객 관리에서 보기"
+                      className="p-1.5 rounded-md text-on-surface-muted bg-surface-elevated border border-border-default hover:bg-primary-600 hover:text-white dark:hover:bg-primary-500 hover:border-primary-600 transition-all cursor-pointer shadow-sm group/btn"
+                    >
+                      <ExternalLink className="w-4 h-4 transition-colors" />
+                    </button>
+                  </td>
+                </>
+              );
+            }}
+            components={{
+              Table: (props) => <table {...props} className="w-full text-sm text-left" />,
+              TableBody: React.forwardRef((props, ref) => <tbody {...props} ref={ref} className="divide-y divide-border-default" />),
+              TableRow: (props) => <tr {...props} className="hover:bg-surface-elevated/50 transition-colors group" />
+            }}
+          />
         </div>
       </div>
     </div>

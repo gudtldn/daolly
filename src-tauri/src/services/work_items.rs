@@ -1,14 +1,9 @@
-use chrono::{Local, Utc};
+use chrono::Utc;
 use sea_orm::*;
 use serde::Deserialize;
 use std::collections::HashMap;
 
 use crate::db::entities::{payment, work_item, work_item::WorkItemStatus, work_item_detail};
-
-/// Returns local datetime string without timezone suffix, e.g. "2025-04-22T09:00:00".
-fn local_now() -> String {
-    Local::now().format("%Y-%m-%dT%H:%M:%S").to_string()
-}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -115,7 +110,7 @@ pub async fn create(
     let note = note.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty());
 
     let now = Utc::now().to_rfc3339();
-    let recv = received_at.unwrap_or_else(local_now);
+    let recv = received_at.unwrap_or_else(|| now.clone());
     let tx = db.begin().await?;
 
     let wi = work_item::ActiveModel {
@@ -199,10 +194,9 @@ pub async fn update_status(
     existing: work_item::Model,
     status: WorkItemStatus,
 ) -> Result<work_item::Model, DbErr> {
-    let sys_now = Utc::now().to_rfc3339();
-    let local_ts = local_now();
+    let now = Utc::now().to_rfc3339();
     let mut active: work_item::ActiveModel = existing.into();
-    active.last_modified_at = Set(sys_now);
+    active.last_modified_at = Set(now.clone());
 
     match status {
         WorkItemStatus::Received => {
@@ -210,11 +204,11 @@ pub async fn update_status(
             active.picked_up_at = Set(None);
         }
         WorkItemStatus::Completed => {
-            active.completed_at = Set(Some(local_ts));
+            active.completed_at = Set(Some(now));
             active.picked_up_at = Set(None);
         }
         WorkItemStatus::PickedUp => {
-            active.picked_up_at = Set(Some(local_ts));
+            active.picked_up_at = Set(Some(now));
         }
     }
     active.status = Set(status);
@@ -271,9 +265,9 @@ pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<u64, DbErr> {
 /// 모든 고객에 대해 미수금(price - paid_amount) 합계를 반환합니다.
 pub async fn get_all_unpaid_amounts(db: &DatabaseConnection) -> Result<HashMap<i32, i64>, DbErr> {
     use sea_orm::{
+        FromQueryResult,
         prelude::Expr,
         sea_query::{ExprTrait, Func, SimpleExpr},
-        FromQueryResult,
     };
 
     #[derive(FromQueryResult)]

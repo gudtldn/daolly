@@ -8,6 +8,7 @@ interface CustomerState {
   isLoading: boolean;
   unpaidMap: Record<number, number>;
   searchKeyword: string | null;
+  lastRequestId: number;
 }
 
 interface CustomerActions {
@@ -21,20 +22,29 @@ interface CustomerActions {
 
 type CustomerStore = CustomerState & CustomerActions;
 
-export const useCustomerStore = create<CustomerStore>((set) => ({
+export const useCustomerStore = create<CustomerStore>((set, get) => ({
   customers: [],
   selectedCustomer: null,
   isLoading: false,
   unpaidMap: {},
   searchKeyword: null,
+  lastRequestId: 0,
 
   load: async (search) => {
-    set({ isLoading: true, searchKeyword: search ?? null });
+    const requestId = get().lastRequestId + 1;
+    set({ isLoading: true, searchKeyword: search ?? null, lastRequestId: requestId });
+    
     try {
       const customers = await customerApi.list(search ?? null);
-      set({ customers });
+      
+      // 최신 요청인 경우에만 결과 반영
+      if (get().lastRequestId === requestId) {
+        set({ customers });
+      }
     } finally {
-      set({ isLoading: false });
+      if (get().lastRequestId === requestId) {
+        set({ isLoading: false });
+      }
     }
   },
 

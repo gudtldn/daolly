@@ -2,7 +2,7 @@ use sea_orm::DatabaseConnection;
 use serde::Deserialize;
 use tauri::State;
 
-use crate::commands::{require_positive, CmdResult};
+use crate::commands::{CmdResult, require_positive};
 use crate::db::entities::payment;
 use crate::services;
 

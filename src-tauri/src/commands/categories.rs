@@ -2,7 +2,7 @@ use sea_orm::{DatabaseConnection, EntityTrait};
 use serde::Deserialize;
 use tauri::State;
 
-use crate::commands::{require_non_empty, AppError, CmdResult};
+use crate::commands::{AppError, CmdResult, require_non_empty};
 use crate::db::entities::category;
 use crate::services;
 
