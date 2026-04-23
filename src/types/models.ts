@@ -112,3 +112,20 @@ export interface TopItem {
   itemName: string;
   totalQuantity: number;
 }
+
+export interface RevenueSummary {
+  totalSales: number;
+  actualIncome: number;
+}
+
+export interface PaymentRecord {
+  paymentId: number;
+  workItemId: number;
+  customerId: number;
+  customerName: string;
+  description: string | null;
+  amount: number;
+  method: string | null;
+  paidAt: string;
+  isBackPayment: boolean;
+}

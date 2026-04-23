@@ -44,6 +44,33 @@ pub struct UnpaidRecord {
     pub received_at: String,
 }
 
+/// Summary of revenue for a given period.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RevenueSummary {
+    /// Total price of work items received during the period (Accrual basis)
+    pub total_sales: i64,
+    /// Total amount actually paid during the period (Cash basis)
+    pub actual_income: i64,
+}
+
+/// Detailed payment record for the summary view.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PaymentRecord {
+    pub payment_id: i32,
+    pub work_item_id: i32,
+    pub customer_id: i32,
+    pub customer_name: String,
+    pub description: Option<String>,
+    pub amount: i64,
+    pub method: Option<String>,
+    pub paid_at: String,
+    /// Whether this payment is for a work_item received in the same period.
+    /// If false, it's a back-payment (미수금 수령).
+    pub is_back_payment: bool,
+}
+
 /// Returns work_items received in the given date range with customer name and payment method.
 ///
 /// `from` / `to` are optional "YYYY-MM-DD" strings. Credit items have payment_method = None.
@@ -250,7 +277,10 @@ pub async fn list_top_items(
     let mut query = work_item_detail::Entity::find()
         .select_only()
         .column(work_item_detail::Column::ItemName)
-        .column_as(Expr::col(work_item_detail::Column::Quantity).sum(), "total_quantity")
+        .column_as(
+            Expr::col(work_item_detail::Column::Quantity).sum(),
+            "total_quantity",
+        )
         .group_by(work_item_detail::Column::ItemName)
         .order_by_desc(Expr::cust("total_quantity"));
 
@@ -292,4 +322,107 @@ pub async fn list_top_items(
         .collect();
 
     Ok(items)
+}
+
+/// Calculates summary of total sales and actual income for the given date range.
+/// `from` / `to` are optional UTC ISO strings.
+pub async fn get_revenue_summary(
+    db: &DatabaseConnection,
+    from: Option<&str>,
+    to: Option<&str>,
+) -> Result<RevenueSummary, DbErr> {
+    // 1. Total Sales (Accrual Basis): Sum of work_item prices received in the range
+    let mut sales_query = work_item::Entity::find()
+        .select_only()
+        .column_as(work_item::Column::Price.sum(), "sum");
+    if let Some(f) = from {
+        sales_query = sales_query.filter(work_item::Column::ReceivedAt.gte(f));
+    }
+    if let Some(t) = to {
+        sales_query = sales_query.filter(work_item::Column::ReceivedAt.lte(t));
+    }
+
+    #[derive(FromQueryResult)]
+    struct SumRow {
+        sum: Option<i64>,
+    }
+    let sales_res = sales_query.into_model::<SumRow>().one(db).await?;
+    let total_sales = sales_res.and_then(|r| r.sum).unwrap_or(0);
+
+    // 2. Actual Income (Cash Basis): Sum of payments made in the range
+    let mut income_query = payment::Entity::find()
+        .select_only()
+        .column_as(payment::Column::Amount.sum(), "sum");
+    if let Some(f) = from {
+        income_query = income_query.filter(payment::Column::PaidAt.gte(f));
+    }
+    if let Some(t) = to {
+        income_query = income_query.filter(payment::Column::PaidAt.lte(t));
+    }
+
+    let income_res = income_query.into_model::<SumRow>().one(db).await?;
+    let actual_income = income_res.and_then(|r| r.sum).unwrap_or(0);
+
+    Ok(RevenueSummary {
+        total_sales,
+        actual_income,
+    })
+}
+
+/// Returns all payments made in the given date range, with customer and work_item info.
+pub async fn list_payment_records(
+    db: &DatabaseConnection,
+    from: Option<&str>,
+    to: Option<&str>,
+) -> Result<Vec<PaymentRecord>, DbErr> {
+    let mut query = payment::Entity::find()
+        .join(JoinType::InnerJoin, payment::Relation::WorkItem.def())
+        .join(JoinType::InnerJoin, work_item::Relation::Customer.def())
+        .select_also(work_item::Entity)
+        .select_also(customer::Entity);
+
+    if let Some(f) = from {
+        query = query.filter(payment::Column::PaidAt.gte(f));
+    }
+    if let Some(t) = to {
+        query = query.filter(payment::Column::PaidAt.lte(t));
+    }
+
+    let results: Vec<(
+        payment::Model,
+        Option<work_item::Model>,
+        Option<customer::Model>,
+    )> = query.order_by_desc(payment::Column::PaidAt).all(db).await?;
+
+    let records = results
+        .into_iter()
+        .map(|(p, wi, cust)| {
+            let customer_name = cust.map(|c| c.name).unwrap_or_default();
+            let customer_id = wi.as_ref().map(|w| w.customer_id).unwrap_or(0);
+            let description = wi.as_ref().and_then(|w| w.description.clone());
+
+            // 이 결제가 이번 기간(from~to)에 접수된 건에 대한 것인지 확인
+            // (간단하게 received_at이 from보다 이전이면 back_payment로 간주)
+            let is_back_payment = if let (Some(f), Some(w)) = (from, wi) {
+                w.received_at.as_str() < f
+            } else {
+                false
+            };
+
+            PaymentRecord {
+                payment_id: p.id,
+                work_item_id: p.work_item_id,
+                customer_id,
+                customer_name,
+                description,
+
+                amount: p.amount,
+                method: p.method,
+                paid_at: p.paid_at,
+                is_back_payment,
+            }
+        })
+        .collect();
+
+    Ok(records)
 }

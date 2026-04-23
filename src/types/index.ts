@@ -12,6 +12,8 @@ export type {
   UnpaidRecord,
   ChartDay,
   TopItem,
+  RevenueSummary,
+  PaymentRecord,
   PaymentMethod,
 } from "./models";
 

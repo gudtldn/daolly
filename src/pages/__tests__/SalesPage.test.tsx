@@ -8,9 +8,11 @@ import { SalesPage } from "@/pages/SalesPage";
 vi.mock("@/bindings/sales", () => ({
   salesApi: {
     listSalesRecords: vi.fn().mockResolvedValue([]),
+    listPaymentRecords: vi.fn().mockResolvedValue([]),
+    getRevenueSummary: vi.fn().mockResolvedValue({ totalSales: 0, actualIncome: 0 }),
     listUnpaidRecords: vi.fn().mockResolvedValue([]),
     listWeeklyChart: vi.fn().mockResolvedValue([]),
-        listTopItems: vi.fn().mockResolvedValue([]),
+    listTopItems: vi.fn().mockResolvedValue([]),
   },
 }));
 
@@ -30,10 +32,10 @@ describe("SalesPage", () => {
   it("기본 탭에서 KPI 카드들이 표시된다", () => {
     renderWithRouter(<SalesPage />);
     // KPI 카드 헤더 텍스트 기준으로 확인 (selector: "p" 로 카드 제목만 지정)
-    expect(screen.getByText("선택 기간 총 매출", { selector: "p" })).toBeInTheDocument();
-    expect(screen.getByText("카드", { selector: "p" })).toBeInTheDocument();
-    expect(screen.getByText("현금 / 이체", { selector: "p" })).toBeInTheDocument();
-    expect(screen.getByText("외상 발생", { selector: "p" })).toBeInTheDocument();
+    expect(screen.getByText("오늘 입금된 금액", { selector: "p" })).toBeInTheDocument();
+    expect(screen.getByText("카드 결제액", { selector: "p" })).toBeInTheDocument();
+    expect(screen.getByText("현금 / 이체 합계", { selector: "p" })).toBeInTheDocument();
+    expect(screen.getByText("오늘 접수한 일 (총액)", { selector: "p" })).toBeInTheDocument();
   });
 
   it("'거래 내역' 탭 클릭 시 해당 콘텐츠가 표시된다", async () => {
@@ -57,9 +59,9 @@ describe("SalesPage", () => {
     expect(screen.getByText("주간 매출 추이")).toBeInTheDocument();
   });
 
-  it("매출 요약 탭에서 많이 접수된 품목 섹션이 표시된다", () => {
+  it("매출 요약 탭에서 자주 찾는 품목 섹션이 표시된다", () => {
     renderWithRouter(<SalesPage />);
-    expect(screen.getByText(/많이 접수된 품목/)).toBeInTheDocument();
+    expect(screen.getByText(/자주 찾는 품목/)).toBeInTheDocument();
     // API mock이 빈 배열을 반환하므로 "데이터 없음" 메시지가 표시됨
     expect(screen.getByText("데이터 없음")).toBeInTheDocument();
   });

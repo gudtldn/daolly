@@ -2,6 +2,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+// Tauri API 및 플러그인 mock
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: () => ({
+    show: vi.fn().mockResolvedValue(undefined),
+  }),
+}));
+
+vi.mock("@tauri-apps/plugin-updater", () => ({
+  check: vi.fn().mockResolvedValue({ available: false }),
+}));
+
 // CustomersPage가 마운트 시 Tauri invoke를 호출하므로 mock 필요
 vi.mock("@/bindings", () => ({
   customerApi: {

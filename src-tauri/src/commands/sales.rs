@@ -3,7 +3,27 @@ use tauri::State;
 
 use crate::commands::CmdResult;
 use crate::services;
-use crate::services::sales::{ChartDay, SalesRecord, TopItem, UnpaidRecord};
+use crate::services::sales::{
+    ChartDay, PaymentRecord, RevenueSummary, SalesRecord, TopItem, UnpaidRecord,
+};
+
+#[tauri::command]
+pub async fn get_revenue_summary(
+    db: State<'_, DatabaseConnection>,
+    from: Option<String>,
+    to: Option<String>,
+) -> CmdResult<RevenueSummary> {
+    Ok(services::sales::get_revenue_summary(db.inner(), from.as_deref(), to.as_deref()).await?)
+}
+
+#[tauri::command]
+pub async fn list_payment_records(
+    db: State<'_, DatabaseConnection>,
+    from: Option<String>,
+    to: Option<String>,
+) -> CmdResult<Vec<PaymentRecord>> {
+    Ok(services::sales::list_payment_records(db.inner(), from.as_deref(), to.as_deref()).await?)
+}
 
 #[tauri::command]
 pub async fn list_sales_records(
