@@ -6,8 +6,6 @@ use crate::db::entities::customer;
 pub async fn list(
     db: &DatabaseConnection,
     search: Option<String>,
-    page: Option<u64>,
-    page_size: Option<u64>,
 ) -> Result<Vec<customer::Model>, DbErr> {
     let mut query = customer::Entity::find();
 
@@ -20,14 +18,6 @@ pub async fn list(
     }
 
     query = query.order_by_asc(customer::Column::Name);
-
-    if let Some(limit) = page_size {
-        query = query.limit(limit);
-        if let Some(p) = page {
-            let offset = p.saturating_sub(1) * limit;
-            query = query.offset(offset);
-        }
-    }
 
     query.all(db).await
 }
@@ -125,7 +115,7 @@ mod tests {
             .await
             .unwrap();
 
-        let results = list(&db, Some("홍".into()), None, None).await.unwrap();
+        let results = list(&db, Some("홍".into())).await.unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].name, "홍길동");
     }
@@ -140,27 +130,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn list_with_pagination() {
+    async fn list_all_at_once() {
         let db = setup_test_db().await.unwrap();
         for i in 1..=5 {
             create(&db, format!("고객{}", i), None, None).await.unwrap();
         }
 
-        // page 1, size 2
-        let page1 = list(&db, None, Some(1), Some(2)).await.unwrap();
-        assert_eq!(page1.len(), 2);
-        assert_eq!(page1[0].name, "고객1");
-        assert_eq!(page1[1].name, "고객2");
-
-        // page 2, size 2
-        let page2 = list(&db, None, Some(2), Some(2)).await.unwrap();
-        assert_eq!(page2.len(), 2);
-        assert_eq!(page2[0].name, "고객3");
-        assert_eq!(page2[1].name, "고객4");
-
-        // page 3, size 2
-        let page3 = list(&db, None, Some(3), Some(2)).await.unwrap();
-        assert_eq!(page3.len(), 1);
-        assert_eq!(page3[0].name, "고객5");
+        let results = list(&db, None).await.unwrap();
+        assert_eq!(results.len(), 5);
+        assert_eq!(results[0].name, "고객1");
+        assert_eq!(results[4].name, "고객5");
     }
 }

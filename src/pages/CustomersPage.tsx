@@ -139,7 +139,7 @@ function CustomerListPanel({
   lastSource: InteractionSource;
   onMouseMove: () => void;
 }) {
-  const { unpaidMap, loadMore, hasMore, isLoading } = useCustomerStore();
+  const { unpaidMap, isLoading } = useCustomerStore();
   const virtuosoRef = useRef<VirtuosoHandle>(null);
 
   // scrollToId 변경 시 해당 항목으로 스크롤
@@ -208,11 +208,6 @@ function CustomerListPanel({
         <Virtuoso
           ref={virtuosoRef}
           data={filtered}
-          endReached={() => {
-            if (hasMore && !isLoading) {
-              loadMore();
-            }
-          }}
           itemContent={(_index: number, c: Customer) => {
             const isSelected = selectedId === c.id;
             return (
@@ -258,13 +253,8 @@ function CustomerListPanel({
           components={{
             EmptyPlaceholder: () => (
               <div className="p-8 text-center text-on-surface-muted text-sm">
-                {searchKeyword ? "검색 결과가 없습니다." : "등록된 고객이 없습니다."}
+                {isLoading ? "로딩 중..." : searchKeyword ? "검색 결과가 없습니다." : "등록된 고객이 없습니다."}
               </div>
-            ),
-            Footer: () => (
-              isLoading && hasMore ? (
-                <div className="p-4 text-center text-sm text-on-surface-muted">로딩 중...</div>
-              ) : null
             )
           }}
         />

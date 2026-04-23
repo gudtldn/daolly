@@ -29,10 +29,8 @@ pub struct UpdateCustomer {
 pub async fn list_customers(
     db: State<'_, DatabaseConnection>,
     search: Option<String>,
-    page: Option<u64>,
-    page_size: Option<u64>,
 ) -> CmdResult<Vec<customer::Model>> {
-    Ok(services::customers::list(db.inner(), search, page, page_size).await?)
+    Ok(services::customers::list(db.inner(), search).await?)
 }
 
 #[tauri::command]
