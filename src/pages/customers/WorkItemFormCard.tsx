@@ -134,10 +134,6 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
     setPayDate(toLocalInput(new Date().toISOString()));
     setPayLoading(false);
     setEditingPaymentId(null);
-    const t = setTimeout(() => {
-      if (!initialTab || initialTab === "info") descRef.current?.focus();
-    }, 150);
-    return () => clearTimeout(t);
   }, [open, mode, workItem, initialTab]);
 
   // Esc로 닫기
@@ -373,6 +369,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
             <input
               ref={descRef}
               type="text"
+              autoFocus
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="세탁 내용 요약"

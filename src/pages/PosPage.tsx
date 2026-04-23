@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
+import { useDebounce } from "@/hooks/useDebounce";
 import {
   User, Plus, Search, History, X,
   Minus, Trash2, Pen, Keyboard, Shirt,
@@ -29,28 +30,32 @@ function CustomerPanel({
   onViewHistory: (customerId: number) => void;
 }) {
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebounce(query, 300);
   const [results, setResults] = useState<Customer[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [unpaid, setUnpaid] = useState(0);
   const [highlightIdx, setHighlightIdx] = useState(0);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleSearch = (q: string) => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!q.trim()) { setResults([]); setShowDropdown(false); return; }
-    debounceRef.current = setTimeout(() => {
-      customerApi.list(q.trim()).then((fetched) => {
+  useEffect(() => {
+    if (!debouncedQuery.trim()) {
+      setResults([]);
+      setShowDropdown(false);
+      return;
+    }
+    customerApi
+      .list(debouncedQuery.trim())
+      .then((fetched) => {
         setResults(fetched);
         setHighlightIdx(0);
         setShowDropdown(true);
-      }).catch(() => {});
-    }, 300);
-  };
+      })
+      .catch(() => {});
+  }, [debouncedQuery]);
 
   const handleSelect = (c: Customer) => {
     onSelect(c);
     setQuery("");
-    setResults([]);  // Prevent stale results from triggering unintended selection.
+    setResults([]); // Prevent stale results from triggering unintended selection.
     setShowDropdown(false);
   };
 
@@ -85,20 +90,20 @@ function CustomerPanel({
               <input
                 type="text"
                 value={query}
-                onChange={(e) => { setQuery(e.target.value); handleSearch(e.target.value); }}
+                onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      if (results.length > 0) handleSelect(results[highlightIdx]);
-                    } else if (e.key === "ArrowDown") {
-                      e.preventDefault();
-                      setHighlightIdx((i) => Math.min(i + 1, results.length - 1));
-                    } else if (e.key === "ArrowUp") {
-                      e.preventDefault();
-                      setHighlightIdx((i) => Math.max(i - 1, 0));
-                    } else if (e.key === "Escape") {
-                      setShowDropdown(false);
-                    }
-                  }}
+                  if (e.key === "Enter") {
+                    if (results.length > 0) handleSelect(results[highlightIdx]);
+                  } else if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setHighlightIdx((i) => Math.min(i + 1, results.length - 1));
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setHighlightIdx((i) => Math.max(i - 1, 0));
+                  } else if (e.key === "Escape") {
+                    setShowDropdown(false);
+                  }
+                }}
                 placeholder="이름, 전화번호 뒷자리..."
                 className={`w-full border border-border-default bg-surface-card rounded px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-muted focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 ${query ? "pr-8" : ""}`}
               />

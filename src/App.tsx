@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { MemoryRouter, Routes, Route, Navigate } from "react-router";
 import { Toaster } from "sonner";
 import { check } from "@tauri-apps/plugin-updater";
@@ -110,30 +110,33 @@ function App() {
   const [isClosing, setIsClosing] = useState(false);
   const [showApp, setShowApp] = useState(false);
 
+  // 스플래시 페이드아웃 및 앱 노출 시퀀스
+  const finishSplash = useCallback((delay = 0) => {
+    const timer = setTimeout(() => {
+      setIsClosing(true);
+      // CSS 트랜지션(700ms) 완료 후 스플래시 컴포넌트 제거
+      setTimeout(() => setShowApp(true), 750);
+    }, delay);
+    return () => clearTimeout(timer);
+  }, []);
+
   useEffect(() => {
     const runUpdate = async () => {
-      // 앱이 준비되면 윈도우 노출
       try {
         await getCurrentWindow().show();
       } catch (e) {
         console.error("Failed to show window:", e);
       }
 
-      // 윈도우 노출 직후 업데이트 확인 시작
-      try {
-        // 개발 모드에서는 업데이트 확인을 건너뜀
-        if (import.meta.env.DEV) {
-          console.log("Development mode: skipping update check");
-          setIsClosing(true);
-          setTimeout(() => setShowApp(true), 100);
-          return;
-        }
+      if (import.meta.env.DEV) {
+        finishSplash(100);
+        return;
+      }
 
+      try {
         const update = await check();
         if (!update?.available) {
-          // 업데이트가 없으면 바로 페이드아웃 시작
-          setIsClosing(true);
-          setTimeout(() => setShowApp(true), 700); // 애니메이션 시간(700ms) 후 앱 노출
+          finishSplash(500);
           return;
         }
 
@@ -156,9 +159,7 @@ function App() {
               }
               break;
             case "Finished":
-              // Windows에서는 설치 프로그램이 자동으로 앱을 종료하고 교체 후 다시 띄움
-              // relaunch()를 직접 호출하면 구버전이 다시 실행되어 파일 잠금이 발생할 수 있음
-              console.log("Update finished. The installer will now handle the relaunch.");
+              // Windows 재시작 로직 대기
               break;
           }
         });
@@ -169,14 +170,12 @@ function App() {
           progress: 0,
           error: "업데이트를 확인하지 못했습니다.",
         });
-        // 에러 시에도 페이드아웃 후 진입
-        setTimeout(() => setIsClosing(true), 1500);
-        setTimeout(() => setShowApp(true), 2200);
+        finishSplash(2000); // 에러 메시지를 볼 수 있도록 충분히 대기
       }
     };
 
     runUpdate();
-  }, []);
+  }, [finishSplash]);
 
   return (
     <ErrorBoundary>

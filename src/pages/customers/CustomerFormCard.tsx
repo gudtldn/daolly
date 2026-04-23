@@ -51,9 +51,6 @@ export function CustomerFormCard({ open, mode, customer, onSave, onClose }: Prop
     }
     setError("");
     setSaving(false);
-    // 약간의 딜레이 후 포커스 (애니메이션 후)
-    const t = setTimeout(() => nameRef.current?.focus(), 150);
-    return () => clearTimeout(t);
   }, [open, mode, customer]);
 
   // Esc로 닫기
@@ -161,6 +158,7 @@ export function CustomerFormCard({ open, mode, customer, onSave, onClose }: Prop
             <input
               ref={nameRef}
               type="text"
+              autoFocus
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="고객 이름"

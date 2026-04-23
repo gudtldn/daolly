@@ -120,6 +120,7 @@ function CustomerListPanel({
   onEdit,
   onDelete,
   scrollToId,
+  onScrollComplete,
   searchKeyword,
   onSearchChange,
   filtered,
@@ -133,6 +134,7 @@ function CustomerListPanel({
   onEdit: () => void;
   onDelete: () => void;
   scrollToId: number | null;
+  onScrollComplete?: () => void;
   searchKeyword: string;
   onSearchChange: (kw: string) => void;
   filtered: Customer[];
@@ -149,8 +151,9 @@ function CustomerListPanel({
     const index = filtered.findIndex((c) => c.id === scrollToId);
     if (index !== -1 && virtuosoRef.current) {
       virtuosoRef.current.scrollToIndex({ index, align: "center", behavior: "smooth" });
+      onScrollComplete?.();
     }
-  }, [scrollToId, filtered]);
+  }, [scrollToId, filtered, onScrollComplete]);
 
   return (
     <div className="w-[380px] bg-surface-card rounded-lg shadow-sm flex flex-col overflow-hidden shrink-0 border border-border-default transition-colors">
@@ -432,8 +435,9 @@ function WorkItemListPanel({
 
   // focusWorkItemId가 있으면 자동으로 해당 항목 expand + 스크롤
   useEffect(() => {
-    if (!focusWorkItemId) return;
-    const timer = setTimeout(async () => {
+    if (!focusWorkItemId || workItems.length === 0) return;
+    
+    const applyFocus = async () => {
       setExpandedId(focusWorkItemId);
       if (!detailsCache[focusWorkItemId]) {
         try {
@@ -443,11 +447,15 @@ function WorkItemListPanel({
           console.error("Failed to lazy load details for focus item:", e);
         }
       }
-      const el = rowRefs.current.get(focusWorkItemId);
-      if (el) { el.scrollIntoView({ block: "center", behavior: "smooth" }); }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [focusWorkItemId, setExpandedId, detailsCache]); // eslint-disable-line react-hooks/exhaustive-deps
+      // 렌더링을 기다리기 위해 requestAnimationFrame 사용 (setTimeout 대용)
+      requestAnimationFrame(() => {
+        const el = rowRefs.current.get(focusWorkItemId);
+        if (el) { el.scrollIntoView({ block: "center", behavior: "smooth" }); }
+      });
+    };
+
+    void applyFocus();
+  }, [focusWorkItemId, workItems.length, setExpandedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // isActive 패널에서만 키보드 네비게이션 처리
   useEffect(() => {
@@ -674,7 +682,6 @@ export function CustomersPage() {
       // 검색어가 비워졌을 때(초기화) 선택된 고객이 있다면 그 위치로 스크롤 유도
       if (!debouncedSearchKeyword.trim() && useCustomerStore.getState().selectedCustomer) {
         setScrollToCustomerId(useCustomerStore.getState().selectedCustomer!.id);
-        setTimeout(() => setScrollToCustomerId(null), 100);
       }
     });
   }, [debouncedSearchKeyword, load, loadUnpaid]);
@@ -709,7 +716,6 @@ export function CustomersPage() {
       const created = await create(data as CreateCustomer);
       select(created);
       setScrollToCustomerId(created.id);
-      setTimeout(() => setScrollToCustomerId(null), 100);
     } else if (selectedCustomer) {
       await update(selectedCustomer.id, data as UpdateCustomer);
     }
@@ -781,7 +787,6 @@ export function CustomersPage() {
         if (target) {
           select(target);
           setScrollToCustomerId(target.id);
-          setTimeout(() => setScrollToCustomerId(null), 100);
           if (focusItemId) {
             await useWorkItemStore.getState().setFilter({ customerId: target.id });
             setFocusWorkItemId(focusItemId);
@@ -838,6 +843,7 @@ export function CustomersPage() {
         onEdit={handleEdit}
         onDelete={handleDelete}
         scrollToId={scrollToCustomerId}
+        onScrollComplete={() => setScrollToCustomerId(null)}
         searchKeyword={searchKeyword}
         onSearchChange={setSearchKeyword}
         filtered={filteredCustomers}
