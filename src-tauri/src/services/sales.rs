@@ -1,4 +1,4 @@
-use chrono::{DateTime, Datelike, Duration, Local, NaiveDate, Utc};
+use chrono::{DateTime, Datelike, Duration, Local, NaiveDate};
 use sea_orm::prelude::Expr;
 use sea_orm::*;
 use serde::Serialize;
@@ -6,11 +6,20 @@ use std::collections::HashMap;
 
 use crate::db::entities::{customer, payment, work_item, work_item_detail};
 
-/// Parses RFC3339 string and converts to local date.
+/// Parses date string and converts to local date.
+/// Supports RFC3339 and fallback to simple YYYY-MM-DD format.
 fn parse_to_local_date(iso: &str) -> Option<NaiveDate> {
-    DateTime::parse_from_rfc3339(iso)
-        .ok()
-        .map(|dt| dt.with_timezone(&Local).date_naive())
+    // 1. Try strict RFC3339 (standard for this app now)
+    if let Ok(dt) = DateTime::parse_from_rfc3339(iso) {
+        return Some(dt.with_timezone(&Local).date_naive());
+    }
+
+    // 2. Try simple date prefix (common for migrated or raw string data)
+    if iso.len() >= 10 {
+        return NaiveDate::parse_from_str(&iso[..10], "%Y-%m-%d").ok();
+    }
+
+    None
 }
 
 /// Sales record for one work_item (includes customer name and payment method).
@@ -87,13 +96,17 @@ pub async fn list_sales_records(
         query = query.filter(work_item::Column::ReceivedAt.gte(f));
     }
     if let Some(t) = to {
-        if let Ok(date) = NaiveDate::parse_from_str(t, "%Y-%m-%d") {
-            let next_day = date + Duration::days(1);
-            let next_day_str = next_day.format("%Y-%m-%d").to_string();
-            query = query.filter(work_item::Column::ReceivedAt.lt(next_day_str));
+        // To include the entire 'to' day, we find everything strictly less than the next day.
+        if t.len() >= 10 {
+            if let Ok(date) = NaiveDate::parse_from_str(&t[..10], "%Y-%m-%d") {
+                let next_day = date + Duration::days(1);
+                let next_day_str = next_day.format("%Y-%m-%d").to_string();
+                query = query.filter(work_item::Column::ReceivedAt.lt(next_day_str));
+            } else {
+                query = query.filter(work_item::Column::ReceivedAt.lte(t));
+            }
         } else {
-            let to_end = format!("{}T23:59:59.999", t);
-            query = query.filter(work_item::Column::ReceivedAt.lte(to_end));
+            query = query.filter(work_item::Column::ReceivedAt.lte(t));
         }
     }
 
@@ -202,26 +215,16 @@ pub async fn list_weekly_chart(db: &DatabaseConnection) -> Result<Vec<ChartDay>,
     let now_local = Local::now();
     let today = now_local.date_naive();
     let from_local = today - Duration::days(6);
+    let next_day = today + Duration::days(1);
 
-    // Convert local boundaries to UTC RFC3339 for filtering.
-    let from_utc = from_local
-        .and_hms_opt(0, 0, 0)
-        .expect("valid time")
-        .and_local_timezone(Local)
-        .unwrap()
-        .with_timezone(&Utc)
-        .to_rfc3339();
+    // Filter using simple date strings to support various storage formats (RFC3339 or raw).
+    // range: [from_local, next_day)
+    let from_str = from_local.format("%Y-%m-%d").to_string();
+    let next_day_str = next_day.format("%Y-%m-%d").to_string();
 
-    let to_utc = today
-        .and_hms_opt(23, 59, 59)
-        .expect("valid time")
-        .and_local_timezone(Local)
-        .unwrap()
-        .with_timezone(&Utc)
-        .to_rfc3339();
     let items = work_item::Entity::find()
-        .filter(work_item::Column::ReceivedAt.gte(&from_utc))
-        .filter(work_item::Column::ReceivedAt.lte(&to_utc))
+        .filter(work_item::Column::ReceivedAt.gte(&from_str))
+        .filter(work_item::Column::ReceivedAt.lt(&next_day_str))
         .all(db)
         .await?;
 
@@ -298,7 +301,18 @@ pub async fn list_top_items(
             query = query.filter(work_item::Column::ReceivedAt.gte(f));
         }
         if let Some(t) = to {
-            query = query.filter(work_item::Column::ReceivedAt.lte(t));
+            if t.len() >= 10 {
+                if let Ok(d) = NaiveDate::parse_from_str(&t[..10], "%Y-%m-%d") {
+                    let next = d + Duration::days(1);
+                    query = query.filter(
+                        work_item::Column::ReceivedAt.lt(next.format("%Y-%m-%d").to_string()),
+                    );
+                } else {
+                    query = query.filter(work_item::Column::ReceivedAt.lte(t));
+                }
+            } else {
+                query = query.filter(work_item::Column::ReceivedAt.lte(t));
+            }
         }
     }
 
@@ -339,7 +353,18 @@ pub async fn get_revenue_summary(
         sales_query = sales_query.filter(work_item::Column::ReceivedAt.gte(f));
     }
     if let Some(t) = to {
-        sales_query = sales_query.filter(work_item::Column::ReceivedAt.lte(t));
+        // to가 "YYYY-MM-DD..." 형식이면 다음날 00시 미만으로 필터링
+        if t.len() >= 10 {
+            if let Ok(d) = NaiveDate::parse_from_str(&t[..10], "%Y-%m-%d") {
+                let next = d + Duration::days(1);
+                sales_query = sales_query
+                    .filter(work_item::Column::ReceivedAt.lt(next.format("%Y-%m-%d").to_string()));
+            } else {
+                sales_query = sales_query.filter(work_item::Column::ReceivedAt.lte(t));
+            }
+        } else {
+            sales_query = sales_query.filter(work_item::Column::ReceivedAt.lte(t));
+        }
     }
 
     #[derive(FromQueryResult)]
@@ -357,7 +382,17 @@ pub async fn get_revenue_summary(
         income_query = income_query.filter(payment::Column::PaidAt.gte(f));
     }
     if let Some(t) = to {
-        income_query = income_query.filter(payment::Column::PaidAt.lte(t));
+        if t.len() >= 10 {
+            if let Ok(d) = NaiveDate::parse_from_str(&t[..10], "%Y-%m-%d") {
+                let next = d + Duration::days(1);
+                income_query = income_query
+                    .filter(payment::Column::PaidAt.lt(next.format("%Y-%m-%d").to_string()));
+            } else {
+                income_query = income_query.filter(payment::Column::PaidAt.lte(t));
+            }
+        } else {
+            income_query = income_query.filter(payment::Column::PaidAt.lte(t));
+        }
     }
 
     let income_res = income_query.into_model::<SumRow>().one(db).await?;
@@ -385,7 +420,17 @@ pub async fn list_payment_records(
         query = query.filter(payment::Column::PaidAt.gte(f));
     }
     if let Some(t) = to {
-        query = query.filter(payment::Column::PaidAt.lte(t));
+        if t.len() >= 10 {
+            if let Ok(d) = NaiveDate::parse_from_str(&t[..10], "%Y-%m-%d") {
+                let next = d + Duration::days(1);
+                query =
+                    query.filter(payment::Column::PaidAt.lt(next.format("%Y-%m-%d").to_string()));
+            } else {
+                query = query.filter(payment::Column::PaidAt.lte(t));
+            }
+        } else {
+            query = query.filter(payment::Column::PaidAt.lte(t));
+        }
     }
 
     let results: Vec<(
