@@ -11,6 +11,7 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
@@ -35,6 +36,40 @@ pub fn run() {
 
             // 커맨드에서 State<DatabaseConnection>으로 주입받아 사용
             app.manage(db);
+
+            // DPI 및 모니터 크기 대응 (Safe Capping)
+            if let (Some(window), Ok(Some(monitor))) = (app.get_webview_window("main"), app.get_webview_window("main").map(|w| w.current_monitor()).unwrap_or(Ok(None))) {
+                let monitor_size = monitor.size();
+                let scale_factor = monitor.scale_factor();
+                let logical_monitor_size = monitor_size.to_logical::<f64>(scale_factor);
+
+                // 현재 창의 실제 크기 (플러그인에 의해 복구되었을 수 있음)
+                let current_size = window.outer_size().unwrap_or(*monitor_size).to_logical::<f64>(scale_factor);
+
+                // 모니터 가용 영역의 안전 한계치
+                let max_w = logical_monitor_size.width * 0.98;
+                let max_h = logical_monitor_size.height * 0.92;
+
+                let mut new_w = current_size.width;
+                let mut new_h = current_size.height;
+                let mut need_resize = false;
+
+                // 현재 크기가 모니터보다 클 때만 줄임 (캡핑 로직)
+                if new_w > max_w { 
+                    new_w = max_w; 
+                    need_resize = true;
+                }
+                if new_h > max_h { 
+                    new_h = max_h; 
+                    need_resize = true;
+                }
+
+                if need_resize {
+                    let _ = window.set_size(tauri::LogicalSize::new(new_w, new_h));
+                    let _ = window.center();
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

@@ -9,6 +9,7 @@
     "opener:default",
     "process:allow-restart",
     "store:default",
+    "window-state:default",
     "updater:default",
     "dialog:default",
     "dialog:allow-open"
