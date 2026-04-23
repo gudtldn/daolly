@@ -219,19 +219,40 @@ export function SummaryTab() {
       <div className="flex-1 flex gap-4 min-h-0">
         {/* 좌측 패널: 차트 + 인기품목 */}
         <div className="w-72 shrink-0 flex flex-col gap-4 min-h-0">
-          <div className="flex-1 bg-surface-card border border-border-default rounded-lg shadow-sm flex flex-col p-4 overflow-hidden">
-            <h3 className="text-sm font-bold text-on-surface mb-4">주간 매출 추이</h3>
+          <div className="flex-1 bg-surface-card border border-border-default rounded-lg shadow-sm flex flex-col p-4 overflow-visible">
+            <h3 className="text-sm font-bold text-on-surface mb-4">주간 접수액 현황</h3>
             <div className="flex-1 flex items-end justify-between gap-1.5 relative min-h-0">
               {chartData.map((data, i) => {
                 const isToday = i === chartData.length - 1;
                 const maxTotal = Math.max(...chartData.map((d) => d.total), 1);
                 const pct = Math.round((data.total / maxTotal) * 100);
                 return (
-                  <div key={data.date} className="flex flex-col items-center w-full h-full justify-end group z-10">
-                    <div className={`w-full max-w-[32px] rounded-t transition-all ${isToday ? "bg-primary-600" : "bg-primary-200 dark:bg-primary-900/50"}`} style={{ height: `${pct}%`, minHeight: pct > 0 ? "4px" : "0" }} />
-                    <span className={`text-[10px] mt-2 font-medium ${isToday ? "text-primary-600 font-bold" : "text-on-surface-muted"}`}>{data.label}</span>
+                  <div key={data.date} className="flex flex-col items-center w-full h-full justify-end group z-10 relative">
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full mb-2 hidden group-hover:flex flex-col items-center z-20">
+                      <div className="bg-surface-card border border-border-default px-2 py-1 rounded shadow-lg text-[10px] whitespace-nowrap animate-in fade-in zoom-in duration-200">
+                        <p className="text-on-surface-muted font-medium">{data.date}</p>
+                        <p className="text-primary-600 font-bold">{data.total.toLocaleString()}원 (접수)</p>
+                      </div>
+                      <div className="w-1.5 h-1.5 bg-surface-card border-r border-b border-border-default rotate-45 -mt-1" />
+                    </div>
+
+                    <div
+                      className={`w-full max-w-[32px] rounded-t transition-all ${
+                        isToday ? "bg-primary-600" : "bg-primary-200 dark:bg-primary-900/50 hover:bg-primary-400"
+                      }`}
+                      style={{ height: `${pct}%`, minHeight: pct > 0 ? "4px" : "0" }}
+                    />
+                    <span
+                      className={`text-[10px] mt-2 font-medium ${
+                        isToday ? "text-primary-600 font-bold" : "text-on-surface-muted"
+                      }`}
+                    >
+                      {data.label}
+                    </span>
                   </div>
                 );
+
               })}
             </div>
           </div>
