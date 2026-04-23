@@ -3,6 +3,7 @@ import { Virtuoso } from "react-virtuoso";
 import type { VirtuosoHandle } from "react-virtuoso";
 import { useLocation } from "react-router";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useListInteraction, type InteractionSource } from "@/hooks/useListInteraction";
 import {
   Search,
   Plus,
@@ -22,9 +23,6 @@ import { useDialogStore } from "@/stores/dialogStore";
 import { workItemApi } from "@/bindings";
 import { CustomerFormCard } from "@/pages/customers/CustomerFormCard";
 import { WorkItemFormCard } from "@/pages/customers/WorkItemFormCard";
-
-// 조작 수단 타입
-type InteractionSource = "mouse" | "keyboard";
 
 // 날짜 포맷 헬퍼
 function formatDateShort(iso: string | null): string {
@@ -336,13 +334,41 @@ function WorkItemListPanel({
   const { workItems } = useWorkItemStore();
 
   // 키보드 하이라이트 (sortedItems 기반으로 관리)
-  const [highlightedIdx, setHighlightedIdx] = useState(0);
-  const rowRefs = useRef<Map<number, HTMLTableRowElement>>(new Map());
+  const {
+    highlightIdx: highlightedIdx,
+    setHighlightIdx: setHighlightedIdx,
+    setItemRef,
+    itemRefs: rowRefs,
+  } = useListInteraction({
+    externalSource: lastSource,
+    onSourceChange: (source) => {
+      if (source === "mouse") onMouseMove();
+      if (source === "keyboard") onKeyDown();
+    },
+    onScroll: (el) => {
+      const container = el.closest(".overflow-auto");
+      if (container) {
+        const rect = el.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        // 헤더 높이 (약 40px) + 여유 공간 고려
+        const headerHeight = 44;
+        
+        const isAbove = rect.top < containerRect.top + headerHeight;
+        const isBelow = rect.bottom > containerRect.bottom;
+
+        if (isAbove) {
+          container.scrollBy({ top: rect.top - containerRect.top - headerHeight, behavior: "smooth" });
+        } else if (isBelow) {
+          container.scrollBy({ top: rect.bottom - containerRect.bottom, behavior: "smooth" });
+        }
+      }
+    },
+  });
 
   // 고객 변경 시 하이라이트 초기화
   useEffect(() => {
     setHighlightedIdx(0);
-  }, [customer?.id]);
+  }, [customer?.id, setHighlightedIdx]);
 
   // 컬럼 정렬 상태: null -> asc -> desc -> null (3-state)
   type SortCol = "status" | "receivedAt" | "pickedUpAt" | "description" | "price";
@@ -378,33 +404,6 @@ function WorkItemListPanel({
       return 0;
     });
   }, [workItems, sortCol, sortDir]);
-
-  // 키보드로 하이라이트 이동 시 해당 행 스크롤 (헤더 가림 방지)
-  useEffect(() => {
-    if (lastSource !== "keyboard") return;
-
-    const item = sortedItems[highlightedIdx];
-    if (!item) return;
-    const el = rowRefs.current.get(item.id);
-    if (el) {
-      const container = el.closest(".overflow-auto");
-      if (container) {
-        const rect = el.getBoundingClientRect();
-        const containerRect = container.getBoundingClientRect();
-        // 헤더 높이 (약 40px) + 여유 공간 고려
-        const headerHeight = 44;
-        
-        const isAbove = rect.top < containerRect.top + headerHeight;
-        const isBelow = rect.bottom > containerRect.bottom;
-
-        if (isAbove) {
-          container.scrollBy({ top: rect.top - containerRect.top - headerHeight, behavior: "smooth" });
-        } else if (isBelow) {
-          container.scrollBy({ top: rect.bottom - containerRect.bottom, behavior: "smooth" });
-        }
-      }
-    }
-  }, [highlightedIdx, sortedItems, lastSource]);
 
   // 아코디언 상세: 열 때 lazy load, 로컬 캐시
   const [detailsCache, setDetailsCache] = useState<Record<number, WorkItemDetail[]>>({});
@@ -464,7 +463,8 @@ function WorkItemListPanel({
       }
       // 렌더링을 기다리기 위해 requestAnimationFrame 사용 (setTimeout 대용)
       requestAnimationFrame(() => {
-        const el = rowRefs.current.get(focusWorkItemId);
+        const idx = workItems.findIndex(i => i.id === focusWorkItemId);
+        const el = rowRefs.current.get(idx);
         if (el) { el.scrollIntoView({ block: "center" }); }
       });
     };
@@ -591,7 +591,7 @@ function WorkItemListPanel({
               return (
                 <Fragment key={item.id}>
                   <tr
-                    ref={(el) => { if (el) rowRefs.current.set(item.id, el); else rowRefs.current.delete(item.id); }}
+                    ref={setItemRef(itemIdx)}
                     onClick={() => handleToggle(item.id)}
                     onMouseEnter={() => lastSource === "mouse" && setHighlightedIdx(itemIdx)}
                     className={`transition-colors cursor-pointer ${isExpanded ? "bg-primary-50/60 dark:bg-primary-950/40" : ""} ${lastSource === "mouse" ? "hover:bg-surface-elevated" : ""} ${lastSource === "keyboard" && isHighlighted && isActive ? "ring-2 ring-inset ring-primary-400" : ""}`}

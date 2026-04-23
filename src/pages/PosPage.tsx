@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useListInteraction } from "@/hooks/useListInteraction";
 import {
   User, Plus, Search, History, X,
   Minus, Trash2, Pen, Keyboard, Shirt,
@@ -37,8 +38,15 @@ function CustomerPanel({
   const [results, setResults] = useState<Customer[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [unpaid, setUnpaid] = useState(0);
-  const [highlightIdx, setHighlightIdx] = useState(0);
-  const [lastSource, setLastSource] = useState<"mouse" | "keyboard">("keyboard");
+
+  const {
+    source: lastSource,
+    setSource: setLastSource,
+    highlightIdx,
+    setHighlightIdx,
+    setItemRef,
+  } = useListInteraction();
+
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -56,19 +64,7 @@ function CustomerPanel({
         setShowDropdown(true);
       })
       .catch(() => {});
-  }, [debouncedQuery]);
-
-  // 키보드 이동 시 스크롤 처리
-  useEffect(() => {
-    if (lastSource !== "keyboard" || !showDropdown || !dropdownRef.current) return;
-    const container = dropdownRef.current;
-    const items = container.querySelectorAll("button");
-    const activeItem = items[highlightIdx] as HTMLElement;
-
-    if (activeItem) {
-      activeItem.scrollIntoView({ block: "nearest" });
-    }
-  }, [highlightIdx, showDropdown, lastSource]);
+  }, [debouncedQuery, setHighlightIdx]);
 
   // 외부 클릭 시 드롭다운 닫기
   useEffect(() => {
@@ -193,6 +189,7 @@ function CustomerPanel({
             {results.map((c, idx) => (
               <button
                 key={c.id}
+                ref={setItemRef(idx)}
                 onClick={() => handleSelect(c)}
                 onMouseMove={() => {
                   if (lastSource !== "mouse" || highlightIdx !== idx) {
@@ -220,6 +217,7 @@ function CustomerPanel({
               <>
                 {results.length > 0 && <div className="border-t border-border-default/50 my-1" />}
                 <button
+                  ref={setItemRef(results.length)}
                   onClick={handleAddNew}
                   onMouseMove={() => {
                     if (lastSource !== "mouse" || highlightIdx !== results.length) {
