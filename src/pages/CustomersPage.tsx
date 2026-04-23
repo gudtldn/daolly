@@ -312,6 +312,7 @@ function WorkItemListPanel({
   focusWorkItemId,
   lastSource,
   onMouseMove,
+  onKeyDown,
 }: {
   customer: Customer | null;
   expandedId: number | null;
@@ -328,6 +329,7 @@ function WorkItemListPanel({
   focusWorkItemId?: number | null;
   lastSource: InteractionSource;
   onMouseMove: () => void;
+  onKeyDown: () => void;
 }) {
   const { workItems } = useWorkItemStore();
 
@@ -377,6 +379,8 @@ function WorkItemListPanel({
 
   // 키보드로 하이라이트 이동 시 해당 행 스크롤 (헤더 가림 방지)
   useEffect(() => {
+    if (lastSource !== "keyboard") return;
+
     const item = sortedItems[highlightedIdx];
     if (!item) return;
     const el = rowRefs.current.get(item.id);
@@ -398,7 +402,7 @@ function WorkItemListPanel({
         }
       }
     }
-  }, [highlightedIdx, sortedItems]);
+  }, [highlightedIdx, sortedItems, lastSource]);
 
   // 아코디언 상세: 열 때 lazy load, 로컬 캐시
   const [detailsCache, setDetailsCache] = useState<Record<number, WorkItemDetail[]>>({});
@@ -472,6 +476,11 @@ function WorkItemListPanel({
     const handleKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+      if (["ArrowUp", "ArrowDown", "ArrowRight", "ArrowLeft", "Enter"].includes(e.key)) {
+        onKeyDown();
+      }
+
       switch (e.key) {
         case "ArrowUp":
           e.preventDefault();
@@ -500,7 +509,7 @@ function WorkItemListPanel({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isActive, sortedItems, highlightedIdx, expandedId, handleToggle, onGoToPreviousPanel, onEdit]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isActive, sortedItems, highlightedIdx, expandedId, handleToggle, onGoToPreviousPanel, onEdit, onKeyDown]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!customer) {
     return (
@@ -876,6 +885,7 @@ export function CustomersPage() {
         focusWorkItemId={focusWorkItemId}
         lastSource={lastSource}
         onMouseMove={() => setLastSource("mouse")}
+        onKeyDown={() => setLastSource("keyboard")}
       />
       <CustomerFormCard open={cardOpen} mode={cardMode} customer={selectedCustomer} onSave={handleCardSave} onClose={() => setCardOpen(false)} />
       <WorkItemFormCard open={wiCardOpen} mode={wiCardMode} customerId={selectedCustomer?.id ?? 0} workItem={editingWorkItem} initialTab={wiInitialTab} onSave={handleWiCardSave} onClose={() => setWiCardOpen(false)} onPaymentChange={() => { useWorkItemStore.getState().load(); loadUnpaid(); }} />
