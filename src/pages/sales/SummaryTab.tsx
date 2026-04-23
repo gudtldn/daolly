@@ -10,10 +10,11 @@ import {
   Wallet,
   ArrowDownCircle,
   History,
+  LayoutList,
 } from "lucide-react";
 import { DateRangePicker } from "@/pages/sales/DateRangePicker";
 import { salesApi } from "@/bindings/sales";
-import type { PaymentRecord, ChartDay, TopItem, RevenueSummary } from "@/types";
+import type { PaymentRecord, SalesRecord, ChartDay, TopItem, RevenueSummary } from "@/types";
 import { formatSmartDateTime } from "@/utils/dateUtils";
 import {
   DateRange,
@@ -31,7 +32,11 @@ export function SummaryTab() {
   const [period, setPeriod] = useState<PresetId>("today");
   const [customRange, setCustomRange] = useState<DateRange | null>(null);
   const [search, setSearch] = useState("");
+  const [rightTab, setRightTab] = useState<"payments" | "receptions">("payments");
+  
+  // 데이터 상태
   const [paymentRecords, setPaymentRecords] = useState<PaymentRecord[]>([]);
+  const [salesRecords, setSalesRecords] = useState<SalesRecord[]>([]);
   const [summary, setSummary] = useState<RevenueSummary>({ totalSales: 0, actualIncome: 0 });
   const [chartData, setChartData] = useState<ChartDay[]>([]);
   const [topItems, setTopItems] = useState<TopItem[]>([]);
@@ -42,12 +47,14 @@ export function SummaryTab() {
   const loadData = useCallback(async () => {
     try {
       setError(null);
-      const [payments, summaryData, topItemData] = await Promise.all([
+      const [payments, sales, summaryData, topItemData] = await Promise.all([
         salesApi.listPaymentRecords(activeRange.from, activeRange.to),
+        salesApi.listSalesRecords(activeRange.from, activeRange.to),
         salesApi.getRevenueSummary(activeRange.from, activeRange.to),
         salesApi.listTopItems(activeRange.from, activeRange.to),
       ]);
       setPaymentRecords(payments);
+      setSalesRecords(sales);
       setSummary(summaryData);
       setTopItems(topItemData);
     } catch (e) {
@@ -80,19 +87,23 @@ export function SummaryTab() {
 
   const periodLabel = customRange
     ? (() => {
-        const from = new Date(customRange.from);
-        const to = new Date(customRange.to);
+        const from = new Date(activeRange.from);
+        const to = new Date(activeRange.to);
         const fmt = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
         return `${fmt(from)} ~ ${fmt(to)}`;
       })()
     : (PERIODS.find((p) => p.id === period)?.label ?? "");
 
+  // 검색 필터링
   const filteredPayments = paymentRecords.filter(
     (r) => r.customerName.includes(search) || (r.description ?? "").includes(search)
   );
+  const filteredSales = salesRecords.filter(
+    (r) => r.customerName.includes(search) || (r.description ?? "").includes(search)
+  );
 
-  const handleGoToCustomer = (r: PaymentRecord) => {
-    navigate("/customers", { state: { focusCustomerId: r.customerId, focusWorkItemId: r.workItemId } });
+  const handleGoToCustomer = (customerId: number, workItemId: number) => {
+    navigate("/customers", { state: { focusCustomerId: customerId, focusWorkItemId: workItemId } });
   };
 
   return (
@@ -128,9 +139,9 @@ export function SummaryTab() {
         />
       </div>
 
-      {/* KPI 카드 4개 - 한눈에 들어오는 수입 구조 */}
+      {/* KPI 카드 4개 */}
       <div className="grid grid-cols-4 gap-4 shrink-0">
-        {/* 오늘 입금된 금액 (오늘 들어온 돈 전체) */}
+        {/* 오늘 입금된 금액 */}
         <div className="bg-surface-card border border-border-default border-l-4 border-l-primary-500 p-5 rounded-xl shadow-sm relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-5">
             <Wallet className="w-16 h-16 text-primary-600" />
@@ -155,7 +166,7 @@ export function SummaryTab() {
           </div>
         </div>
 
-        {/* 카드 수입 */}
+        {/* 카드 결제액 */}
         <div className="bg-surface-card border border-border-default p-5 rounded-lg shadow-sm">
           <div className="flex items-center gap-1.5 mb-1.5">
             <CreditCard className="w-3.5 h-3.5 text-primary-500" />
@@ -168,10 +179,10 @@ export function SummaryTab() {
           <div className="mt-3 w-full bg-secondary-100 rounded-full h-1.5 dark:bg-secondary-800">
             <div className="bg-primary-500 h-1.5 rounded-full" style={{ width: `${cardPct}%` }} />
           </div>
-          <p className="text-[10px] text-on-surface-muted mt-1.5 text-right font-medium">전체 수입의 {cardPct}%</p>
+          <p className="text-[10px] text-on-surface-muted mt-1.5 text-right font-medium">수입의 {cardPct}%</p>
         </div>
 
-        {/* 현금 / 이체 */}
+        {/* 현금 / 이체 합계 */}
         <div className="bg-surface-card border border-border-default p-5 rounded-lg shadow-sm">
           <div className="flex items-center gap-1.5 mb-1.5">
             <Banknote className="w-3.5 h-3.5 text-success-500" />
@@ -184,10 +195,10 @@ export function SummaryTab() {
           <div className="mt-3 w-full bg-secondary-100 rounded-full h-1.5 dark:bg-secondary-800">
             <div className="bg-success-500 h-1.5 rounded-full" style={{ width: `${cashTransferPct}%` }} />
           </div>
-          <p className="text-[10px] text-on-surface-muted mt-1.5 text-right font-medium">전체 수입의 {cashTransferPct}%</p>
+          <p className="text-[10px] text-on-surface-muted mt-1.5 text-right font-medium">수입의 {cashTransferPct}%</p>
         </div>
 
-        {/* 오늘 접수한 금액 (업무량) */}
+        {/* 오늘 접수한 금액 */}
         <div className="bg-surface-card border border-border-default p-5 rounded-lg shadow-sm opacity-85">
           <div className="flex items-center gap-1.5 mb-1.5">
             <TrendingUp className="w-3.5 h-3.5 text-secondary-500" />
@@ -199,34 +210,36 @@ export function SummaryTab() {
           </div>
           <div className="mt-3 flex items-center gap-1.5 text-xs font-medium text-on-surface-muted">
             <Receipt className="w-3 h-3" />
-            <span>{paymentRecords.length}건의 작업 접수됨</span>
+            <span>{salesRecords.length}건의 작업 접수됨</span>
           </div>
         </div>
-        </div>
+      </div>
 
-
-      {/* 하단: 차트 + 결제 상세 내역 */}
+      {/* 하단 상세 섹션 */}
       <div className="flex-1 flex gap-4 min-h-0">
-        <div className="w-72 shrink-0 bg-surface-card border border-border-default rounded-lg shadow-sm flex flex-col p-4 overflow-hidden">
-          <h3 className="text-sm font-bold text-on-surface mb-4 shrink-0">주간 매출 추이</h3>
-          <div className="flex-1 flex items-end justify-between gap-1.5 relative min-h-0">
-            {chartData.map((data, i) => {
-              const isToday = i === chartData.length - 1;
-              const maxTotal = Math.max(...chartData.map((d) => d.total), 1);
-              const pct = Math.round((data.total / maxTotal) * 100);
-              return (
-                <div key={data.date} className="flex flex-col items-center w-full h-full justify-end group z-10">
-                  <div className={`w-full max-w-[32px] rounded-t transition-all ${isToday ? "bg-primary-600" : "bg-primary-200 dark:bg-primary-900/50"}`} style={{ height: `${pct}%`, minHeight: pct > 0 ? "4px" : "0" }} />
-                  <span className={`text-[10px] mt-2 font-medium ${isToday ? "text-primary-600 font-bold" : "text-on-surface-muted"}`}>{data.label}</span>
-                </div>
-              );
-            })}
+        {/* 좌측 패널: 차트 + 인기품목 */}
+        <div className="w-72 shrink-0 flex flex-col gap-4 min-h-0">
+          <div className="flex-1 bg-surface-card border border-border-default rounded-lg shadow-sm flex flex-col p-4 overflow-hidden">
+            <h3 className="text-sm font-bold text-on-surface mb-4">주간 매출 추이</h3>
+            <div className="flex-1 flex items-end justify-between gap-1.5 relative min-h-0">
+              {chartData.map((data, i) => {
+                const isToday = i === chartData.length - 1;
+                const maxTotal = Math.max(...chartData.map((d) => d.total), 1);
+                const pct = Math.round((data.total / maxTotal) * 100);
+                return (
+                  <div key={data.date} className="flex flex-col items-center w-full h-full justify-end group z-10">
+                    <div className={`w-full max-w-[32px] rounded-t transition-all ${isToday ? "bg-primary-600" : "bg-primary-200 dark:bg-primary-900/50"}`} style={{ height: `${pct}%`, minHeight: pct > 0 ? "4px" : "0" }} />
+                    <span className={`text-[10px] mt-2 font-medium ${isToday ? "text-primary-600 font-bold" : "text-on-surface-muted"}`}>{data.label}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-border-default shrink-0">
-            <h4 className="text-[11px] font-bold text-on-surface-muted mb-2">자주 찾는 품목</h4>
-            <div className="space-y-1.5">
+          <div className="h-48 bg-surface-card border border-border-default rounded-lg shadow-sm flex flex-col p-4 overflow-hidden">
+            <h4 className="text-[11px] font-bold text-on-surface-muted mb-3 uppercase tracking-wider">자주 찾는 품목</h4>
+            <div className="flex-1 overflow-y-auto space-y-2">
               {topItems.length === 0 ? (
-                <p className="text-xs text-on-surface-muted">데이터 없음</p>
+                <p className="text-xs text-on-surface-muted text-center py-8">데이터 없음</p>
               ) : (
                 topItems.map((item) => (
                   <div key={item.rank} className="flex justify-between items-center text-sm">
@@ -239,60 +252,120 @@ export function SummaryTab() {
           </div>
         </div>
 
+        {/* 우측 패널: 상세 내역 (탭 방식) */}
         <div className="flex-1 bg-surface-card border border-border-default rounded-lg shadow-sm flex flex-col overflow-hidden">
           <div className="px-4 py-3 bg-surface-elevated border-b border-border-default flex justify-between items-center shrink-0">
-            <div className="flex items-center gap-2">
-              <ArrowDownCircle className="w-4 h-4 text-primary-600 dark:text-primary-400" />
-              <h3 className="text-sm font-bold text-on-surface">입금 상세 내역 ({periodLabel})</h3>
+            <div className="flex items-center gap-4">
+              <div className="flex bg-surface-card rounded-md border border-border-default p-1 p-0.5">
+                <button
+                  onClick={() => setRightTab("payments")}
+                  className={`flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded transition-all cursor-pointer ${
+                    rightTab === "payments" ? "bg-primary-600 text-white shadow-sm" : "text-on-surface-muted hover:text-on-surface"
+                  }`}
+                >
+                  <ArrowDownCircle className="w-3.5 h-3.5" />
+                  입금 내역
+                </button>
+                <button
+                  onClick={() => setRightTab("receptions")}
+                  className={`flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded transition-all cursor-pointer ${
+                    rightTab === "receptions" ? "bg-primary-600 text-white shadow-sm" : "text-on-surface-muted hover:text-on-surface"
+                  }`}
+                >
+                  <LayoutList className="w-3.5 h-3.5" />
+                  접수 내역
+                </button>
+              </div>
+              <span className="text-[11px] text-on-surface-muted font-medium">({periodLabel})</span>
             </div>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-secondary-400" />
-              <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="고객명 검색..." className="pl-7 pr-3 py-1.5 text-sm border border-border-default rounded bg-surface-card text-on-surface placeholder:text-on-surface-muted focus:outline-none focus:border-primary-500 transition-colors" />
+              <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="검색..." className="pl-7 pr-3 py-1.5 text-sm border border-border-default rounded bg-surface-card text-on-surface placeholder:text-on-surface-muted focus:outline-none focus:border-primary-500 transition-colors w-48" />
             </div>
           </div>
 
           <div className="flex-1 overflow-y-auto">
             <table className="w-full text-sm text-left">
               <thead className="bg-surface-elevated sticky top-0 border-b border-border-default z-10">
-                <tr>
-                  <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-24 text-center border-r border-border-default/50">시간</th>
-                  <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-28">고객명</th>
-                  <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted">결제 내용</th>
-                  <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted text-center w-32">수입 구분</th>
-                  <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted text-center w-24">수단</th>
-                  <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted text-right w-28">입금액</th>
-                  <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-12"></th>
-                </tr>
+                {rightTab === "payments" ? (
+                  <tr>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-24 text-center border-r border-border-default/50">시간</th>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-28">고객명</th>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted">내용</th>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted text-center w-32">수입 구분</th>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted text-center w-20">수단</th>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted text-right w-24">금액</th>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-12"></th>
+                  </tr>
+                ) : (
+                  <tr>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-24 text-center border-r border-border-default/50">시간</th>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-28">고객명</th>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted">내용</th>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted text-center w-32">결제 상태</th>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted text-right w-24">금액</th>
+                    <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-12"></th>
+                  </tr>
+                )}
               </thead>
               <tbody className="divide-y divide-border-default">
-                {filteredPayments.map((r) => {
-                  const { time, isToday } = formatSmartDateTime(r.paidAt);
-                  return (
-                    <tr key={r.paymentId} className="hover:bg-surface-elevated transition-colors group">
-                      <td className={`px-4 py-3 text-xs text-center border-r border-border-default/50 font-mono ${isToday ? "text-primary-600 font-bold dark:text-primary-400" : "text-on-surface-muted"}`}>{time}</td>
-                      <td className="px-4 py-3 font-semibold text-on-surface">{r.customerName}</td>
-                      <td className="px-4 py-3 text-on-surface truncate max-w-[200px]">{r.description ?? "-"}</td>
-                      <td className="px-4 py-3 text-center">
-                        {r.isBackPayment ? (
-                          <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-800/50 text-[11px] font-bold">
-                            <History className="w-3 h-3" /> 미수 수납
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800/50 text-[11px] font-bold">
-                            <Receipt className="w-3 h-3" /> 당일 결제
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <PaymentMethodBadge method={r.method as any ?? "credit"} />
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold text-on-surface whitespace-nowrap">{r.amount.toLocaleString()}원</td>
-                      <td className="px-4 py-3 text-center">
-                        <button onClick={() => handleGoToCustomer(r)} title="고객 관리에서 보기" className="p-1.5 rounded-md text-on-surface-muted bg-surface-elevated border border-border-default hover:bg-primary-600 hover:text-white transition-all cursor-pointer shadow-sm"><ExternalLink className="w-4 h-4" /></button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {rightTab === "payments" ? (
+                  filteredPayments.length === 0 ? (
+                    <tr><td colSpan={7} className="px-4 py-10 text-center text-on-surface-muted text-sm">입금 내역이 없습니다.</td></tr>
+                  ) : (
+                    filteredPayments.map((r) => {
+                      const { time, isToday } = formatSmartDateTime(r.paidAt);
+                      return (
+                        <tr key={r.paymentId} className="hover:bg-surface-elevated transition-colors group">
+                          <td className={`px-4 py-3 text-xs text-center border-r border-border-default/50 font-mono ${isToday ? "text-primary-600 font-bold dark:text-primary-400" : "text-on-surface-muted"}`}>{time}</td>
+                          <td className="px-4 py-3 font-semibold text-on-surface">{r.customerName}</td>
+                          <td className="px-4 py-3 text-on-surface truncate max-w-[200px]">{r.description ?? "-"}</td>
+                          <td className="px-4 py-3 text-center">
+                            {r.isBackPayment ? (
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 text-[11px] font-bold"><History className="w-3 h-3" /> 미수 수납</span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 text-[11px] font-bold"><Receipt className="w-3 h-3" /> 당일 결제</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-center"><PaymentMethodBadge method={r.method as any ?? "credit"} /></td>
+                          <td className="px-4 py-3 text-right font-bold text-on-surface whitespace-nowrap">{r.amount.toLocaleString()}원</td>
+                          <td className="px-4 py-3 text-center">
+                            <button onClick={() => handleGoToCustomer(r.customerId, r.workItemId)} title="고객 관리에서 보기" className="p-1.5 rounded-md text-on-surface-muted bg-surface-elevated border border-border-default hover:bg-primary-600 hover:text-white transition-all cursor-pointer shadow-sm"><ExternalLink className="w-4 h-4" /></button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )
+                ) : (
+                  filteredSales.length === 0 ? (
+                    <tr><td colSpan={6} className="px-4 py-10 text-center text-on-surface-muted text-sm">접수 내역이 없습니다.</td></tr>
+                  ) : (
+                    filteredSales.map((r) => {
+                      const { time, isToday } = formatSmartDateTime(r.receivedAt);
+                      const isFullyPaid = r.paidAmount >= r.price;
+                      return (
+                        <tr key={r.workItemId} className="hover:bg-surface-elevated transition-colors group">
+                          <td className={`px-4 py-3 text-xs text-center border-r border-border-default/50 font-mono ${isToday ? "text-primary-600 font-bold dark:text-primary-400" : "text-on-surface-muted"}`}>{time}</td>
+                          <td className="px-4 py-3 font-semibold text-on-surface">{r.customerName}</td>
+                          <td className="px-4 py-3 text-on-surface truncate max-w-[200px]">{r.description ?? "-"}</td>
+                          <td className="px-4 py-3 text-center">
+                            {isFullyPaid ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 text-[10px] font-bold">완납</span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 text-danger-700 border border-rose-100 dark:bg-danger-950/20 dark:text-danger-400 text-[10px] font-bold">
+                                {r.paidAmount > 0 ? "일부 미납" : "미납"}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right font-bold text-on-surface whitespace-nowrap">{r.price.toLocaleString()}원</td>
+                          <td className="px-4 py-3 text-center">
+                            <button onClick={() => handleGoToCustomer(r.customerId, r.workItemId)} title="고객 관리에서 보기" className="p-1.5 rounded-md text-on-surface-muted bg-surface-elevated border border-border-default hover:bg-primary-600 hover:text-white transition-all cursor-pointer shadow-sm"><ExternalLink className="w-4 h-4" /></button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )
+                )}
               </tbody>
             </table>
           </div>

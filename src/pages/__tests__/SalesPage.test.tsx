@@ -35,7 +35,7 @@ describe("SalesPage", () => {
     expect(screen.getByText("오늘 입금된 금액", { selector: "p" })).toBeInTheDocument();
     expect(screen.getByText("카드 결제액", { selector: "p" })).toBeInTheDocument();
     expect(screen.getByText("현금 / 이체 합계", { selector: "p" })).toBeInTheDocument();
-    expect(screen.getByText("오늘 접수한 일 (총액)", { selector: "p" })).toBeInTheDocument();
+    expect(screen.getByText("오늘 접수한 금액", { selector: "p" })).toBeInTheDocument();
   });
 
   it("'거래 내역' 탭 클릭 시 해당 콘텐츠가 표시된다", async () => {
