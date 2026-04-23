@@ -145,12 +145,21 @@ function CustomerListPanel({
   const { unpaidMap, isLoading } = useCustomerStore();
   const virtuosoRef = useRef<VirtuosoHandle>(null);
 
-  // scrollToId 변경 시 해당 항목으로 스크롤
+  // scrollToId 변경 시 해당 항목으로 스크롤 (Fast Smooth Scroll 트릭)
   useEffect(() => {
     if (scrollToId == null) return;
     const index = filtered.findIndex((c) => c.id === scrollToId);
     if (index !== -1 && virtuosoRef.current) {
-      virtuosoRef.current.scrollToIndex({ index, align: "center", behavior: "smooth" });
+      // 50개 이상의 거리가 있으면 근처(20개 전)로 순간이동 후 부드럽게 이동
+      if (index > 50) {
+        virtuosoRef.current.scrollToIndex({ index: index - 20, align: "start" });
+        requestAnimationFrame(() => {
+          virtuosoRef.current?.scrollToIndex({ index, align: "center", behavior: "smooth" });
+        });
+      } else {
+        // 가깝거나 위로 올라가는 경우(index < 50) 바로 부드럽게
+        virtuosoRef.current.scrollToIndex({ index, align: "center", behavior: "smooth" });
+      }
       onScrollComplete?.();
     }
   }, [scrollToId, filtered, onScrollComplete]);
@@ -450,7 +459,7 @@ function WorkItemListPanel({
       // 렌더링을 기다리기 위해 requestAnimationFrame 사용 (setTimeout 대용)
       requestAnimationFrame(() => {
         const el = rowRefs.current.get(focusWorkItemId);
-        if (el) { el.scrollIntoView({ block: "center", behavior: "smooth" }); }
+        if (el) { el.scrollIntoView({ block: "center" }); }
       });
     };
 
