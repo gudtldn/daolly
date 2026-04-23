@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Clock, ChevronDown, ChevronUp, Users, ExternalLink, Receipt } from "lucide-react";
+import { Clock, ChevronDown, ChevronUp, Users, ExternalLink, Receipt, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { salesApi } from "@/bindings/sales";
 import type { UnpaidRecord } from "@/types";
@@ -44,12 +44,15 @@ export function UnpaidTab() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [records, setRecords] = useState<UnpaidRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    setIsLoading(true);
     void salesApi
       .listUnpaidRecords()
       .then(setRecords)
-      .catch(() => setError("데이터를 불러오는 중 오류가 발생했습니다."));
+      .catch(() => setError("데이터를 불러오는 중 오류가 발생했습니다."))
+      .finally(() => setIsLoading(false));
   }, []);
 
   const customers = useMemo(() => groupByCustomer(records), [records]);
@@ -97,7 +100,15 @@ export function UnpaidTab() {
   const gridCols = "grid-cols-[200px_1fr_140px_140px_48px]";
 
   return (
-    <div className="h-full flex flex-col gap-4 min-h-0">
+    <div className="h-full flex flex-col gap-4 min-h-0 relative">
+      {isLoading && (
+        <div className="absolute inset-0 bg-surface/50 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg">
+          <div className="bg-surface-card p-4 rounded-xl shadow-lg flex flex-col items-center gap-3">
+            <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+            <span className="text-sm font-medium text-on-surface">데이터를 불러오는 중...</span>
+          </div>
+        </div>
+      )}
       {error && (
         <div className="shrink-0 px-4 py-2.5 rounded-lg bg-danger-50 border border-danger-200 text-danger-700 text-sm dark:bg-danger-950/30 dark:border-danger-900/40 dark:text-danger-400">
           {error}

@@ -11,6 +11,7 @@ import {
   ArrowDownCircle,
   History,
   LayoutList,
+  Loader2,
 } from "lucide-react";
 import { DateRangePicker } from "@/pages/sales/DateRangePicker";
 import { salesApi } from "@/bindings/sales";
@@ -46,11 +47,13 @@ export function SummaryTab() {
   const [chartData, setChartData] = useState<ChartDay[]>([]);
   const [topItems, setTopItems] = useState<TopItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const activeRange = useMemo(() => customRange ?? getDateRange(period), [customRange, period]);
 
   const loadData = useCallback(async () => {
     try {
+      setIsLoading(true);
       setError(null);
       const [payments, sales, summaryData, topItemData] = await Promise.all([
         salesApi.listPaymentRecords(activeRange.from, activeRange.to),
@@ -65,6 +68,8 @@ export function SummaryTab() {
     } catch (e) {
       setError("데이터를 불러오는 중 오류가 발생했습니다.");
       console.error(e);
+    } finally {
+      setIsLoading(false);
     }
   }, [activeRange.from, activeRange.to]);
 
@@ -112,7 +117,15 @@ export function SummaryTab() {
   };
 
   return (
-    <div className="h-full flex flex-col gap-4 min-h-0">
+    <div className="h-full flex flex-col gap-4 min-h-0 relative">
+      {isLoading && (
+        <div className="absolute inset-0 bg-surface/50 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg">
+          <div className="bg-surface-card p-4 rounded-xl shadow-lg flex flex-col items-center gap-3">
+            <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+            <span className="text-sm font-medium text-on-surface">데이터를 불러오는 중...</span>
+          </div>
+        </div>
+      )}
       {error && (
         <div className="shrink-0 px-4 py-2.5 rounded-lg bg-danger-50 border border-danger-200 text-danger-700 text-sm dark:bg-danger-950/30 dark:border-danger-900/40 dark:text-danger-400">
           {error}
@@ -151,7 +164,7 @@ export function SummaryTab() {
           <div className="absolute top-0 right-0 p-4 opacity-5">
             <Wallet className="w-16 h-16 text-primary-600" />
           </div>
-          <p className="text-sm font-bold text-on-surface-muted mb-1.5">오늘 입금된 금액</p>
+          <p className="text-sm font-bold text-on-surface-muted mb-1.5">{periodLabel} 입금된 금액</p>
           <div className="flex items-baseline gap-1">
             <h3 className="text-3xl font-extrabold text-primary-600 tracking-tight dark:text-primary-400">
               {summary.actualIncome.toLocaleString()}
@@ -207,7 +220,7 @@ export function SummaryTab() {
         <div className="bg-surface-card border border-border-default p-5 rounded-lg shadow-sm opacity-85">
           <div className="flex items-center gap-1.5 mb-1.5">
             <TrendingUp className="w-3.5 h-3.5 text-secondary-500" />
-            <p className="text-xs font-bold text-on-surface-muted">오늘 접수한 금액</p>
+            <p className="text-xs font-bold text-on-surface-muted">{periodLabel} 접수한 금액</p>
           </div>
           <div className="flex items-baseline gap-1">
             <span className="text-2xl font-bold text-on-surface">{summary.totalSales.toLocaleString()}</span>
