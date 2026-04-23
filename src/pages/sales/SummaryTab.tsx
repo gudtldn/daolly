@@ -187,21 +187,23 @@ export function SummaryTab() {
           <p className="text-[10px] text-on-surface-muted mt-1.5 text-right font-medium">전체 수입의 {cashTransferPct}%</p>
         </div>
 
-        {/* 총 접수 매출 (업무량) */}
+        {/* 오늘 접수한 금액 (업무량) */}
         <div className="bg-surface-card border border-border-default p-5 rounded-lg shadow-sm opacity-85">
           <div className="flex items-center gap-1.5 mb-1.5">
             <TrendingUp className="w-3.5 h-3.5 text-secondary-500" />
-            <p className="text-xs font-bold text-on-surface-muted">오늘 접수한 일 (총액)</p>
+            <p className="text-xs font-bold text-on-surface-muted">오늘 접수한 금액</p>
           </div>
           <div className="flex items-baseline gap-1">
             <span className="text-2xl font-bold text-on-surface">{summary.totalSales.toLocaleString()}</span>
             <span className="text-sm text-on-surface-muted">원</span>
           </div>
-          <p className="text-[10px] text-secondary-600 mt-4 dark:text-secondary-400 font-medium">
-            * {paymentRecords.length}건 결제 처리됨
-          </p>
+          <div className="mt-3 flex items-center gap-1.5 text-xs font-medium text-on-surface-muted">
+            <Receipt className="w-3 h-3" />
+            <span>{paymentRecords.length}건의 작업 접수됨</span>
+          </div>
         </div>
-      </div>
+        </div>
+
 
       {/* 하단: 차트 + 결제 상세 내역 */}
       <div className="flex-1 flex gap-4 min-h-0">
