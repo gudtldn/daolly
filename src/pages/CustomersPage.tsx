@@ -122,6 +122,7 @@ function CustomerListPanel({
   scrollToId,
   onScrollComplete,
   searchKeyword,
+  debouncedSearchKeyword,
   onSearchChange,
   filtered,
   isActive,
@@ -136,6 +137,7 @@ function CustomerListPanel({
   scrollToId: number | null;
   onScrollComplete?: () => void;
   searchKeyword: string;
+  debouncedSearchKeyword: string;
   onSearchChange: (kw: string) => void;
   filtered: Customer[];
   isActive?: boolean;
@@ -172,7 +174,7 @@ function CustomerListPanel({
         <h2 className="font-medium">
           고객 목록{" "}
           <span className="text-secondary-400 ml-1">
-            {searchKeyword ? `검색 ${filtered.length}명` : `${filtered.length}명`}
+            {debouncedSearchKeyword ? `검색 ${filtered.length}명` : `${filtered.length}명`}
           </span>
         </h2>
       </div>
@@ -283,7 +285,7 @@ function CustomerListPanel({
           components={{
             EmptyPlaceholder: () => (
               <div className="p-8 text-center text-on-surface-muted text-sm">
-                {isLoading ? "로딩 중..." : searchKeyword ? "검색 결과가 없습니다." : "등록된 고객이 없습니다."}
+                {isLoading ? "로딩 중..." : debouncedSearchKeyword ? "검색 결과가 없습니다." : "등록된 고객이 없습니다."}
               </div>
             )
           }}
@@ -863,6 +865,7 @@ export function CustomersPage() {
         scrollToId={scrollToCustomerId}
         onScrollComplete={() => setScrollToCustomerId(null)}
         searchKeyword={searchKeyword}
+        debouncedSearchKeyword={debouncedSearchKeyword}
         onSearchChange={setSearchKeyword}
         filtered={filteredCustomers}
         isActive={activePanel === "customers"}
