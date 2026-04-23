@@ -55,6 +55,7 @@ pub async fn migrate_from_legacy(
 
     let now = Utc::now().to_rfc3339();
     let mut imported_customer_ids = HashSet::new();
+    let mut customer_models = Vec::new();
 
     for row in legacy_customers {
         let old_id: i32 = row.try_get("", "id")?;
@@ -62,16 +63,22 @@ pub async fn migrate_from_legacy(
         let phone_number: Option<String> = row.try_get("", "phone_number")?;
         let note: Option<String> = row.try_get("", "note")?;
 
-        let model = customer::ActiveModel {
+        customer_models.push(customer::ActiveModel {
             id: Set(old_id),
             name: Set(name),
             phone_number: Set(phone_number),
             note: Set(note),
             created_at: Set(now.clone()),
             last_modified_at: Set(now.clone()),
-        };
-        customer::Entity::insert(model).exec(&tx).await?;
+        });
         imported_customer_ids.insert(old_id);
+    }
+
+    if !customer_models.is_empty() {
+        // 고객 데이터 벌크 삽입
+        customer::Entity::insert_many(customer_models)
+            .exec(&tx)
+            .await?;
     }
 
     // 4.1 고아 데이터 처리를 위한 '이름 없음' 고객 생성
@@ -183,4 +190,84 @@ pub async fn migrate_from_legacy(
     .await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::entities::{customer, payment, work_item};
+    use crate::test_helpers::setup_test_db;
+    use sea_orm::EntityTrait;
+    use std::fs;
+
+    #[tokio::test]
+    async fn test_full_migration_flow() {
+        // 1. 테스트용 레거시 DB 생성
+        let legacy_path = PathBuf::from("test_legacy.db");
+        let legacy_url = format!("sqlite:{}?mode=rwc", legacy_path.display());
+
+        if legacy_path.exists() {
+            fs::remove_file(&legacy_path).unwrap();
+        }
+
+        {
+            let legacy_db = Database::connect(&legacy_url).await.unwrap();
+            legacy_db.execute(sea_orm::Statement::from_string(sea_orm::DatabaseBackend::Sqlite, "CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT, phone_number TEXT, note TEXT)")).await.unwrap();
+            legacy_db.execute(sea_orm::Statement::from_string(sea_orm::DatabaseBackend::Sqlite, "CREATE TABLE garments (id INTEGER PRIMARY KEY, reception_date TEXT, processing_date TEXT, is_completed INTEGER, contents TEXT, price INTEGER, note TEXT, customer_id INTEGER)")).await.unwrap();
+
+            // 고객 데이터 삽입
+            legacy_db.execute(sea_orm::Statement::from_string(sea_orm::DatabaseBackend::Sqlite, "INSERT INTO customers (id, name, phone_number, note) VALUES (1, '홍길동', '01012345678', '메모')")).await.unwrap();
+            legacy_db.execute(sea_orm::Statement::from_string(sea_orm::DatabaseBackend::Sqlite, "INSERT INTO customers (id, name, phone_number, note) VALUES (2, '김철수', NULL, NULL)")).await.unwrap();
+
+            // 작업 데이터 삽입
+            legacy_db.execute(sea_orm::Statement::from_string(sea_orm::DatabaseBackend::Sqlite, "INSERT INTO garments (id, reception_date, processing_date, is_completed, contents, price, note, customer_id) VALUES (101, '2024-01-01', '2024-01-02', 1, '양복 상의', 5000, '빨리', 1)")).await.unwrap();
+            legacy_db.execute(sea_orm::Statement::from_string(sea_orm::DatabaseBackend::Sqlite, "INSERT INTO garments (id, reception_date, processing_date, is_completed, contents, price, note, customer_id) VALUES (102, '2024-01-03', NULL, 0, '셔츠', 2000, NULL, 2)")).await.unwrap();
+            legacy_db.execute(sea_orm::Statement::from_string(sea_orm::DatabaseBackend::Sqlite, "INSERT INTO garments (id, reception_date, processing_date, is_completed, contents, price, note, customer_id) VALUES (103, '2024-01-04', NULL, 0, '고아 옷', 3000, '주인찾기', 99)")).await.unwrap();
+        }
+
+        // 2. 새 DB 초기화 및 마이그레이션 실행
+        let db = setup_test_db().await.unwrap();
+        migrate_from_legacy(&db, legacy_path.clone())
+            .await
+            .expect("Migration failed");
+
+        // 3. 검증
+        // 3.1 고객 수 검증 (기존 2명 + 이름 없음 1명 = 3명)
+        let customers = customer::Entity::find().all(&db).await.unwrap();
+        assert_eq!(customers.len(), 3);
+        assert!(customers.iter().any(|c| c.name == "홍길동"));
+        assert!(customers.iter().any(|c| c.name.contains("이름 없음")));
+
+        // 3.2 작업 수 검증 (총 3건)
+        let work_items = work_item::Entity::find().all(&db).await.unwrap();
+        assert_eq!(work_items.len(), 3);
+
+        // 3.3 상태 매핑 검증 (작업 1: PickedUp)
+        let wi1 = work_item::Entity::find_by_id(101)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(wi1.status, work_item::WorkItemStatus::PickedUp);
+        assert_eq!(wi1.paid_amount, 5000);
+        assert!(wi1.completed_at.is_some());
+
+        // 3.4 고아 데이터 연결 검증 (작업 3: customer_id = 999999)
+        let wi3 = work_item::Entity::find_by_id(103)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(wi3.customer_id, 999999);
+        assert_eq!(wi3.description, Some("고아 옷".to_owned()));
+
+        // 3.5 결제 내역 검증 (완납된 작업 1에 대해 1건 생성)
+        let payments = payment::Entity::find().all(&db).await.unwrap();
+        assert_eq!(payments.len(), 1);
+        assert_eq!(payments[0].amount, 5000);
+        assert_eq!(payments[0].method, Some("transfer".to_owned()));
+
+        // 4. 테스트 파일 정리
+        fs::remove_file(legacy_path).unwrap();
+    }
 }
