@@ -40,7 +40,7 @@ export function CustomerFormCard({ open, mode, customer, onSave, onClose }: Prop
   // 열릴 때 폼 초기화
   useEffect(() => {
     if (!open) return;
-    if (mode === "edit" && customer) {
+    if (customer) {
       setName(customer.name);
       setPhone(customer.phoneNumber ?? "");
       setNote(customer.note ?? "");

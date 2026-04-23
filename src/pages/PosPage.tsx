@@ -5,14 +5,15 @@ import { useDebounce } from "@/hooks/useDebounce";
 import {
   User, Plus, Search, History, X,
   Minus, Trash2, Pen, Keyboard, Shirt,
-  CheckCircle2, CreditCard, Banknote, Landmark, Clock,
+  CheckCircle2, CreditCard, Banknote, Landmark, Clock, UserPlus,
 } from "lucide-react";
-import type { Customer, Category, PriceItem, PriceOption } from "@/types";
+import type { Customer, Category, PriceItem, PriceOption, CreateCustomer } from "@/types";
 import {
   customerApi, categoryApi, priceItemApi, priceOptionApi, workItemApi,
 } from "@/bindings";
 import { useCartStore, type CartItem, type PaymentMethod } from "@/stores/cartStore";
 import { useDialogStore } from "@/stores/dialogStore";
+import { CustomerFormCard } from "@/pages/customers/CustomerFormCard";
 
 // ============================================================
 // CustomerPanel (왼쪽 300px)
@@ -23,11 +24,13 @@ function CustomerPanel({
   onSelect,
   onDeselect,
   onViewHistory,
+  onAddNew,
 }: {
   selectedCustomer: Customer | null;
   onSelect: (c: Customer) => void;
   onDeselect: () => void;
   onViewHistory: (customerId: number) => void;
+  onAddNew: (name: string) => void;
 }) {
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebounce(query, 300);
@@ -35,6 +38,9 @@ function CustomerPanel({
   const [showDropdown, setShowDropdown] = useState(false);
   const [unpaid, setUnpaid] = useState(0);
   const [highlightIdx, setHighlightIdx] = useState(0);
+  const [lastSource, setLastSource] = useState<"mouse" | "keyboard">("keyboard");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!debouncedQuery.trim()) {
@@ -52,10 +58,42 @@ function CustomerPanel({
       .catch(() => {});
   }, [debouncedQuery]);
 
+  // 키보드 이동 시 스크롤 처리
+  useEffect(() => {
+    if (lastSource !== "keyboard" || !showDropdown || !dropdownRef.current) return;
+    const container = dropdownRef.current;
+    const items = container.querySelectorAll("button");
+    const activeItem = items[highlightIdx] as HTMLElement;
+
+    if (activeItem) {
+      activeItem.scrollIntoView({ block: "nearest" });
+    }
+  }, [highlightIdx, showDropdown, lastSource]);
+
+  // 외부 클릭 시 드롭다운 닫기
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const handleSelect = (c: Customer) => {
     onSelect(c);
     setQuery("");
-    setResults([]); // Prevent stale results from triggering unintended selection.
+    setResults([]);
+    setShowDropdown(false);
+  };
+
+  const handleAddNew = () => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    onAddNew(trimmed);
+    setQuery("");
+    setResults([]);
     setShowDropdown(false);
   };
 
@@ -66,6 +104,9 @@ function CustomerPanel({
     }).catch(() => {});
   }, [selectedCustomer]);
 
+  const isExactMatch = results.some((c) => c.name === query.trim());
+  const showAddOption = query.trim() && !isExactMatch;
+
   return (
     <div className="w-[300px] shrink-0 bg-surface-card border border-border-default rounded-lg flex flex-col shadow-sm overflow-hidden">
       <div className="px-4 py-3 bg-secondary-800 dark:bg-secondary-900 text-white flex items-center shrink-0">
@@ -73,7 +114,7 @@ function CustomerPanel({
         <h3 className="font-medium">고객 정보</h3>
       </div>
 
-      <div className="p-4 border-b border-border-default shrink-0 relative">
+      <div className="p-4 border-b border-border-default shrink-0 relative" ref={containerRef}>
         {selectedCustomer ? (
           // Customer selected: show a minimal change-customer link. Full info is in the card below.
           <button
@@ -90,13 +131,22 @@ function CustomerPanel({
               <input
                 type="text"
                 value={query}
+                onFocus={() => query.trim() && setShowDropdown(true)}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
+                  if (["ArrowUp", "ArrowDown", "Enter"].includes(e.key)) {
+                    setLastSource("keyboard");
+                  }
                   if (e.key === "Enter") {
-                    if (results.length > 0) handleSelect(results[highlightIdx]);
+                    if (results.length > 0 && highlightIdx < results.length) {
+                      handleSelect(results[highlightIdx]);
+                    } else if (showAddOption) {
+                      handleAddNew();
+                    }
                   } else if (e.key === "ArrowDown") {
                     e.preventDefault();
-                    setHighlightIdx((i) => Math.min(i + 1, results.length - 1));
+                    const maxIdx = showAddOption ? results.length : Math.max(0, results.length - 1);
+                    setHighlightIdx((i) => Math.min(i + 1, maxIdx));
                   } else if (e.key === "ArrowUp") {
                     e.preventDefault();
                     setHighlightIdx((i) => Math.max(i - 1, 0));
@@ -116,32 +166,83 @@ function CustomerPanel({
                 </button>
               )}
             </div>
-            <button
-              onClick={() => results.length > 0 && handleSelect(results[0])}
-              disabled={!query.trim()}
-              className="bg-primary-600 text-white px-3 py-2 rounded hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
-            >
-              <Search className="w-4 h-4" />
-            </button>
+            {showAddOption && results.length === 0 ? (
+              <button
+                onClick={handleAddNew}
+                title="새 고객으로 추가"
+                className="bg-primary-600 text-white px-3 py-2 rounded hover:bg-primary-700 transition-colors shrink-0 flex items-center justify-center cursor-pointer"
+              >
+                <UserPlus className="w-4 h-4" />
+              </button>
+            ) : (
+              <button
+                onClick={() => results.length > 0 && handleSelect(results[0])}
+                disabled={!query.trim()}
+                className="bg-primary-600 text-white px-3 py-2 rounded hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0 cursor-pointer"
+              >
+                <Search className="w-4 h-4" />
+              </button>
+            )}
           </div>
         )}
-        {showDropdown && results.length > 0 && (
-          <div className="absolute left-4 right-4 top-full mt-1 bg-surface-card border border-border-default rounded-lg shadow-lg z-20 max-h-48 overflow-auto">
+        {showDropdown && (
+          <div 
+            ref={dropdownRef}
+            className="absolute left-4 right-4 top-full mt-1 bg-surface-card border border-border-default rounded-lg shadow-lg z-20 max-h-48 overflow-x-hidden overflow-y-auto"
+          >
             {results.map((c, idx) => (
               <button
                 key={c.id}
                 onClick={() => handleSelect(c)}
-                onMouseEnter={() => setHighlightIdx(idx)}
-                className={`w-full text-left px-3 py-2.5 text-sm border-b border-border-default last:border-0 transition-colors ${
-                  idx === highlightIdx ? "bg-primary-50 dark:bg-primary-900/30" : "hover:bg-surface"
+                onMouseMove={() => {
+                  if (lastSource !== "mouse" || highlightIdx !== idx) {
+                    setLastSource("mouse");
+                    setHighlightIdx(idx);
+                  }
+                }}
+                className={`w-full text-left px-3 py-2.5 text-sm border-b border-border-default last:border-0 transition-colors flex items-center justify-between gap-2 cursor-pointer ${
+                  idx === highlightIdx ? "bg-primary-50 dark:bg-primary-900/30" : ""
                 }`}
               >
-                <span className="font-bold text-on-surface">{c.name}</span>
-                {c.phoneNumber && (
-                  <span className="text-on-surface-muted ml-2">{c.phoneNumber}</span>
+                <div className="flex items-center min-w-0 flex-1">
+                  <span className="font-bold text-on-surface truncate">{c.name}</span>
+                  {c.phoneNumber && (
+                    <span className="text-on-surface-muted ml-2 text-xs shrink-0">{c.phoneNumber}</span>
+                  )}
+                </div>
+                {idx === highlightIdx && (
+                  <span className="text-[0.6rem] text-on-surface-muted bg-surface-elevated px-1.5 py-0.5 rounded border border-border-default shrink-0 animate-in fade-in duration-200">Enter</span>
                 )}
               </button>
             ))}
+            
+            {showAddOption && (
+              <>
+                {results.length > 0 && <div className="border-t border-border-default/50 my-1" />}
+                <button
+                  onClick={handleAddNew}
+                  onMouseMove={() => {
+                    if (lastSource !== "mouse" || highlightIdx !== results.length) {
+                      setLastSource("mouse");
+                      setHighlightIdx(results.length);
+                    }
+                  }}
+                  className={`w-full text-left px-4 py-3.5 text-sm transition-colors cursor-pointer ${
+                    highlightIdx === results.length ? "bg-primary-50 dark:bg-primary-900/30" : ""
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 text-primary-600 font-bold min-w-0">
+                      <UserPlus className="w-4 h-4 shrink-0" />
+                      <span className="truncate">"{query.trim()}"님 신규 등록</span>
+                    </div>
+                    {highlightIdx === results.length && (
+                      <span className="text-[0.65rem] text-on-surface-muted bg-surface-elevated px-1.5 py-0.5 rounded border border-border-default shrink-0 animate-in fade-in duration-200">Enter</span>
+                    )}
+                  </div>
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -640,6 +741,11 @@ export function PosPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitCount, setSubmitCount] = useState(0);
+  
+  // 고객 추가 모달 상태
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+  const [newCustomerName, setNewCustomerName] = useState("");
+
   const { items, addItem, removeItem, updateQuantity, updateOptionsMemo, setCustomer, submit } =
     useCartStore();
   const navigate = useNavigate();
@@ -671,6 +777,22 @@ export function PosPage() {
     navigate("/customers", { state: { focusCustomerId: customerId } });
   };
 
+  const handleAddNewCustomer = (name: string) => {
+    setNewCustomerName(name);
+    setIsCustomerModalOpen(true);
+  };
+
+  const handleCustomerSave = async (data: CreateCustomer) => {
+    try {
+      const created = await customerApi.create(data);
+      handleSelectCustomer(created);
+      toast.success(`${created.name} 고객님이 등록되었습니다.`);
+    } catch (e) {
+      toast.error(`고객 등록 실패: ${String(e)}`);
+      throw e; // CustomerFormCard에서 에러 처리를 할 수 있도록 던짐
+    }
+  };
+
   const handleSubmit = async (method: PaymentMethod, note: string) => {
     const customerName = selectedCustomer?.name ?? "";
     setSubmitting(true);
@@ -693,7 +815,13 @@ export function PosPage() {
 
   return (
     <div className="h-full flex gap-4 overflow-hidden">
-      <CustomerPanel selectedCustomer={selectedCustomer} onSelect={handleSelectCustomer} onDeselect={handleDeselectCustomer} onViewHistory={handleViewHistory} />
+      <CustomerPanel 
+        selectedCustomer={selectedCustomer} 
+        onSelect={handleSelectCustomer} 
+        onDeselect={handleDeselectCustomer} 
+        onViewHistory={handleViewHistory}
+        onAddNew={handleAddNewCustomer}
+      />
       {/* 고객 미선택 시 OrderPanel, PaymentPanel 비활성화 overlay */}
       <div className="flex-1 min-w-0 flex gap-4 overflow-hidden relative">
         {!selectedCustomer && (
@@ -719,6 +847,14 @@ export function PosPage() {
           submitting={submitting}
         />
       </div>
+
+      <CustomerFormCard
+        open={isCustomerModalOpen}
+        mode="create"
+        customer={newCustomerName ? { id: 0, name: newCustomerName, phoneNumber: null, note: null, createdAt: "", lastModifiedAt: "" } : null}
+        onSave={handleCustomerSave as any}
+        onClose={() => setIsCustomerModalOpen(false)}
+      />
     </div>
   );
 }
