@@ -93,7 +93,7 @@ export function UnpaidTab() {
     }
   }
 
-  // Grid column definition for consistency
+  // 일관성을 위한 그리드 열 정의
   const gridCols = "grid-cols-[200px_1fr_140px_140px_48px]";
 
   return (
@@ -110,7 +110,7 @@ export function UnpaidTab() {
             <Clock className="w-6 h-6 text-warning-600 dark:text-warning-400" />
           </div>
           <div>
-            <p className="text-[11px] font-bold text-warning-600/80 dark:text-warning-400/70 uppercase tracking-wider mb-0.5">총 미수금 합계</p>
+            <p className="text-[0.6875rem] font-bold text-warning-600/80 dark:text-warning-400/70 uppercase tracking-wider mb-0.5">총 미수금 합계</p>
             <div className="flex items-baseline gap-1.5">
               <span className="text-3xl font-black text-warning-700 dark:text-warning-300 tracking-tight">
                 {totalUnpaid.toLocaleString()}
@@ -202,9 +202,9 @@ export function UnpaidTab() {
                       <div className="bg-surface-elevated/30 border-t border-border-default/50 px-4 py-2 animate-in fade-in slide-in-from-top-1 duration-200">
                         <div className="bg-surface-card rounded-md border border-border-default/60 shadow-inner-sm overflow-hidden mb-2">
                           <div className="grid grid-cols-[120px_1fr_120px_48px] px-4 py-2 bg-surface-elevated/50 border-b border-border-default/50">
-                            <span className="text-[10px] font-bold text-on-surface-muted uppercase">날짜</span>
-                            <span className="text-[10px] font-bold text-on-surface-muted uppercase">상세 내용</span>
-                            <span className="text-[10px] font-bold text-on-surface-muted uppercase text-right">금액</span>
+                            <span className="text-[0.625rem] font-bold text-on-surface-muted uppercase">날짜</span>
+                            <span className="text-[0.625rem] font-bold text-on-surface-muted uppercase">상세 내용</span>
+                            <span className="text-[0.625rem] font-bold text-on-surface-muted uppercase text-right">금액</span>
                             <span />
                           </div>
                           <div className="divide-y divide-border-default/40">

@@ -3,8 +3,8 @@ import { createPortal } from "react-dom";
 import { CalendarDays, ArrowRight, X } from "lucide-react";
 
 interface DateRange {
-  from: string; // YYYY-MM-DD
-  to: string;   // YYYY-MM-DD
+  from: string; // YYYY-MM-DD 형식의 시작일
+  to: string;   // YYYY-MM-DD 형식의 종료일
 }
 
 interface Props {
@@ -35,6 +35,9 @@ function formatDisplay(range: DateRange): string {
   return `${fmtShort(from)} ~ ${fmtShort(to)}`;
 }
 
+/**
+ * 날짜 범위를 직접 지정할 수 있는 데이트 피커(Date Range Picker) 컴포넌트입니다.
+ */
 export function DateRangePicker({ value, onApply, onClear }: Props) {
   const [open, setOpen] = useState(false);
   const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
@@ -55,7 +58,7 @@ export function DateRangePicker({ value, onApply, onClear }: Props) {
     });
   };
 
-  // Close the popover when the window is resized to avoid position mismatch.
+  // 위치가 어긋나는 것을 방지하기 위해 창 크기가 변경되면 팝오버를 닫습니다.
   useEffect(() => {
     if (!open) return;
     const handler = () => setOpen(false);
@@ -63,7 +66,7 @@ export function DateRangePicker({ value, onApply, onClear }: Props) {
     return () => window.removeEventListener("resize", handler);
   }, [open]);
 
-  // Close on outside click.
+  // 외부 클릭 시 팝오버를 닫습니다.
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
@@ -104,7 +107,7 @@ export function DateRangePicker({ value, onApply, onClear }: Props) {
 
           <div className="flex items-center gap-2">
             <div className="flex-1">
-              <label htmlFor="drp-from" className="block text-[11px] font-semibold text-on-surface-muted mb-1">시작일</label>
+              <label htmlFor="drp-from" className="block text-[0.6875rem] font-semibold text-on-surface-muted mb-1">시작일</label>
               <input
                 id="drp-from"
                 type="date"
@@ -116,7 +119,7 @@ export function DateRangePicker({ value, onApply, onClear }: Props) {
             </div>
             <ArrowRight className="w-4 h-4 text-on-surface-muted shrink-0 mt-4" />
             <div className="flex-1">
-              <label htmlFor="drp-to" className="block text-[11px] font-semibold text-on-surface-muted mb-1">종료일</label>
+              <label htmlFor="drp-to" className="block text-[0.6875rem] font-semibold text-on-surface-muted mb-1">종료일</label>
               <input
                 id="drp-to"
                 type="date"

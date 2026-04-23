@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 import { useSettingsStore } from "@/stores/settingsStore";
 
-const FONT_SIZE_CLASSES: Record<string, string> = {
-  small: "text-sm",
-  medium: "text-base",
-  large: "text-lg",
+const FONT_SIZE_VALUES: Record<string, string> = {
+  small: "14px",
+  medium: "16px",
+  large: "18px",
 };
 
 /**
@@ -44,11 +44,6 @@ export function useThemeEffect() {
 
   // 글꼴 크기 적용
   useEffect(() => {
-    const root = document.documentElement;
-    // 이전 크기 클래스 제거
-    Object.values(FONT_SIZE_CLASSES).forEach((cls) =>
-      root.classList.remove(cls)
-    );
-    root.classList.add(FONT_SIZE_CLASSES[fontSize]);
+    document.documentElement.style.fontSize = FONT_SIZE_VALUES[fontSize] || "16px";
   }, [fontSize]);
 }

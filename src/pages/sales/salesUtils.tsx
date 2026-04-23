@@ -16,6 +16,9 @@ export const PERIODS = [
 
 export type PresetId = (typeof PERIODS)[number]["id"];
 
+/**
+ * 주어진 프리셋(오늘, 어제, 이번 주 등)에 해당하는 날짜 범위를 반환합니다.
+ */
 export function getDateRange(period: PresetId): DateRange {
   const today = new Date();
   switch (period) {
@@ -33,8 +36,8 @@ export function getDateRange(period: PresetId): DateRange {
       };
     }
     case "week": {
-      const day = today.getDay(); // 0=Sun
-      const diff = day === 0 ? 6 : day - 1; // Mon=0
+      const day = today.getDay(); // 0=일요일
+      const diff = day === 0 ? 6 : day - 1; // 월요일=0
       const mon = new Date(today);
       mon.setDate(today.getDate() - diff);
       return { 
@@ -59,6 +62,9 @@ export function getDateRange(period: PresetId): DateRange {
   }
 }
 
+/**
+ * 결제 수단에 따른 뱃지 UI를 렌더링하는 컴포넌트입니다.
+ */
 export function PaymentMethodBadge({ method }: { method: string }) {
   // 여러 결제 수단이 쉼표로 합쳐져 있는 경우 (예: "card, cash" 또는 "카드, 현금")
   if (method.includes(",")) {
@@ -74,7 +80,7 @@ export function PaymentMethodBadge({ method }: { method: string }) {
 
   const m = method.toLowerCase();
   const baseClass = "inline-flex items-center gap-1 font-bold px-1.5 py-0.5 rounded border whitespace-nowrap";
-  const smallText = "text-[11px]";
+  const smallText = "text-[0.6875rem]";
 
   if (m === "card" || m === "카드") {
     return (
@@ -107,7 +113,7 @@ export function PaymentMethodBadge({ method }: { method: string }) {
 
   // 매칭되는 것이 없으면 텍스트라도 표시
   return (
-    <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-surface-elevated text-on-surface-muted border border-border-default text-[10px] font-bold whitespace-nowrap">
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-surface-elevated text-on-surface-muted border border-border-default text-[0.625rem] font-bold whitespace-nowrap">
       {method}
     </span>
   );

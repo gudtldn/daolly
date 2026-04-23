@@ -17,6 +17,11 @@ import {
 // ============================================================
 // TransactionsTab
 // ============================================================
+/**
+ * 결제 내역(Transactions) 탭 컴포넌트입니다.
+ * 
+ * 기간별 전체 결제 내역을 조회하고 검색할 수 있습니다.
+ */
 export function TransactionsTab() {
   const navigate = useNavigate();
   const [period, setPeriod] = useState<PresetId>("today");

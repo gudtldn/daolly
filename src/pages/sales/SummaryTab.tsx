@@ -27,6 +27,11 @@ import {
 // ============================================================
 // SummaryTab
 // ============================================================
+/**
+ * 요약(Summary) 탭 컴포넌트입니다.
+ * 
+ * 기간별 매출 요약, 인기 품목, 주간 접수액 현황 및 상세 입금/접수 내역을 표시합니다.
+ */
 export function SummaryTab() {
   const navigate = useNavigate();
   const [period, setPeriod] = useState<PresetId>("today");
@@ -155,12 +160,12 @@ export function SummaryTab() {
           </div>
           <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5">
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-on-surface-muted">당일</span>
+              <span className="text-[0.6875rem] font-bold text-on-surface-muted">당일</span>
               <span className="text-xs font-bold text-primary-600/90 dark:text-primary-400">{currentPaymentIncome.toLocaleString()}원</span>
             </div>
             <div className="w-px h-3 bg-border-default/60 self-center" />
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-on-surface-muted">미수</span>
+              <span className="text-[0.6875rem] font-bold text-on-surface-muted">미수</span>
               <span className="text-xs font-bold text-primary-600/90 dark:text-primary-400">{backPaymentIncome.toLocaleString()}원</span>
             </div>
           </div>
@@ -179,7 +184,7 @@ export function SummaryTab() {
           <div className="mt-3 w-full bg-secondary-100 rounded-full h-1.5 dark:bg-secondary-800">
             <div className="bg-primary-500 h-1.5 rounded-full" style={{ width: `${cardPct}%` }} />
           </div>
-          <p className="text-[10px] text-on-surface-muted mt-1.5 text-right font-medium">수입의 {cardPct}%</p>
+          <p className="text-[0.625rem] text-on-surface-muted mt-1.5 text-right font-medium">수입의 {cardPct}%</p>
         </div>
 
         {/* 현금 / 이체 합계 */}
@@ -195,7 +200,7 @@ export function SummaryTab() {
           <div className="mt-3 w-full bg-secondary-100 rounded-full h-1.5 dark:bg-secondary-800">
             <div className="bg-success-500 h-1.5 rounded-full" style={{ width: `${cashTransferPct}%` }} />
           </div>
-          <p className="text-[10px] text-on-surface-muted mt-1.5 text-right font-medium">수입의 {cashTransferPct}%</p>
+          <p className="text-[0.625rem] text-on-surface-muted mt-1.5 text-right font-medium">수입의 {cashTransferPct}%</p>
         </div>
 
         {/* 오늘 접수한 금액 */}
@@ -220,7 +225,7 @@ export function SummaryTab() {
         {/* 좌측 패널: 차트 + 인기품목 */}
         <div className="w-72 shrink-0 flex flex-col gap-4 min-h-0">
           <div className="flex-1 bg-surface-card border border-border-default rounded-lg shadow-sm flex flex-col p-4 overflow-visible">
-            <h3 className="text-sm font-bold text-on-surface mb-4">주간 접수액 현황</h3>
+            <h3 className="text-sm font-bold text-on-surface mb-4">주간 매출 추이</h3>
             <div className="flex-1 flex items-end justify-between gap-1.5 relative min-h-0">
               {chartData.map((data, i) => {
                 const isToday = i === chartData.length - 1;
@@ -230,7 +235,7 @@ export function SummaryTab() {
                   <div key={data.date} className="flex flex-col items-center w-full h-full justify-end group z-10 relative">
                     {/* Tooltip */}
                     <div className="absolute bottom-full mb-2 hidden group-hover:flex flex-col items-center z-20">
-                      <div className="bg-surface-card border border-border-default px-2 py-1 rounded shadow-lg text-[10px] whitespace-nowrap animate-in fade-in zoom-in duration-200">
+                      <div className="bg-surface-card border border-border-default px-2 py-1 rounded shadow-lg text-[0.625rem] whitespace-nowrap animate-in fade-in zoom-in duration-200">
                         <p className="text-on-surface-muted font-medium">{data.date}</p>
                         <p className="text-primary-600 font-bold">{data.total.toLocaleString()}원 (접수)</p>
                       </div>
@@ -244,7 +249,7 @@ export function SummaryTab() {
                       style={{ height: `${pct}%`, minHeight: pct > 0 ? "4px" : "0" }}
                     />
                     <span
-                      className={`text-[10px] mt-2 font-medium ${
+                      className={`text-[0.625rem] mt-2 font-medium ${
                         isToday ? "text-primary-600 font-bold" : "text-on-surface-muted"
                       }`}
                     >
@@ -257,7 +262,7 @@ export function SummaryTab() {
             </div>
           </div>
           <div className="h-48 bg-surface-card border border-border-default rounded-lg shadow-sm flex flex-col p-4 overflow-hidden">
-            <h4 className="text-[11px] font-bold text-on-surface-muted mb-3 uppercase tracking-wider">자주 찾는 품목</h4>
+            <h4 className="text-[0.6875rem] font-bold text-on-surface-muted mb-3 uppercase tracking-wider">자주 찾는 품목</h4>
             <div className="flex-1 overflow-y-auto space-y-2">
               {topItems.length === 0 ? (
                 <p className="text-xs text-on-surface-muted text-center py-8">데이터 없음</p>
@@ -297,7 +302,7 @@ export function SummaryTab() {
                   접수 내역
                 </button>
               </div>
-              <span className="text-[11px] text-on-surface-muted font-medium">({periodLabel})</span>
+              <span className="text-[0.6875rem] text-on-surface-muted font-medium">({periodLabel})</span>
             </div>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-secondary-400" />
@@ -343,9 +348,9 @@ export function SummaryTab() {
                           <td className="px-4 py-3 text-on-surface truncate max-w-[200px]">{r.description ?? "-"}</td>
                           <td className="px-4 py-3 text-center">
                             {r.isBackPayment ? (
-                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 text-[11px] font-bold"><History className="w-3 h-3" /> 미수 수납</span>
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 text-[0.6875rem] font-bold"><History className="w-3 h-3" /> 미수 수납</span>
                             ) : (
-                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 text-[11px] font-bold"><Receipt className="w-3 h-3" /> 당일 결제</span>
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 text-[0.6875rem] font-bold"><Receipt className="w-3 h-3" /> 당일 결제</span>
                             )}
                           </td>
                           <td className="px-4 py-3 text-center"><PaymentMethodBadge method={r.method as any ?? "credit"} /></td>
@@ -371,9 +376,9 @@ export function SummaryTab() {
                           <td className="px-4 py-3 text-on-surface truncate max-w-[200px]">{r.description ?? "-"}</td>
                           <td className="px-4 py-3 text-center">
                             {isFullyPaid ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 text-[10px] font-bold">완납</span>
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 text-[0.625rem] font-bold">완납</span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 text-danger-700 border border-rose-100 dark:bg-danger-950/20 dark:text-danger-400 text-[10px] font-bold">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 text-danger-700 border border-rose-100 dark:bg-danger-950/20 dark:text-danger-400 text-[0.625rem] font-bold">
                                 {r.paidAmount > 0 ? "일부 미납" : "미납"}
                               </span>
                             )}

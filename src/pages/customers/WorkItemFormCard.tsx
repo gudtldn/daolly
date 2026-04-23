@@ -452,13 +452,13 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                           className="w-full px-2 py-1 border border-border-default rounded text-sm bg-surface-card text-on-surface focus:outline-none focus:border-primary-500"
                         />
                         <div className="mt-1 flex items-center gap-1">
-                          <span className="text-[11px] text-on-surface-muted/60 shrink-0">&#8627;</span>
+                          <span className="text-[0.6875rem] text-on-surface-muted/60 shrink-0">&#8627;</span>
                           <input
                             type="text"
                             value={d.optionsMemo ?? ""}
                             onChange={(e) => updateDetail(d._key, "optionsMemo", e.target.value)}
                             placeholder="옵션 메모 (선택)"
-                            className="flex-1 px-2 py-0.5 border border-border-default rounded text-[11px] bg-surface text-on-surface-muted placeholder:text-on-surface-muted/50 focus:outline-none focus:border-primary-400"
+                            className="flex-1 px-2 py-0.5 border border-border-default rounded text-[0.6875rem] bg-surface text-on-surface-muted placeholder:text-on-surface-muted/50 focus:outline-none focus:border-primary-400"
                           />
                         </div>
                       </td>
@@ -639,7 +639,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                               </tr>
                             ) : (
                               <tr key={p.id}>
-                                <td className="px-3 py-2 text-on-surface-muted text-[13px]">
+                                <td className="px-3 py-2 text-on-surface-muted text-[0.8125rem]">
                                   {new Date(p.paidAt).toLocaleDateString("ko-KR")} {new Date(p.paidAt).toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit", hour12: true })}
                                 </td>
                                 <td className="px-3 py-2 text-right font-medium text-on-surface">{p.amount.toLocaleString()}원</td>

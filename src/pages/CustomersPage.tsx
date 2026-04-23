@@ -588,10 +588,10 @@ function WorkItemListPanel({
                     <td className="px-3 py-3 text-center">
                       <StatusDropdown status={item.status} onChangeStatus={(s) => onChangeStatus(item.id, s)} />
                     </td>
-                    <td className="px-2 py-3 text-on-surface-muted font-mono text-[13px] tracking-tighter" title={formatDateFull(item.receivedAt)}>
+                    <td className="px-2 py-3 text-on-surface-muted font-mono text-[0.8125rem] tracking-tighter" title={formatDateFull(item.receivedAt)}>
                       {formatDateShort(item.receivedAt)}
                     </td>
-                    <td className="px-2 py-3 text-on-surface-muted font-mono text-[13px] tracking-tighter" title={formatDateFull(item.pickedUpAt)}>
+                    <td className="px-2 py-3 text-on-surface-muted font-mono text-[0.8125rem] tracking-tighter" title={formatDateFull(item.pickedUpAt)}>
                       {formatDateShort(item.pickedUpAt)}
                     </td>
                     <td className="px-3 py-3 font-bold text-on-surface">{item.description}</td>
@@ -607,7 +607,7 @@ function WorkItemListPanel({
                         )}
                       </div>
                     </td>
-                    <td className="px-3 py-3 text-on-surface-muted text-[13px] max-w-[112px] truncate" title={item.note || ""}>{item.note || ""}</td>
+                    <td className="px-3 py-3 text-on-surface-muted text-[0.8125rem] max-w-[112px] truncate" title={item.note || ""}>{item.note || ""}</td>
                     <td className="px-2 py-3 text-center">
                       <ChevronDown className={`w-4 h-4 text-on-surface-muted transition-transform inline-block ${isExpanded ? "rotate-180" : ""}`} />
                     </td>
@@ -633,7 +633,7 @@ function WorkItemListPanel({
                                   <td className="py-1.5 text-on-surface">
                                     <span>{d.itemName}</span>
                                     {d.optionsMemo && (
-                                      <p className="mt-0.5 text-[11px] text-on-surface-muted">&#8627; {d.optionsMemo}</p>
+                                      <p className="mt-0.5 text-[0.6875rem] text-on-surface-muted">&#8627; {d.optionsMemo}</p>
                                     )}
                                   </td>
                                   <td className="py-1.5 text-center text-on-surface-muted">{d.quantity}</td>
