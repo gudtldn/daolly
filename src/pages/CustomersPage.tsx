@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from "rea
 import { Virtuoso } from "react-virtuoso";
 import type { VirtuosoHandle } from "react-virtuoso";
 import { useLocation } from "react-router";
+import { useDebounce } from "@/hooks/useDebounce";
 import {
   Search,
   Plus,
@@ -173,6 +174,23 @@ function CustomerListPanel({
             placeholder="이름 / 전화번호 검색"
             value={searchKeyword}
             onChange={(e) => onSearchChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (filtered.length === 0) return;
+              
+              const currentIndex = filtered.findIndex(c => c.id === selectedId);
+              
+              if (e.key === "Enter") {
+                onSelect(filtered[currentIndex === -1 ? 0 : currentIndex]);
+              } else if (e.key === "ArrowDown") {
+                e.preventDefault();
+                const nextIndex = Math.min(currentIndex + 1, filtered.length - 1);
+                onSelect(filtered[nextIndex === -1 ? 0 : nextIndex]);
+              } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                const prevIndex = Math.max(currentIndex - 1, 0);
+                onSelect(filtered[prevIndex === -1 ? 0 : prevIndex]);
+              }
+            }}
             className={`w-full pl-9 py-2 border border-border-default rounded text-sm bg-surface-card text-on-surface placeholder:text-on-surface-muted focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 ${searchKeyword ? "pr-8" : "pr-3"}`}
           />
           {searchKeyword && (
@@ -642,13 +660,24 @@ export function CustomersPage() {
 
   // 고객 검색
   const [searchKeyword, setSearchKeyword] = useState("");
+  const debouncedSearchKeyword = useDebounce(searchKeyword, 300);
   const isInitialMount = useRef(true);
 
   useEffect(() => {
-    if (isInitialMount.current) { isInitialMount.current = false; return; }
-    const timer = setTimeout(() => { load(searchKeyword.trim()).then(() => loadUnpaid()); }, 300);
-    return () => clearTimeout(timer);
-  }, [searchKeyword, load, loadUnpaid]);
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    
+    load(debouncedSearchKeyword.trim()).then(() => {
+      loadUnpaid();
+      // 검색어가 비워졌을 때(초기화) 선택된 고객이 있다면 그 위치로 스크롤 유도
+      if (!debouncedSearchKeyword.trim() && useCustomerStore.getState().selectedCustomer) {
+        setScrollToCustomerId(useCustomerStore.getState().selectedCustomer!.id);
+        setTimeout(() => setScrollToCustomerId(null), 100);
+      }
+    });
+  }, [debouncedSearchKeyword, load, loadUnpaid]);
 
   const filteredCustomers = customers;
 
