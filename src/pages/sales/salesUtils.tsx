@@ -11,6 +11,7 @@ export const PERIODS = [
   { id: "yesterday", label: "어제" },
   { id: "week", label: "이번 주" },
   { id: "month", label: "이번 달" },
+  { id: "year", label: "올해" },
 ] as const;
 
 export type PresetId = (typeof PERIODS)[number]["id"];
@@ -43,6 +44,13 @@ export function getDateRange(period: PresetId): DateRange {
     }
     case "month": {
       const first = new Date(today.getFullYear(), today.getMonth(), 1);
+      return { 
+        from: getStartOfLocalDateAsUTC(first), 
+        to: getEndOfLocalDateAsUTC(today) 
+      };
+    }
+    case "year": {
+      const first = new Date(today.getFullYear(), 0, 1);
       return { 
         from: getStartOfLocalDateAsUTC(first), 
         to: getEndOfLocalDateAsUTC(today) 
