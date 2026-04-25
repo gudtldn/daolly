@@ -37,6 +37,7 @@ export function Sidebar() {
         {collapsed ? (
           <button
             onClick={toggleSidebar}
+            title="사이드바 펼치기"
             className="w-full flex items-center justify-center text-secondary-400 hover:text-white transition-colors cursor-pointer"
             aria-label="사이드바 펼치기"
           >
@@ -49,6 +50,7 @@ export function Sidebar() {
             </div>
             <button
               onClick={toggleSidebar}
+              title="사이드바 접기"
               className="text-secondary-400 hover:text-white transition-colors shrink-0 cursor-pointer ml-2"
               aria-label="사이드바 접기"
             >
@@ -64,6 +66,7 @@ export function Sidebar() {
           <NavLink
             key={item.to}
             to={item.to}
+            title={collapsed ? item.label : undefined}
             className={({ isActive }) =>
               `flex items-center whitespace-nowrap ${
                 collapsed ? "justify-center px-0 py-3" : "px-5 py-3"
@@ -86,6 +89,7 @@ export function Sidebar() {
           <NavLink
             key={item.to}
             to={item.to}
+            title={collapsed ? item.label : undefined}
             className={({ isActive }) =>
               `flex items-center whitespace-nowrap ${
                 collapsed ? "justify-center px-0 py-3" : "px-5 py-3"
