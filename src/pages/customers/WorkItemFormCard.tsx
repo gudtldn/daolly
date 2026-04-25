@@ -3,6 +3,7 @@ import { X, Plus, Trash2, Pencil, Check } from "lucide-react";
 import type { WorkItemFull, WorkItemStatus, CreateWorkItem, UpdateWorkItem, DetailInput, Payment } from "@/types";
 import { paymentApi } from "@/bindings";
 import { CurrencyInput } from "@/components/CurrencyInput";
+import { NumberInput } from "@/components/NumberInput";
 
 // datetime-local <-> ISO 변환 헬퍼
 function toLocalInput(iso: string | null): string {
@@ -464,11 +465,10 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                         />
                       </td>
                       <td className="px-2 py-1.5">
-                        <input
-                          type="number"
+                        <NumberInput
                           min={1}
                           value={d.quantity}
-                          onChange={(e) => updateDetail(d._key, "quantity", Math.max(1, parseInt(e.target.value, 10) || 1))}
+                          onChange={(val) => updateDetail(d._key, "quantity", Math.max(1, val))}
                           className="w-full px-2 py-1 border border-border-default rounded text-sm text-center bg-surface-card text-on-surface focus:outline-none focus:border-primary-500"
                         />
                       </td>

@@ -18,7 +18,6 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
         {...props}
         ref={ref}
         type="text"
-        inputMode="numeric"
         value={value ? value.toLocaleString("ko-KR") : ""}
         onChange={handleChange}
       />

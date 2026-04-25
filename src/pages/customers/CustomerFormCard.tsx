@@ -172,7 +172,7 @@ export function CustomerFormCard({ open, mode, customer, onSave, onClose }: Prop
             </label>
             <input
               ref={phoneInputRef}
-              type="tel"
+              type="text"
               value={phone}
               onChange={handlePhoneChange}
               placeholder="010-0000-0000"

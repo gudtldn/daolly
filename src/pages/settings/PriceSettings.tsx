@@ -21,6 +21,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { usePriceStore } from "@/stores/priceStore";
 import { useDialogStore } from "@/stores/dialogStore";
 import type { Category, PriceItem, PriceOption } from "@/types";
+import { CurrencyInput } from "@/components/CurrencyInput";
 
 // ============================================================
 // Form components rendered inside GlobalDialog customContent
@@ -113,11 +114,10 @@ function PriceItemFormContent({
       </div>
       <div>
         <label className="block text-sm font-medium text-on-surface mb-1">단가 (원)</label>
-        <input
-          type="number"
-          min="0"
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
+        <CurrencyInput
+          min={0}
+          value={parseInt(price, 10) || 0}
+          onChange={(val) => setPrice(String(val))}
           className="w-full px-3 py-2 border border-border-default rounded-lg bg-surface text-on-surface focus:border-primary-500 outline-none transition-colors"
         />
       </div>
@@ -177,11 +177,10 @@ function PriceOptionFormContent({
       </div>
       <div>
         <label className="block text-sm font-medium text-on-surface mb-1">추가 금액 (원)</label>
-        <input
-          type="number"
-          min="0"
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
+        <CurrencyInput
+          min={0}
+          value={parseInt(price, 10) || 0}
+          onChange={(val) => setPrice(String(val))}
           className="w-full px-3 py-2 border border-border-default rounded-lg bg-surface text-on-surface focus:border-primary-500 outline-none transition-colors"
         />
       </div>
