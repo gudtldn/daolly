@@ -68,6 +68,16 @@ describe("cartStore", () => {
     });
   });
 
+  describe("updateItem", () => {
+    it("단가 및 메모 동시 변경", () => {
+      useCartStore.getState().addItem(sampleItem);
+      useCartStore.getState().updateItem(0, { unitPrice: 5000, optionsMemo: "특수" });
+      const item = useCartStore.getState().items[0];
+      expect(item.unitPrice).toBe(5000);
+      expect(item.optionsMemo).toBe("특수");
+    });
+  });
+
   describe("totalPrice", () => {
     it("단가 * 수량 합계 반환", () => {
       useCartStore.getState().addItem(sampleItem);

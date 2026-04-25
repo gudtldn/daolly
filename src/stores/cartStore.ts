@@ -26,6 +26,7 @@ interface CartActions {
   removeItem: (index: number) => void;
   updateQuantity: (index: number, quantity: number) => void;
   updateOptionsMemo: (index: number, memo: string) => void;
+  updateItem: (index: number, updates: Partial<CartItem>) => void;
   clear: () => void;
   submit: (method: PaymentMethod, note?: string) => Promise<WorkItem>;
   totalPrice: () => number;
@@ -73,6 +74,14 @@ export const useCartStore = create<CartStore>((set, get) => ({
     set((s) => {
       const updated = [...s.items];
       updated[index] = { ...updated[index], optionsMemo: memo };
+      return { items: updated };
+    });
+  },
+
+  updateItem: (index, updates) => {
+    set((s) => {
+      const updated = [...s.items];
+      updated[index] = { ...updated[index], ...updates };
       return { items: updated };
     });
   },

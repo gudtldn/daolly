@@ -355,13 +355,13 @@ function OrderPanel({
   onAddItem,
   onRemoveItem,
   onUpdateQty,
-  onUpdateMemo,
+  onUpdateItem,
 }: {
   items: CartItem[];
   onAddItem: (item: Omit<CartItem, "uid" | "quantity"> & { optionsMemo?: string }) => void;
   onRemoveItem: (i: number) => void;
   onUpdateQty: (i: number, qty: number) => void;
-  onUpdateMemo: (i: number, memo: string) => void;
+  onUpdateItem: (i: number, updates: Partial<CartItem>) => void;
 }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [priceItems, setPriceItems] = useState<PriceItem[]>([]);
@@ -374,8 +374,11 @@ function OrderPanel({
   useEffect(() => {
     setSelectedOptionIds(new Set());
   }, [activeCatId]);
+  const [editingPriceIdx, setEditingPriceIdx] = useState<number | null>(null);
+  const [editingMemoIdx, setEditingMemoIdx] = useState<number | null>(null);
   const { showCustom } = useDialogStore();
   const memoRef = useRef<string>("");
+  const priceRef = useRef<number>(0);
   const catTabsRef = useRef<HTMLDivElement>(null);
 
   // native non-passive wheel -> horizontal scroll (React onWheel is passive in newer browsers)
@@ -414,26 +417,41 @@ function OrderPanel({
     setSelectedOptionIds(new Set());
   };
 
-  const openMemoEdit = (i: number) => {
+  const openFullEdit = (i: number) => {
+    priceRef.current = items[i].unitPrice;
     memoRef.current = items[i].optionsMemo ?? "";
-    // GlobalDialog showCustom으로 메모 인라인 편집
     const inputEl = (
-      <input
-        type="text"
-        autoFocus
-        defaultValue={memoRef.current}
-        onChange={(e) => { memoRef.current = e.target.value; }}
-        onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.form?.requestSubmit?.(); }}
-        placeholder="메모를 입력하세요"
-        className="w-full border border-border-default rounded-lg px-3 py-2 text-sm text-on-surface bg-surface focus:border-primary-500 outline-none"
-      />
+      <div className="py-2 flex flex-col gap-4">
+        <div>
+          <label className="block text-xs font-medium text-on-surface-muted mb-1.5">단가 수정</label>
+          <CurrencyInput
+            value={priceRef.current}
+            onChange={(v) => { priceRef.current = v; }}
+            onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.form?.requestSubmit?.(); }}
+            className="w-full border border-border-default rounded-lg px-3 py-2 text-lg font-bold text-primary-600 bg-surface focus:border-primary-500 outline-none text-left"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-on-surface-muted mb-1.5">메모 수정</label>
+          <input
+            type="text"
+            defaultValue={memoRef.current}
+            onChange={(e) => { memoRef.current = e.target.value; }}
+            onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.form?.requestSubmit?.(); }}
+            placeholder="메모를 입력하세요"
+            className="w-full border border-border-default rounded-lg px-3 py-2 text-sm text-on-surface bg-surface focus:border-primary-500 outline-none"
+          />
+        </div>
+      </div>
     );
     showCustom({
-      title: `${items[i].name} - 메모 수정`,
+      title: `${items[i].name} - 수정`,
       customContent: inputEl,
       confirmText: "적용",
     }).then((confirmed) => {
-      if (confirmed) onUpdateMemo(i, memoRef.current);
+      if (confirmed) {
+        onUpdateItem(i, { unitPrice: priceRef.current, optionsMemo: memoRef.current });
+      }
     });
   };
 
@@ -541,8 +559,8 @@ function OrderPanel({
             <tr>
               <th className="px-4 py-3 font-medium">품목명 / 메모</th>
               <th className="px-4 py-3 font-medium text-center w-28">수량</th>
-              <th className="px-4 py-3 font-medium text-right w-24">단가</th>
-              <th className="px-4 py-3 font-medium text-right w-28">금액</th>
+              <th className="px-4 py-3 font-medium text-right w-32">단가</th>
+              <th className="px-4 py-3 font-medium text-right w-32">금액</th>
               <th className="px-4 py-3 font-medium text-center w-20">수정</th>
             </tr>
           </thead>
@@ -551,9 +569,26 @@ function OrderPanel({
               <tr key={item.uid} className="hover:bg-surface transition-colors">
                 <td className="px-4 py-3">
                   <div className="font-bold text-on-surface">{item.name}</div>
-                  {item.optionsMemo && (
-                    <div className="text-xs text-on-surface-muted mt-0.5">
-                      &#8627; {item.optionsMemo}
+                  {editingMemoIdx === index ? (
+                    <input
+                      autoFocus
+                      type="text"
+                      value={item.optionsMemo}
+                      onChange={(e) => onUpdateItem(index, { optionsMemo: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === "Escape") setEditingMemoIdx(null);
+                      }}
+                      onBlur={() => setEditingMemoIdx(null)}
+                      className="w-full border-2 border-primary-500 rounded-md px-2 py-1 text-sm text-on-surface outline-none bg-surface shadow-sm"
+                      placeholder="메모 입력..."
+                    />
+                  ) : (
+                    <div
+                      onClick={() => setEditingMemoIdx(index)}
+                      className="text-xs text-on-surface-muted mt-0.5 cursor-pointer hover:text-primary-500 transition-colors inline-block"
+                      title="메모 수정"
+                    >
+                      {item.optionsMemo ? `↳ ${item.optionsMemo}` : <span className="opacity-50">↳ 메모 추가...</span>}
                     </div>
                   )}
                 </td>
@@ -574,8 +609,27 @@ function OrderPanel({
                     </button>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-right text-on-surface-muted">
-                  {item.unitPrice.toLocaleString()}
+                <td className="px-4 py-3 text-right">
+                  {editingPriceIdx === index ? (
+                    <CurrencyInput
+                      autoFocus
+                      value={item.unitPrice}
+                      onChange={(v) => onUpdateItem(index, { unitPrice: v })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === "Escape") setEditingPriceIdx(null);
+                      }}
+                      onBlur={() => setEditingPriceIdx(null)}
+                      className="w-full border-2 border-primary-500 rounded-md px-2 py-1 text-base font-bold text-primary-600 outline-none bg-surface text-right shadow-sm"
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setEditingPriceIdx(index)}
+                      className="text-primary-600 font-semibold hover:text-primary-700 hover:bg-primary-50 dark:hover:bg-primary-900/30 px-2 py-1 rounded transition-colors"
+                      title="단가 수정"
+                    >
+                      {item.unitPrice.toLocaleString()}
+                    </button>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-right font-bold text-on-surface">
                   {(item.unitPrice * item.quantity).toLocaleString()}
@@ -583,9 +637,9 @@ function OrderPanel({
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-center gap-1">
                     <button
-                      onClick={() => openMemoEdit(index)}
+                      onClick={() => openFullEdit(index)}
                       className="p-1.5 text-on-surface-muted hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded transition-colors"
-                      title="메모 수정"
+                      title="상세 수정"
                     >
                       <Pen className="w-4 h-4" />
                     </button>
@@ -736,7 +790,7 @@ export function PosPage() {
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState("");
 
-  const { items, addItem, removeItem, updateQuantity, updateOptionsMemo, setCustomer, submit } =
+  const { items, addItem, removeItem, updateQuantity, updateItem, setCustomer, submit } =
     useCartStore();
   const navigate = useNavigate();
 
@@ -827,7 +881,7 @@ export function PosPage() {
           onAddItem={addItem}
           onRemoveItem={removeItem}
           onUpdateQty={updateQuantity}
-          onUpdateMemo={updateOptionsMemo}
+          onUpdateItem={updateItem}
         />
         <PaymentPanel
           key={submitCount}
