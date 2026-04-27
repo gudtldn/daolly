@@ -56,8 +56,6 @@ pub async fn clear_all_data(
 
     // 3. 앱 재시작 (메모리 및 프론트엔드 상태 초기화)
     app.restart();
-
-    Ok(())
 }
 
 /// DB가 있는 폴더를 파일 탐색기로 엽니다.
