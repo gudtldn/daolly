@@ -54,7 +54,9 @@ export function CustomerFormCard({ open, mode, customer, onSave, onClose }: Prop
 
     if (customer) {
       setName(customer.name);
-      setPhone(customer.phoneNumber ?? "");
+      // 숫자만 추출 후 포맷팅 적용
+      const digits = (customer.phoneNumber ?? "").replace(/\D/g, "");
+      setPhone(digits ? formatPhone(digits) : "");
       setNote(customer.note ?? "");
     } else {
       setName("");

@@ -291,11 +291,28 @@ function CustomerListPanel({
             );
           }}
           components={{
-            EmptyPlaceholder: () => (
-              <div className="p-8 text-center text-on-surface-muted text-sm">
-                {isLoading ? "로딩 중..." : debouncedSearchKeyword ? "검색 결과가 없습니다." : "등록된 고객이 없습니다."}
-              </div>
-            )
+            EmptyPlaceholder: () => {
+              if (isLoading) {
+                return <div className="p-8 text-center text-on-surface-muted text-sm">로딩 중...</div>;
+              }
+              if (debouncedSearchKeyword) {
+                return (
+                  <div className="p-8 text-center flex flex-col items-center justify-center h-full">
+                    <p className="text-on-surface-muted text-sm mb-4">
+                      <span className="font-bold text-on-surface">"{debouncedSearchKeyword}"</span> 검색 결과가 없습니다.
+                    </p>
+                    <button
+                      onClick={onAdd}
+                      className="flex items-center px-4 py-2 bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-800 rounded-lg text-sm font-medium hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4 mr-1.5" />
+                      신규 고객으로 추가하기
+                    </button>
+                  </div>
+                );
+              }
+              return <div className="p-8 text-center text-on-surface-muted text-sm">등록된 고객이 없습니다.</div>;
+            }
           }}
         />
       </div>
@@ -783,6 +800,24 @@ export function CustomersPage() {
     loadUnpaid();
   };
 
+  // 폼에 전달할 고객 데이터 계산
+  const getCustomerForCard = () => {
+    if (cardMode === "edit") return selectedCustomer;
+    if (searchKeyword.trim()) {
+      const kw = searchKeyword.trim();
+      const isPhone = /^[0-9- ]+$/.test(kw); // 숫자, 하이픈, 공백으로만 구성되었는지 확인
+      return {
+        id: 0,
+        name: isPhone ? "" : kw,
+        phoneNumber: isPhone ? kw : null,
+        note: null,
+        createdAt: "",
+        lastModifiedAt: "",
+      } as Customer;
+    }
+    return null;
+  };
+
   // 초기 로드
   useEffect(() => {
     const state = location.state as { focusCustomerId?: number; focusWorkItemId?: number } | null;
@@ -882,9 +917,8 @@ export function CustomersPage() {
         onMouseMove={() => setLastSource("mouse")}
         onKeyDown={() => setLastSource("keyboard")}
       />
-      <CustomerFormCard open={cardOpen} mode={cardMode} customer={cardMode === "edit" ? selectedCustomer : null} onSave={handleCardSave} onClose={() => setCardOpen(false)} />
+      <CustomerFormCard open={cardOpen} mode={cardMode} customer={getCustomerForCard()} onSave={handleCardSave} onClose={() => setCardOpen(false)} />
       <WorkItemFormCard open={wiCardOpen} mode={wiCardMode} customerId={selectedCustomer?.id ?? 0} workItem={editingWorkItem} initialTab={wiInitialTab} onSave={handleWiCardSave} onClose={() => setWiCardOpen(false)} onPaymentChange={() => { useWorkItemStore.getState().load(); loadUnpaid(); }} />
     </div>
   );
 }
-
