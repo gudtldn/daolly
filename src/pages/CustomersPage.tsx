@@ -869,7 +869,7 @@ export function CustomersPage() {
         onMouseMove={() => setLastSource("mouse")}
         onKeyDown={() => setLastSource("keyboard")}
       />
-      <CustomerFormCard open={cardOpen} mode={cardMode} customer={selectedCustomer} onSave={handleCardSave} onClose={() => setCardOpen(false)} />
+      <CustomerFormCard open={cardOpen} mode={cardMode} customer={cardMode === "edit" ? selectedCustomer : null} onSave={handleCardSave} onClose={() => setCardOpen(false)} />
       <WorkItemFormCard open={wiCardOpen} mode={wiCardMode} customerId={selectedCustomer?.id ?? 0} workItem={editingWorkItem} initialTab={wiInitialTab} onSave={handleWiCardSave} onClose={() => setWiCardOpen(false)} onPaymentChange={() => { useWorkItemStore.getState().load(); loadUnpaid(); }} />
     </div>
   );
