@@ -164,10 +164,11 @@ export function CustomerFormCard({ open, mode, customer, onSave, onClose }: Prop
           )}
 
           <div>
-            <label className="block text-sm font-medium text-on-surface mb-1">
+            <label htmlFor="customer-name" className="block text-sm font-medium text-on-surface mb-1">
               이름 <span className="text-danger-500">*</span>
             </label>
             <input
+              id="customer-name"
               ref={nameRef}
               type="text"
               autoFocus
@@ -179,10 +180,11 @@ export function CustomerFormCard({ open, mode, customer, onSave, onClose }: Prop
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-on-surface mb-1">
+            <label htmlFor="customer-phone" className="block text-sm font-medium text-on-surface mb-1">
               전화번호
             </label>
             <input
+              id="customer-phone"
               ref={phoneInputRef}
               type="text"
               value={phone}
@@ -193,10 +195,11 @@ export function CustomerFormCard({ open, mode, customer, onSave, onClose }: Prop
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-on-surface mb-1">
+            <label htmlFor="customer-note" className="block text-sm font-medium text-on-surface mb-1">
               메모
             </label>
             <textarea
+              id="customer-note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="고객 관련 메모"

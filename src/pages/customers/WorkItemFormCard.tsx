@@ -215,6 +215,15 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
   // 결제 수정 취소
   const handleCancelEdit = () => setEditingPaymentId(null);
 
+  const payAmountRef = useRef<HTMLInputElement>(null);
+
+  // 탭 전환 시 포커스
+  useEffect(() => {
+    if (activeTab === "payment") {
+      setTimeout(() => payAmountRef.current?.focus(), 50);
+    }
+  }, [activeTab]);
+
   // 결제 삭제
   const handleDeletePayment = async (paymentId: number) => {
     if (!workItem) return;
