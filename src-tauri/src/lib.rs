@@ -123,6 +123,7 @@ pub fn run() {
             commands::database::list_backups,
             commands::database::restore_db,
             commands::database::migrate_from_legacy,
+            commands::database::clear_all_data,
             // sales
             commands::sales::list_sales_records,
             commands::sales::list_unpaid_records,

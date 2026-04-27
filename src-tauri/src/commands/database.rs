@@ -38,6 +38,28 @@ pub async fn migrate_from_legacy(
     app.restart();
 }
 
+/// 모든 데이터를 삭제합니다. 삭제 전 백업을 수행합니다.
+#[tauri::command]
+pub async fn clear_all_data(
+    app: tauri::AppHandle,
+    db: State<'_, DatabaseConnection>,
+) -> CmdResult<()> {
+    // 1. 현재 데이터 백업
+    backup_db(app.clone())
+        .await
+        .map_err(|e| crate::commands::AppError::Validation(format!("삭제 전 백업 실패: {e}")))?;
+
+    // 2. 서비스 레이어 호출하여 모든 데이터 삭제
+    services::migration::clear_database(db.inner())
+        .await
+        .map_err(|e| crate::commands::AppError::Validation(e.to_string()))?;
+
+    // 3. 앱 재시작 (메모리 및 프론트엔드 상태 초기화)
+    app.restart();
+
+    Ok(())
+}
+
 /// DB가 있는 폴더를 파일 탐색기로 엽니다.
 #[tauri::command]
 pub async fn open_db_folder(app: tauri::AppHandle) -> DbResult<()> {

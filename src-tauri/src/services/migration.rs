@@ -1,9 +1,35 @@
 use chrono::Utc;
-use sea_orm::{ConnectionTrait, Database, DatabaseConnection, EntityTrait, Set, TransactionTrait};
+use sea_orm::{
+    ConnectionTrait, Database, DatabaseConnection, DbErr, EntityTrait, Set, TransactionTrait,
+};
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use crate::db::entities::{customer, payment, work_item};
+use crate::db::entities::{
+    category, customer, payment, price_item, price_option, work_item, work_item_detail,
+};
+
+/// 모든 데이터를 삭제합니다.
+pub async fn clear_database(db: &DatabaseConnection) -> Result<(), DbErr> {
+    db.transaction::<_, (), DbErr>(|txn| {
+        Box::pin(async move {
+            // 하위 테이블부터 삭제 (외래 키 제약 조건 고려)
+            work_item_detail::Entity::delete_many().exec(txn).await?;
+            payment::Entity::delete_many().exec(txn).await?;
+            work_item::Entity::delete_many().exec(txn).await?;
+            customer::Entity::delete_many().exec(txn).await?;
+            price_option::Entity::delete_many().exec(txn).await?;
+            price_item::Entity::delete_many().exec(txn).await?;
+            category::Entity::delete_many().exec(txn).await?;
+            Ok(())
+        })
+    })
+    .await
+    .map_err(|e| match e {
+        sea_orm::TransactionError::Connection(e) => e,
+        sea_orm::TransactionError::Transaction(e) => e,
+    })
+}
 
 pub async fn migrate_from_legacy(
     db: &DatabaseConnection,
@@ -60,7 +86,8 @@ pub async fn migrate_from_legacy(
     for row in legacy_customers {
         let old_id: i32 = row.try_get("", "id")?;
         let name: String = row.try_get("", "name")?;
-        let phone_number: Option<String> = row.try_get::<Option<String>>("", "phone_number")?
+        let phone_number: Option<String> = row
+            .try_get::<Option<String>>("", "phone_number")?
             .map(|s| crate::services::customers::format_phone(&s));
         let note: Option<String> = row.try_get("", "note")?;
 

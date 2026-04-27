@@ -24,6 +24,7 @@ export function DatabaseSettings() {
   const [loading, setLoading] = useState(false);
   const [backupLoading, setBackupLoading] = useState(false);
   const [migrationLoading, setMigrationLoading] = useState(false);
+  const [clearLoading, setClearLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const { showCustom } = useDialogStore();
@@ -162,10 +163,53 @@ export function DatabaseSettings() {
     }
   };
 
+  const handleClearAllData = async () => {
+    const confirmed = await showCustom({
+      title: "전체 데이터 삭제",
+      isDestructive: true,
+      confirmText: "모든 데이터 삭제",
+      cancelText: "취소",
+      customContent: (
+        <div className="space-y-3">
+          <div className="flex items-start gap-2 bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 rounded-lg px-4 py-3 text-sm text-danger-700 dark:text-danger-300">
+            <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" />
+            <div className="space-y-1">
+              <p className="font-bold">주의: 모든 데이터가 삭제됩니다.</p>
+              <p className="text-xs">손님 정보, 작업 내역, 매출 기록, 단가 설정 등 모든 정보가 초기화됩니다.</p>
+            </div>
+          </div>
+          <p className="text-sm text-on-surface">
+            삭제 전 <strong className="text-primary-600 dark:text-primary-400">자동으로 백업</strong>이 생성되며, 
+            삭제 완료 후 상태 초기화를 위해 <strong className="text-primary-600 dark:text-primary-400">앱이 재시작</strong>됩니다. 
+            정말로 모든 데이터를 삭제하시겠습니까?
+          </p>
+        </div>
+      ),
+    });
+
+    if (!confirmed) return;
+
+    setClearLoading(true);
+    setError("");
+    setSuccess("");
+    try {
+      await invoke("clear_all_data");
+      setSuccess("모든 데이터가 삭제되었습니다. (삭제 전 백업이 생성되었습니다)");
+      await loadBackups();
+      toast.success("초기화 완료");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+      toast.error("데이터 삭제 실패");
+    } finally {
+      setClearLoading(false);
+    }
+  };
+
   return (
     <div className="h-full overflow-y-auto relative">
       <LoadingOverlay isLoading={migrationLoading} message="데이터를 가져오는 중입니다..." absolute={false} />
       <LoadingOverlay isLoading={backupLoading} message="데이터베이스 백업 중..." absolute={false} />
+      <LoadingOverlay isLoading={clearLoading} message="모든 데이터를 삭제 중..." absolute={false} />
       
       <div className="flex items-center gap-2 mb-6">
         <Database className="w-5 h-5 text-on-surface-muted" />
@@ -203,7 +247,7 @@ export function DatabaseSettings() {
 
         {/* 레거시 데이터 가져오기 */}
         <section className="bg-surface-card rounded-lg border border-border-default p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between">
             <div>
               <h4 className="text-sm font-semibold text-on-surface">이전 버전 데이터 가져오기</h4>
               <p className="text-xs text-on-surface-muted mt-1">
@@ -272,6 +316,30 @@ export function DatabaseSettings() {
               </table>
             </div>
           )}
+        </section>
+
+        {/* 데이터 초기화 (Danger Zone) */}
+        <section className="bg-surface-card rounded-lg border border-danger-200/60 dark:border-danger-900/50 p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 p-2 bg-danger-50 dark:bg-danger-950/50 rounded-lg">
+                <AlertTriangle className="w-4 h-4 text-danger-600 dark:text-danger-400" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-danger-700 dark:text-danger-400">데이터 초기화</h4>
+                <p className="text-xs text-on-surface-muted mt-1">
+                  모든 데이터를 삭제하고 앱을 초기 상태로 되돌립니다. 삭제 전 백업이 자동으로 생성됩니다.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleClearAllData}
+              disabled={clearLoading}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-danger-600 dark:text-danger-400 border border-danger-200 dark:border-danger-800 rounded-lg hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {clearLoading ? "삭제 중..." : "전체 데이터 삭제"}
+            </button>
+          </div>
         </section>
       </div>
     </div>
