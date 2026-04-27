@@ -60,7 +60,8 @@ pub async fn migrate_from_legacy(
     for row in legacy_customers {
         let old_id: i32 = row.try_get("", "id")?;
         let name: String = row.try_get("", "name")?;
-        let phone_number: Option<String> = row.try_get("", "phone_number")?;
+        let phone_number: Option<String> = row.try_get::<Option<String>>("", "phone_number")?
+            .map(|s| crate::services::customers::format_phone(&s));
         let note: Option<String> = row.try_get("", "note")?;
 
         customer_models.push(customer::ActiveModel {
@@ -235,7 +236,8 @@ mod tests {
         // 3.1 고객 수 검증 (기존 2명 + 이름 없음 1명 = 3명)
         let customers = customer::Entity::find().all(&db).await.unwrap();
         assert_eq!(customers.len(), 3);
-        assert!(customers.iter().any(|c| c.name == "홍길동"));
+        let hgd = customers.iter().find(|c| c.name == "홍길동").unwrap();
+        assert_eq!(hgd.phone_number, Some("010-1234-5678".to_owned())); // 포매팅 확인
         assert!(customers.iter().any(|c| c.name.contains("이름 없음")));
 
         // 3.2 작업 수 검증 (총 3건)

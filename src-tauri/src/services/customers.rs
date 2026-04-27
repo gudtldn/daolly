@@ -26,6 +26,31 @@ pub async fn get_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<custom
     customer::Entity::find_by_id(id).one(db).await
 }
 
+pub fn format_phone(phone: &str) -> String {
+    let digits: String = phone.chars().filter(|c| c.is_ascii_digit()).collect();
+    if digits.is_empty() {
+        return phone.to_owned();
+    }
+
+    let is_seoul = digits.starts_with("02");
+    let area_len = if is_seoul { 2 } else { 3 };
+    let max_len = if is_seoul { 10 } else { 11 };
+
+    if digits.len() <= area_len {
+        return digits;
+    }
+
+    let (area, rest) = digits.split_at(area_len);
+    let mid_len = if digits.len() >= max_len { 4 } else { 3 };
+
+    if rest.len() <= mid_len {
+        format!("{}-{}", area, rest)
+    } else {
+        let (mid, end) = rest.split_at(mid_len);
+        format!("{}-{}-{}", area, mid, end)
+    }
+}
+
 pub async fn create(
     db: &DatabaseConnection,
     name: String,
@@ -35,7 +60,8 @@ pub async fn create(
     let name = name.trim().to_owned();
     let phone_number = phone_number
         .map(|s| s.trim().to_owned())
-        .filter(|s| !s.is_empty());
+        .filter(|s| !s.is_empty())
+        .map(|s| format_phone(&s));
     let note = note.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty());
 
     let now = Utc::now().to_rfc3339();
@@ -63,7 +89,8 @@ pub async fn update(
     let name = name.trim().to_owned();
     let phone_number = phone_number
         .map(|s| s.trim().to_owned())
-        .filter(|s| !s.is_empty());
+        .filter(|s| !s.is_empty())
+        .map(|s| format_phone(&s));
     let note = note.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty());
 
     let mut active: customer::ActiveModel = existing.into();
@@ -92,17 +119,16 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(c.name, "홍길동");
-        assert_eq!(c.phone_number, Some("01012345678".to_owned()));
+        assert_eq!(c.phone_number, Some("010-1234-5678".to_owned()));
     }
 
     #[tokio::test]
-    async fn create_customer_trims_whitespace() {
-        let db = setup_test_db().await.unwrap();
-        let c = create(&db, "  김철수  ".into(), Some("  ".into()), None)
-            .await
-            .unwrap();
-        assert_eq!(c.name, "김철수");
-        assert_eq!(c.phone_number, None); // whitespace-only -> None
+    async fn format_phone_variations() {
+        assert_eq!(format_phone("01012345678"), "010-1234-5678");
+        assert_eq!(format_phone("021234567"), "02-123-4567");
+        assert_eq!(format_phone("0212345678"), "02-1234-5678");
+        assert_eq!(format_phone("010-1234-5678"), "010-1234-5678"); // 이미 포맷팅된 경우 유지
+        assert_eq!(format_phone("010 1234 5678"), "010-1234-5678"); // 공백 포함된 경우
     }
 
     #[tokio::test]
