@@ -17,6 +17,7 @@ import {
   ChevronsUpDown,
   X,
 } from "lucide-react";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 import type { Customer, WorkItemFull, WorkItemDetail, WorkItemStatus, CreateWorkItem, UpdateWorkItem, DetailInput, CreateCustomer, UpdateCustomer } from "@/types";
 import { useCustomerStore } from "@/stores/customerStore";
 import { useWorkItemStore } from "@/stores/workItemStore";
@@ -671,7 +672,7 @@ function WorkItemListPanel({
 // 메인 레이아웃
 // ==========================================
 export function CustomersPage() {
-  const { selectedCustomer, select, create, update, delete: deleteCustomer, loadUnpaid } = useCustomerStore();
+  const { selectedCustomer, select, create, update, delete: deleteCustomer, loadUnpaid, isLoading } = useCustomerStore();
   const { setFilter } = useWorkItemStore();
   const { showConfirm } = useDialogStore();
   const location = useLocation();
@@ -882,7 +883,8 @@ export function CustomersPage() {
   }, [selectedCustomer, activePanel, select]);
 
   return (
-    <div className="h-full flex gap-4">
+    <div className="h-full flex gap-4 relative">
+      <LoadingOverlay isLoading={isLoading} />
       <CustomerListPanel
         selectedId={selectedCustomer?.id ?? null}
         onSelect={(c) => { select(c); setActivePanel("customers"); }}

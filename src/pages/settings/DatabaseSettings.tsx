@@ -4,6 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { Database, FolderOpen, DownloadCloud, UploadCloud, AlertTriangle, History } from "lucide-react";
 import { useDialogStore } from "@/stores/dialogStore";
 import { toast } from "sonner";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 
 interface BackupInfo {
   filename: string;
@@ -162,7 +163,10 @@ export function DatabaseSettings() {
   };
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full overflow-y-auto relative">
+      <LoadingOverlay isLoading={migrationLoading} message="데이터를 가져오는 중입니다..." absolute={false} />
+      <LoadingOverlay isLoading={backupLoading} message="데이터베이스 백업 중..." absolute={false} />
+      
       <div className="flex items-center gap-2 mb-6">
         <Database className="w-5 h-5 text-on-surface-muted" />
         <h3 className="text-lg font-bold text-on-surface">데이터 관리</h3>

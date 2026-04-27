@@ -11,8 +11,8 @@ import {
   ArrowDownCircle,
   History,
   LayoutList,
-  Loader2,
 } from "lucide-react";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { DateRangePicker } from "@/pages/sales/DateRangePicker";
 import { salesApi } from "@/bindings/sales";
 import type { PaymentRecord, SalesRecord, ChartDay, TopItem, RevenueSummary } from "@/types";
@@ -118,14 +118,7 @@ export function SummaryTab() {
 
   return (
     <div className="h-full flex flex-col gap-4 min-h-0 relative">
-      {isLoading && (
-        <div className="absolute inset-0 bg-surface/50 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg">
-          <div className="bg-surface-card p-4 rounded-xl shadow-lg flex flex-col items-center gap-3">
-            <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
-            <span className="text-sm font-medium text-on-surface">데이터를 불러오는 중...</span>
-          </div>
-        </div>
-      )}
+      <LoadingOverlay isLoading={isLoading} />
       {error && (
         <div className="shrink-0 px-4 py-2.5 rounded-lg bg-danger-50 border border-danger-200 text-danger-700 text-sm dark:bg-danger-950/30 dark:border-danger-900/40 dark:text-danger-400">
           {error}
