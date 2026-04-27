@@ -151,17 +151,26 @@ function CustomerListPanel({
     if (scrollToId == null) return;
     const index = filtered.findIndex((c) => c.id === scrollToId);
     if (index !== -1 && virtuosoRef.current) {
-      // 50개 이상의 거리가 있으면 근처(20개 전)로 순간이동 후 부드럽게 이동
-      if (index > 50) {
-        virtuosoRef.current.scrollToIndex({ index: index - 20, align: "start" });
-        requestAnimationFrame(() => {
-          virtuosoRef.current?.scrollToIndex({ index, align: "center", behavior: "smooth" });
-        });
-      } else {
-        // 가깝거나 위로 올라가는 경우(index < 50) 바로 부드럽게
-        virtuosoRef.current.scrollToIndex({ index, align: "center", behavior: "smooth" });
-      }
-      onScrollComplete?.();
+      // 컴포넌트 마운트 직후나 데이터 변경 직후에 바로 스크롤을 시도하면
+      // Virtuoso가 아직 항목들의 크기를 측정하지 못해 스크롤이 무시되는 간헐적 문제가 발생할 수 있음
+      // 이를 방지하기 위해 setTimeout으로 렌더링 틱을 지연시킵니다.
+      const timer = setTimeout(() => {
+        if (!virtuosoRef.current) return;
+        // 50개 이상의 거리가 있으면 근처(20개 전)로 순간이동 후 부드럽게 이동
+        if (index > 50) {
+          virtuosoRef.current.scrollToIndex({ index: index - 20, align: "start" });
+          requestAnimationFrame(() => {
+            virtuosoRef.current?.scrollToIndex({ index, align: "center", behavior: "smooth" });
+            onScrollComplete?.();
+          });
+        } else {
+          // 가깝거나 위로 올라가는 경우(index < 50) 바로 부드럽게
+          virtuosoRef.current.scrollToIndex({ index, align: "center", behavior: "smooth" });
+          onScrollComplete?.();
+        }
+      }, 50); // 약간의 지연(50ms)을 주어 DOM 렌더링 완료 보장
+      
+      return () => clearTimeout(timer);
     }
   }, [scrollToId, filtered, onScrollComplete]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -711,7 +720,9 @@ export function CustomersPage() {
       const created = await create(data as CreateCustomer);
       select(created);
       setScrollToCustomerId(created.id);
-      await loadCustomers(searchKeyword);
+      // 신규 등록 시 검색어 초기화
+      setQuery("");
+      await loadCustomers(""); 
     } else if (selectedCustomer) {
       await update(selectedCustomer.id, data as UpdateCustomer);
       await loadCustomers(searchKeyword);
@@ -789,6 +800,8 @@ export function CustomersPage() {
             setFocusWorkItemId(focusItemId);
           }
         }
+      } else if (current) {
+        setScrollToCustomerId(current.id);
       } else if (!current && loaded.length > 0) {
         select(loaded[0]);
         const t = useCustomerStore.getState().selectedCustomer;
