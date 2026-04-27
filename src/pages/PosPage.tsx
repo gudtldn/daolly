@@ -425,6 +425,7 @@ function OrderPanel({
         <div>
           <label className="block text-xs font-medium text-on-surface-muted mb-1.5">단가 수정</label>
           <CurrencyInput
+            autoFocus
             value={priceRef.current}
             onChange={(v) => { priceRef.current = v; }}
             onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.form?.requestSubmit?.(); }}

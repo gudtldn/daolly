@@ -69,6 +69,8 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const descRef = useRef<HTMLInputElement>(null);
+  const previousFocus = useRef<HTMLElement | null>(null);
+  const itemRefs = useRef<Map<number, HTMLInputElement>>(new Map());
 
   // 결제 탭 상태
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -86,9 +88,20 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
   const autoPrice = details.reduce((sum, d) => sum + d.unitPrice * d.quantity, 0);
   const effectivePrice = manualPrice ? priceInput : autoPrice;
 
-  // 열릴 때 폼 초기화
+  // 열릴 때 폼 초기화 및 포커스 저장
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      // 닫힐 때 포커스 복원
+      if (previousFocus.current && document.body.contains(previousFocus.current)) {
+        const prev = previousFocus.current;
+        setTimeout(() => prev.focus(), 50);
+      }
+      previousFocus.current = null;
+      return;
+    }
+
+    previousFocus.current = document.activeElement as HTMLElement;
+
     if (mode === "edit" && workItem) {
       setDescription(workItem.description ?? "");
       setNote(workItem.note ?? "");
@@ -228,7 +241,15 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
     );
   };
 
-  const addDetail = () => setDetails((prev) => [...prev, emptyDetail()]);
+  const addDetail = () => {
+    const newRow = emptyDetail();
+    setDetails((prev) => [...prev, newRow]);
+    // 다음 렌더링 후 새 행의 품목명에 포커스
+    setTimeout(() => {
+      const el = itemRefs.current.get(newRow._key);
+      el?.focus();
+    }, 50);
+  };
 
   const removeDetail = (key: number) => {
     setDetails((prev) => {
@@ -439,6 +460,10 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                     <tr key={d._key}>
                       <td className="px-2 py-1.5">
                         <input
+                          ref={(el) => {
+                            if (el) itemRefs.current.set(d._key, el);
+                            else itemRefs.current.delete(d._key);
+                          }}
                           type="text"
                           value={d.itemName}
                           onChange={(e) => updateDetail(d._key, "itemName", e.target.value)}
@@ -681,6 +706,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                       <div className="flex-1">
                         <label className="block text-xs text-on-surface-muted mb-1">금액</label>
                         <CurrencyInput
+                          ref={payAmountRef}
                           value={payAmount}
                           onChange={setPayAmount}
                           placeholder="결제 금액"

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Tag, Plus, Pen, Trash2, GripVertical } from "lucide-react";
 import {
   DndContext,
@@ -38,6 +38,12 @@ function CategoryFormContent({
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const { close } = useDialogStore();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // 렌더링 후 확실하게 포커스
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +57,7 @@ function CategoryFormContent({
       <div>
         <label className="block text-sm font-medium text-on-surface mb-1">이름</label>
         <input
-          autoFocus
+          ref={inputRef}
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -88,6 +94,11 @@ function PriceItemFormContent({
   const [name, setName] = useState(initial?.name ?? "");
   const [price, setPrice] = useState(initial ? String(initial.defaultPrice) : "");
   const { close } = useDialogStore();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,7 +116,7 @@ function PriceItemFormContent({
       <div>
         <label className="block text-sm font-medium text-on-surface mb-1">이름</label>
         <input
-          autoFocus
+          ref={inputRef}
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -151,6 +162,11 @@ function PriceOptionFormContent({
   const [name, setName] = useState(initial?.name ?? "");
   const [price, setPrice] = useState(initial ? String(initial.price) : "");
   const { close } = useDialogStore();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,7 +184,7 @@ function PriceOptionFormContent({
       <div>
         <label className="block text-sm font-medium text-on-surface mb-1">이름</label>
         <input
-          autoFocus
+          ref={inputRef}
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -448,8 +464,9 @@ export function PriceSettings() {
       hideFooter: true,
       customContent: (
         <CategoryFormContent
-          onSave={(name) => {
-            createCategory({ name, sortOrder: categories.length });
+          onSave={async (name) => {
+            const newCat = await createCategory({ name, sortOrder: categories.length });
+            selectCategory(newCat.id);
           }}
         />
       ),
@@ -504,8 +521,8 @@ export function PriceSettings() {
       hideFooter: true,
       customContent: (
         <PriceItemFormContent
-          onSave={(name, price) => {
-            createPriceItem({
+          onSave={async (name, price) => {
+            await createPriceItem({
               categoryId: selectedCategoryId,
               name,
               defaultPrice: price,

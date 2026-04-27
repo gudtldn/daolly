@@ -1,9 +1,28 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useDialogStore } from "@/stores/dialogStore";
 import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
 
 export function GlobalDialog() {
   const { isOpen, config, close } = useDialogStore();
+  const previousFocus = useRef<HTMLElement | null>(null);
+  const confirmBtnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      previousFocus.current = document.activeElement as HTMLElement;
+      // confirm 버튼에 포커스 (custom이 아니거나 footer가 있을 때)
+      if (config?.type !== "custom" || !config.hideFooter) {
+        setTimeout(() => confirmBtnRef.current?.focus(), 50);
+      }
+    } else {
+      // 닫힐 때 이전 요소로 포커스 복원
+      const prev = previousFocus.current;
+      previousFocus.current = null;
+      if (prev && document.body.contains(prev)) {
+        setTimeout(() => prev.focus(), 50);
+      }
+    }
+  }, [isOpen, config]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -79,6 +98,7 @@ export function GlobalDialog() {
               </button>
             )}
             <button
+              ref={confirmBtnRef}
               onClick={() => close(true)}
               className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                 config?.isDestructive

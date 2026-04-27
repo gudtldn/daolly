@@ -36,10 +36,22 @@ export function CustomerFormCard({ open, mode, customer, onSave, onClose }: Prop
   const [saving, setSaving] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
+  const previousFocus = useRef<HTMLElement | null>(null);
 
-  // 열릴 때 폼 초기화
+  // 열릴 때 폼 초기화 및 포커스 저장
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      // 닫힐 때 포커스 복원
+      if (previousFocus.current && document.body.contains(previousFocus.current)) {
+        const prev = previousFocus.current;
+        setTimeout(() => prev.focus(), 50);
+      }
+      previousFocus.current = null;
+      return;
+    }
+
+    previousFocus.current = document.activeElement as HTMLElement;
+
     if (customer) {
       setName(customer.name);
       setPhone(customer.phoneNumber ?? "");
