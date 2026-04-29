@@ -275,13 +275,13 @@ function SortableCategoryItem({
         <div className="flex items-center gap-0.5 pr-2 shrink-0">
           <button
             onClick={onEdit}
-            className="p-1.5 text-on-surface-muted hover:text-primary-600 hover:bg-primary-100 dark:hover:bg-primary-950/50 rounded transition-colors cursor-pointer"
+            className="p-1.5 text-on-surface-muted hover:text-primary-600 hover:bg-primary-100 dark:hover:bg-primary-950/50 rounded-lg transition-colors cursor-pointer"
           >
             <Pen className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={onDelete}
-            className="p-1.5 text-on-surface-muted hover:text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-950/50 rounded transition-colors cursor-pointer"
+            className="p-1.5 text-on-surface-muted hover:text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-950/50 rounded-lg transition-colors cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
@@ -332,13 +332,13 @@ function SortablePriceItemRow({
         <div className="flex items-center justify-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={onEdit}
-            className="p-1.5 text-on-surface-muted hover:text-primary-600 hover:bg-primary-100 dark:hover:bg-primary-950/50 rounded transition-colors cursor-pointer"
+            className="p-1.5 text-on-surface-muted hover:text-primary-600 hover:bg-primary-100 dark:hover:bg-primary-950/50 rounded-lg transition-colors cursor-pointer"
           >
             <Pen className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={onDelete}
-            className="p-1.5 text-on-surface-muted hover:text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-950/50 rounded transition-colors cursor-pointer"
+            className="p-1.5 text-on-surface-muted hover:text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-950/50 rounded-lg transition-colors cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
@@ -389,13 +389,13 @@ function SortablePriceOptionRow({
         <div className="flex items-center justify-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={onEdit}
-            className="p-1.5 text-on-surface-muted hover:text-primary-600 hover:bg-primary-100 dark:hover:bg-primary-950/50 rounded transition-colors cursor-pointer"
+            className="p-1.5 text-on-surface-muted hover:text-primary-600 hover:bg-primary-100 dark:hover:bg-primary-950/50 rounded-lg transition-colors cursor-pointer"
           >
             <Pen className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={onDelete}
-            className="p-1.5 text-on-surface-muted hover:text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-950/50 rounded transition-colors cursor-pointer"
+            className="p-1.5 text-on-surface-muted hover:text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-950/50 rounded-lg transition-colors cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
@@ -642,7 +642,7 @@ export function PriceSettings() {
             <h4 className="text-sm font-semibold text-on-surface">분류</h4>
             <button
               onClick={handleAddCategory}
-              className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800 rounded hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               추가
@@ -697,7 +697,7 @@ export function PriceSettings() {
               <button
                 onClick={handleAddItem}
                 disabled={!selectedCategoryId}
-                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800 rounded hover:bg-primary-100 dark:hover:bg-primary-900/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 품목 추가
@@ -776,7 +776,7 @@ export function PriceSettings() {
               </div>
               <button
                 onClick={handleAddOption}
-                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800 rounded hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors cursor-pointer self-start"
+                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors cursor-pointer self-start"
               >
                 <Plus className="w-3.5 h-3.5" />
                 옵션 추가

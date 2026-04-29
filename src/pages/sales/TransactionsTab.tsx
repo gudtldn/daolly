@@ -101,7 +101,7 @@ export function TransactionsTab() {
               <button
                 key={p.id}
                 onClick={() => setPeriod(p.id)}
-                className={`px-4 py-1.5 text-sm font-semibold rounded transition-colors cursor-pointer ${
+                className={`px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors cursor-pointer ${
                   period === p.id && !customRange
                     ? "bg-surface-card text-primary-600 border border-border-default shadow-sm dark:text-primary-400 dark:bg-surface-elevated"
                     : "text-on-surface-muted hover:text-on-surface"
