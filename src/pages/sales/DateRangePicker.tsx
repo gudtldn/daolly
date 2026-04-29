@@ -162,7 +162,7 @@ export function DateRangePicker({ value, onApply, onClear }: Props) {
           </span>
           <button
             onClick={onClear}
-            className="p-1.5 text-on-surface-muted hover:text-danger-500 transition-colors cursor-pointer rounded"
+            className="p-1.5 text-on-surface-muted hover:text-danger-500 transition-colors cursor-pointer rounded-lg"
             title="기간 초기화"
           >
             <X className="w-3.5 h-3.5" />

@@ -184,7 +184,7 @@ export function UnpaidTab() {
                             handleGoToCustomer(customer.customerId);
                           }}
                           title="고객 관리에서 보기"
-                          className="p-1.5 rounded text-on-surface-muted bg-surface-elevated border border-border-default hover:bg-primary-600 hover:text-white dark:hover:bg-primary-500 hover:border-primary-600 transition-all cursor-pointer shadow-sm group/btn"
+                          className="p-1.5 rounded-lg text-on-surface-muted bg-surface-elevated border border-border-default hover:bg-primary-600 hover:text-white dark:hover:bg-primary-500 hover:border-primary-600 transition-all cursor-pointer shadow-sm group/btn"
                         >
                           <ExternalLink className="w-4 h-4 transition-colors" />
                         </button>
@@ -242,7 +242,7 @@ export function UnpaidTab() {
                                       handleGoToWorkItem(customer.customerId, r.workItemId);
                                     }}
                                     title="고객 관리에서 이 작업 보기"
-                                    className="p-1.5 rounded text-on-surface-muted bg-surface-elevated border border-border-default hover:bg-primary-600 hover:text-white dark:hover:bg-primary-500 hover:border-primary-600 transition-all cursor-pointer shadow-sm group/btn"
+                                    className="p-1.5 rounded-lg text-on-surface-muted bg-surface-elevated border border-border-default hover:bg-primary-600 hover:text-white dark:hover:bg-primary-500 hover:border-primary-600 transition-all cursor-pointer shadow-sm group/btn"
                                   >
                                     <ExternalLink className="w-3.5 h-3.5" />
                                   </button>

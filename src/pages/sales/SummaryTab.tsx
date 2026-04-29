@@ -318,7 +318,7 @@ export function SummaryTab() {
             </div>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-secondary-400" />
-              <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="검색..." className="pl-7 pr-3 py-1.5 text-sm border border-border-default rounded bg-surface-card text-on-surface placeholder:text-on-surface-muted focus:outline-none focus:border-primary-500 transition-colors w-48" />
+              <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="검색..." className="pl-7 pr-3 py-1.5 text-sm border border-border-default rounded-lg bg-surface-card text-on-surface placeholder:text-on-surface-muted focus:outline-none focus:border-primary-500 transition-colors w-48" />
             </div>
           </div>
 

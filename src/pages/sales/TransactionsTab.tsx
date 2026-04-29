@@ -133,7 +133,7 @@ export function TransactionsTab() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="고객명 / 품목 검색..."
-              className="pl-7 pr-3 py-1.5 text-sm border border-border-default rounded bg-surface-card text-on-surface placeholder:text-on-surface-muted focus:outline-none focus:border-primary-500 transition-colors"
+              className="pl-7 pr-3 py-1.5 text-sm border border-border-default rounded-lg bg-surface-card text-on-surface placeholder:text-on-surface-muted focus:outline-none focus:border-primary-500 transition-colors"
             />
           </div>
         </div>

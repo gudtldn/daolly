@@ -110,7 +110,7 @@ function CustomerPanel({
           // Customer selected: show a minimal change-customer link. Full info is in the card below.
           <button
             onClick={onDeselect}
-            className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-on-surface-muted hover:text-primary-600 hover:bg-surface-elevated rounded transition-colors cursor-pointer border border-dashed border-border-default"
+            className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-on-surface-muted hover:text-primary-600 hover:bg-surface-elevated rounded-lg transition-colors cursor-pointer border border-dashed border-border-default"
           >
             <Search className="w-3.5 h-3.5" />
             다른 고객 검색
@@ -650,7 +650,7 @@ function OrderPanel({
                   ) : (
                     <button
                       onClick={() => setEditingPriceIdx(index)}
-                      className="text-primary-600 font-semibold hover:text-primary-700 hover:bg-primary-50 dark:hover:bg-primary-900/30 px-2 py-1 rounded transition-colors"
+                      className="text-primary-600 font-semibold hover:text-primary-700 hover:bg-primary-50 dark:hover:bg-primary-900/30 px-2 py-1 rounded-lg transition-colors"
                       title="단가 수정"
                     >
                       {item.unitPrice.toLocaleString()}
@@ -664,14 +664,14 @@ function OrderPanel({
                   <div className="flex items-center justify-center gap-1">
                     <button
                       onClick={() => openFullEdit(index)}
-                      className="p-1.5 text-on-surface-muted hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded transition-colors"
+                      className="p-1.5 text-on-surface-muted hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-lg transition-colors"
                       title="상세 수정"
                     >
                       <Pen className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => onRemoveItem(index)}
-                      className="p-1.5 text-on-surface-muted hover:text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30 rounded transition-colors"
+                      className="p-1.5 text-on-surface-muted hover:text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30 rounded-lg transition-colors"
                       title="삭제"
                     >
                       <Trash2 className="w-4 h-4" />
