@@ -71,6 +71,10 @@ export function GeneralSettings() {
               </button>
             ))}
           </div>
+          <div className="mt-3 px-3.5 py-3 bg-surface-elevated rounded-lg border border-border-default">
+            <p className="text-[0.65rem] text-on-surface-muted/60 mb-1.5">미리보기</p>
+            <p className="text-sm text-on-surface">세탁/수선 접수 완료 (홍길동 · 바지 수선 2건 · 12,000원)</p>
+          </div>
         </section>
       </div>
     </div>

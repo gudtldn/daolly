@@ -209,6 +209,11 @@ function CustomerPanel({
               </button>
             ))}
             
+            {results.length === 0 && showAddOption && (
+              <div className="px-3 pt-3 pb-1 text-xs text-on-surface-muted text-center">
+                검색 결과가 없습니다.
+              </div>
+            )}
             {showAddOption && (
               <>
                 {results.length > 0 && <div className="border-t border-border-default/50 my-1" />}
@@ -774,7 +779,7 @@ function PaymentPanel({
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="예: 드라이클리닝 주의, 급행 요청 등"
-            className="w-full px-3 py-2 bg-surface border border-border-default rounded focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 text-on-surface resize-none text-sm"
+            className="w-full px-3 py-2 bg-surface border border-border-default rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 text-on-surface resize-none text-sm"
           />
         </div>
       </div>
