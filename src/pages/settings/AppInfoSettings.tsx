@@ -133,7 +133,7 @@ export function AppInfoSettings() {
                 </button>
               </div>
               {updateState.body && (
-                <pre className="text-xs text-on-surface-muted bg-surface-elevated px-3 py-2 rounded-lg whitespace-pre-wrap max-h-32 overflow-y-auto">
+                <pre className="text-sm text-on-surface-muted bg-surface-elevated px-3 py-2 rounded-lg whitespace-pre-wrap max-h-32 overflow-y-auto">
                   {updateState.body}
                 </pre>
               )}
@@ -178,7 +178,7 @@ export function AppInfoSettings() {
               </div>
               <button
                 onClick={handleCheckUpdate}
-                className="text-xs text-on-surface-muted hover:text-on-surface transition-colors cursor-pointer shrink-0"
+                className="text-sm text-on-surface-muted hover:text-on-surface transition-colors cursor-pointer shrink-0"
               >
                 다시 시도
               </button>
@@ -189,7 +189,7 @@ export function AppInfoSettings() {
         <section className="bg-surface-card rounded-lg border border-border-default p-5">
           <h4 className="text-sm font-semibold text-on-surface mb-3">라이선스</h4>
           <p className="text-sm text-on-surface font-medium">MIT License</p>
-          <p className="text-xs text-on-surface-muted mt-1">Copyright (c) 2026 siwoohyong</p>
+          <p className="text-sm text-on-surface-muted mt-1">Copyright (c) 2026 siwoohyong</p>
         </section>
       </div>
     </div>

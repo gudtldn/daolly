@@ -62,7 +62,7 @@ const STATUS_CONFIG: Record<WorkItemStatus, { label: string; cls: string; title:
 function StatusBadge({ status }: { status: WorkItemStatus }) {
   const c = STATUS_CONFIG[status];
   if (!c) return null;
-  return <span title={c.title} className={`inline-block px-2.5 py-1 rounded text-xs font-bold whitespace-nowrap ${c.cls}`}>{c.label}</span>;
+  return <span title={c.title} className={`inline-block px-2.5 py-1 rounded-lg text-sm font-bold whitespace-nowrap ${c.cls}`}>{c.label}</span>;
 }
 
 // 상태 인라인 드롭다운
