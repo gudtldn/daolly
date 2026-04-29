@@ -477,7 +477,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                           value={d.itemName}
                           onChange={(e) => updateDetail(d._key, "itemName", e.target.value)}
                           placeholder="품목명"
-                          className="w-full px-2 py-1 border border-border-default rounded text-sm bg-surface-card text-on-surface focus:outline-none focus:border-primary-500"
+                          className="w-full px-2 py-1 border border-border-default rounded-lg text-sm bg-surface-card text-on-surface focus:outline-none focus:border-primary-500"
                         />
                         <div className="mt-1 flex items-center gap-1">
                           <span className="text-[0.6875rem] text-on-surface-muted/60 shrink-0">&#8627;</span>
@@ -495,7 +495,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                           value={d.unitPrice}
                           onChange={(val) => updateDetail(d._key, "unitPrice", val)}
                           placeholder="0"
-                          className="w-full px-2 py-1 border border-border-default rounded text-sm text-right bg-surface-card text-on-surface focus:outline-none focus:border-primary-500"
+                          className="w-full px-2 py-1 border border-border-default rounded-lg text-sm text-right bg-surface-card text-on-surface focus:outline-none focus:border-primary-500"
                         />
                       </td>
                       <td className="px-2 py-1.5">
@@ -503,7 +503,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                           min={1}
                           value={d.quantity}
                           onChange={(val) => updateDetail(d._key, "quantity", Math.max(1, val))}
-                          className="w-full px-2 py-1 border border-border-default rounded text-sm text-center bg-surface-card text-on-surface focus:outline-none focus:border-primary-500"
+                          className="w-full px-2 py-1 border border-border-default rounded-lg text-sm text-center bg-surface-card text-on-surface focus:outline-none focus:border-primary-500"
                         />
                       </td>
                       <td className="px-2 py-1.5 text-right text-sm font-medium text-on-surface">
@@ -619,21 +619,21 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                                     type="datetime-local"
                                     value={editDate}
                                     onChange={(e) => setEditDate(e.target.value)}
-                                    className="w-full text-xs border border-border-default rounded px-1.5 py-1 bg-surface-base text-on-surface"
+                                    className="w-full text-sm border border-border-default rounded-lg px-1.5 py-1 bg-surface-base text-on-surface"
                                   />
                                 </td>
                                 <td className="px-2 py-1.5">
                                   <CurrencyInput
                                     value={editAmount}
                                     onChange={setEditAmount}
-                                    className="w-full text-xs border border-border-default rounded px-1.5 py-1 bg-surface-base text-on-surface text-right"
+                                    className="w-full text-sm border border-border-default rounded-lg px-1.5 py-1 bg-surface-base text-on-surface text-right"
                                   />
                                 </td>
                                 <td className="px-2 py-1.5">
                                   <select
                                     value={editMethod}
                                     onChange={(e) => setEditMethod(e.target.value)}
-                                    className="w-full text-xs border border-border-default rounded px-1.5 py-1 bg-surface-base text-on-surface"
+                                    className="w-full text-sm border border-border-default rounded-lg px-1.5 py-1 bg-surface-base text-on-surface"
                                   >
                                     <option value="cash">현금</option>
                                     <option value="card">카드</option>
