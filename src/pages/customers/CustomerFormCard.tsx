@@ -161,7 +161,7 @@ export function CustomerFormCard({ open, mode, customer, onSave, onClose }: Prop
         {/* body */}
         <div className="px-5 py-4 space-y-4">
           {error && (
-            <div className="text-sm text-danger-600 dark:text-danger-400 bg-danger-50 dark:bg-danger-950 px-3 py-2 rounded">
+            <div className="text-sm text-danger-600 dark:text-danger-400 bg-danger-50 dark:bg-danger-950 px-3 py-2 rounded-lg">
               {error}
             </div>
           )}

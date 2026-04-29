@@ -610,7 +610,7 @@ function WorkItemListPanel({
                             미수금 {(item.price - item.paidAmount).toLocaleString()}원
                           </button>
                         ) : (
-                          <span className="px-2 py-0.5 bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800 text-primary-600 dark:text-primary-400 rounded text-xs font-bold whitespace-nowrap leading-none">완납</span>
+                          <span className="px-2 py-0.5 bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800 text-primary-600 dark:text-primary-400 rounded-lg text-xs font-bold whitespace-nowrap leading-none">완납</span>
                         )}
                       </div>
                     </td>

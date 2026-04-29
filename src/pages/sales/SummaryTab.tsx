@@ -138,7 +138,7 @@ export function SummaryTab() {
             <button
               key={p.id}
               onClick={() => setPeriod(p.id)}
-              className={`px-4 py-1.5 text-sm font-semibold rounded transition-colors cursor-pointer ${
+              className={`px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors cursor-pointer ${
                 period === p.id && !customRange
                   ? "bg-surface-card text-primary-600 border border-border-default shadow-sm dark:text-primary-400 dark:bg-surface-elevated"
                   : "text-on-surface-muted hover:text-on-surface"
@@ -297,7 +297,7 @@ export function SummaryTab() {
               <div className="flex bg-surface-card rounded-md border border-border-default p-1 p-0.5">
                 <button
                   onClick={() => setRightTab("payments")}
-                  className={`flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded transition-all cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                     rightTab === "payments" ? "bg-primary-600 text-white shadow-sm" : "text-on-surface-muted hover:text-on-surface"
                   }`}
                 >
@@ -306,7 +306,7 @@ export function SummaryTab() {
                 </button>
                 <button
                   onClick={() => setRightTab("receptions")}
-                  className={`flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded transition-all cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                     rightTab === "receptions" ? "bg-primary-600 text-white shadow-sm" : "text-on-surface-muted hover:text-on-surface"
                   }`}
                 >
