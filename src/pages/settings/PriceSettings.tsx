@@ -671,6 +671,11 @@ export function PriceSettings() {
                     카테고리가 없습니다.
                   </li>
                 )}
+                {categories.length > 1 && (
+                  <li className="px-3 py-2 text-[0.65rem] text-on-surface-muted/60 text-center border-t border-border-default/50">
+                    &#8942; 좌측 핸들을 드래그해서 순서를 변경할 수 있습니다
+                  </li>
+                )}
               </ul>
             </SortableContext>
           </DndContext>
@@ -742,6 +747,13 @@ export function PriceSettings() {
                               {selectedCategoryId
                                 ? "등록된 품목이 없습니다."
                                 : "카테고리를 먼저 선택해주세요."}
+                            </td>
+                          </tr>
+                        )}
+                        {activeItems.length > 1 && (
+                          <tr>
+                            <td colSpan={4} className="px-3 py-2 text-[0.65rem] text-on-surface-muted/60 text-center border-t border-border-default/50">
+                              &#8942; 좌측 핸들을 드래그하면 순서를 변경할 수 있습니다
                             </td>
                           </tr>
                         )}
