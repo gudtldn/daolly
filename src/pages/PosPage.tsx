@@ -256,12 +256,12 @@ function CustomerPanel({
                 </div>
                 <div className="min-w-0">
                   <p className="font-bold text-on-surface text-base leading-tight">{selectedCustomer.name}</p>
-                  <p className="text-xs text-on-surface-muted">{selectedCustomer.phoneNumber}</p>
+                  <p className="text-sm text-on-surface-muted">{selectedCustomer.phoneNumber}</p>
                 </div>
               </div>
               {unpaid > 0 && (
                 <div className="flex items-center justify-between bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-700 rounded-lg px-3 py-2">
-                  <span className="text-xs font-medium text-warning-700 dark:text-warning-300">미수금</span>
+                  <span className="text-sm font-medium text-warning-700 dark:text-warning-300">미수금</span>
                   <span className="text-sm font-bold text-warning-700 dark:text-warning-300">
                     {unpaid.toLocaleString()}원
                   </span>
@@ -269,13 +269,13 @@ function CustomerPanel({
               )}
               {selectedCustomer.note && (
                 <div className="bg-surface-elevated border border-border-default rounded-lg px-3 py-2">
-                  <p className="text-xs text-on-surface-muted leading-relaxed">{selectedCustomer.note}</p>
+                  <p className="text-sm text-on-surface-muted leading-relaxed">{selectedCustomer.note}</p>
                 </div>
               )}
             </div>
             <button
               onClick={() => onViewHistory(selectedCustomer.id)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-medium text-on-surface-muted border border-border-default rounded-lg hover:bg-surface-elevated hover:text-on-surface transition-colors">
+              className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-on-surface-muted border border-border-default rounded-lg hover:bg-surface-elevated hover:text-on-surface transition-colors">
               <History className="w-3.5 h-3.5" />
               지난 접수 확인
             </button>
