@@ -53,16 +53,16 @@ function formatDateFull(iso: string | null): string | undefined {
   });
 }
 
-const STATUS_CONFIG: Record<WorkItemStatus, { label: string; cls: string }> = {
-  Received: { label: "접수", cls: "bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300" },
-  Completed: { label: "완료", cls: "bg-success-100 text-success-700 dark:bg-success-900/50 dark:text-success-300" },
-  PickedUp: { label: "수령", cls: "bg-secondary-200 text-secondary-600 dark:bg-secondary-700 dark:text-secondary-300" },
+const STATUS_CONFIG: Record<WorkItemStatus, { label: string; cls: string; title: string }> = {
+  Received: { label: "접수", cls: "bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300", title: "접수: 수선/세탁 접수 완료, 작업 중" },
+  Completed: { label: "완료", cls: "bg-success-100 text-success-700 dark:bg-success-900/50 dark:text-success-300", title: "완료: 작업 완료, 수령 대기 중" },
+  PickedUp: { label: "수령", cls: "bg-secondary-200 text-secondary-600 dark:bg-secondary-700 dark:text-secondary-300", title: "수령: 고객이 찾아감" },
 };
 
 function StatusBadge({ status }: { status: WorkItemStatus }) {
   const c = STATUS_CONFIG[status];
   if (!c) return null;
-  return <span className={`inline-block px-2.5 py-1 rounded text-xs font-bold whitespace-nowrap ${c.cls}`}>{c.label}</span>;
+  return <span title={c.title} className={`inline-block px-2.5 py-1 rounded text-xs font-bold whitespace-nowrap ${c.cls}`}>{c.label}</span>;
 }
 
 // 상태 인라인 드롭다운
@@ -98,6 +98,7 @@ function StatusDropdown({ status, onChangeStatus }: { status: WorkItemStatus; on
               <button
                 key={s}
                 onClick={(e) => { e.stopPropagation(); onChangeStatus(s); setOpen(false); }}
+                title={c.title}
                 className={`w-full px-3 py-1.5 text-xs font-bold text-left hover:bg-surface-elevated transition-colors cursor-pointer ${s === status ? "opacity-50" : ""}`}
               >
                 <span className={`inline-block px-2 py-0.5 rounded ${c.cls}`}>{c.label}</span>
