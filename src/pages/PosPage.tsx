@@ -381,6 +381,7 @@ function OrderPanel({
   const memoRef = useRef<string>("");
   const priceRef = useRef<number>(0);
   const catTabsRef = useRef<HTMLDivElement>(null);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
   // native non-passive wheel -> horizontal scroll (React onWheel is passive in newer browsers)
   useEffect(() => {
@@ -393,6 +394,18 @@ function OrderPanel({
     el.addEventListener("wheel", handler, { passive: false });
     return () => el.removeEventListener("wheel", handler);
   }, []);
+
+  // 스크롤 가능 여부 감지 -> 오른쪽 페이드 인디케이터
+  useEffect(() => {
+    const el = catTabsRef.current;
+    if (!el) return;
+    const update = () => setCanScrollRight(el.scrollWidth > el.clientWidth + el.scrollLeft + 1);
+    update();
+    el.addEventListener("scroll", update);
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => { el.removeEventListener("scroll", update); ro.disconnect(); };
+  }, [categories]);
 
   useEffect(() => {
     Promise.all([categoryApi.list(), priceItemApi.list(), priceOptionApi.list()]).then(
@@ -460,23 +473,29 @@ function OrderPanel({
   return (
     <div className="flex-1 min-w-0 bg-surface-card border border-border-default rounded-lg flex flex-col shadow-sm overflow-hidden">
       {/* 카테고리 탭 */}
-      <div
-        ref={catTabsRef}
-        className="flex border-b border-border-default bg-surface overflow-x-auto shrink-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
-      >
-        {categories.map((cat) => (
-          <button
-            key={cat.id}
-            onClick={() => setActiveCatId(cat.id)}
-            className={`min-w-[4rem] flex-1 py-3.5 font-bold text-sm transition-colors whitespace-nowrap px-4 ${
-              activeCatId === cat.id
-                ? "text-primary-600 border-b-2 border-primary-600 bg-surface-card"
-                : "text-on-surface-muted hover:text-on-surface hover:bg-surface-elevated"
-            }`}
-          >
-            {cat.name}
-          </button>
-        ))}
+      <div className="relative shrink-0">
+        <div
+          ref={catTabsRef}
+          className="flex border-b border-border-default bg-surface overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+        >
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setActiveCatId(cat.id)}
+              className={`min-w-[4rem] flex-1 py-3.5 font-bold text-sm transition-colors whitespace-nowrap px-4 ${
+                activeCatId === cat.id
+                  ? "text-primary-600 border-b-2 border-primary-600 bg-surface-card"
+                  : "text-on-surface-muted hover:text-on-surface hover:bg-surface-elevated"
+              }`}
+            >
+              {cat.name}
+            </button>
+          ))}
+        </div>
+        {/* 오른쪽 더 볼 탭 있음 안내 (fade 그라디언트) */}
+        {canScrollRight && (
+          <div className="absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-surface to-transparent pointer-events-none border-b border-border-default" />
+        )}
       </div>
 
       {/* 단가 버튼 그리드 */}
