@@ -75,7 +75,8 @@ export function GlobalDialog() {
           </div>
           <button
             onClick={() => close(false)}
-            className="text-on-surface-muted hover:text-on-surface transition-colors cursor-pointer"
+            className="p-1.5 -mr-1.5 rounded-lg text-on-surface-muted hover:text-on-surface hover:bg-surface-elevated transition-colors cursor-pointer"
+            aria-label="닫기"
           >
             <X className="w-5 h-5" />
           </button>

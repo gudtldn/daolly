@@ -349,7 +349,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
           <h3 className="text-lg font-semibold text-on-surface">
             {mode === "create" ? "작업 접수" : "작업 수정"}
           </h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-surface-elevated text-on-surface-muted transition-colors cursor-pointer">
+          <button onClick={onClose} className="p-2 -mr-1 rounded-lg hover:bg-surface-elevated text-on-surface-muted transition-colors cursor-pointer" aria-label="닫기">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -513,7 +513,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                         <button
                           onClick={() => removeDetail(d._key)}
                           type="button"
-                          className="p-1 text-on-surface-muted hover:text-danger-500 transition-colors cursor-pointer"
+                          className="p-1.5 text-on-surface-muted hover:text-danger-500 transition-colors cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -646,14 +646,14 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                                     <button
                                       onClick={handleSaveEditPayment}
                                       disabled={payLoading || editAmount <= 0}
-                                      className="p-1 text-primary-600 hover:text-primary-700 transition-colors cursor-pointer disabled:opacity-30"
+                                      className="p-1.5 text-primary-600 hover:text-primary-700 transition-colors cursor-pointer disabled:opacity-30"
                                     >
                                       <Check className="w-3.5 h-3.5" />
                                     </button>
                                     <button
                                       onClick={handleCancelEdit}
                                       disabled={payLoading}
-                                      className="p-1 text-on-surface-muted hover:text-on-surface transition-colors cursor-pointer disabled:opacity-30"
+                                      className="p-1.5 text-on-surface-muted hover:text-on-surface transition-colors cursor-pointer disabled:opacity-30"
                                     >
                                       <X className="w-3.5 h-3.5" />
                                     </button>
@@ -672,14 +672,14 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                                     <button
                                       onClick={() => handleEditPayment(p)}
                                       disabled={payLoading}
-                                      className="p-1 text-on-surface-muted hover:text-primary-600 transition-colors cursor-pointer disabled:opacity-30"
+                                      className="p-1.5 text-on-surface-muted hover:text-primary-600 transition-colors cursor-pointer disabled:opacity-30"
                                     >
                                       <Pencil className="w-3.5 h-3.5" />
                                     </button>
                                     <button
                                       onClick={() => handleDeletePayment(p.id)}
                                       disabled={payLoading}
-                                      className="p-1 text-on-surface-muted hover:text-danger-500 transition-colors cursor-pointer disabled:opacity-30"
+                                      className="p-1.5 text-on-surface-muted hover:text-danger-500 transition-colors cursor-pointer disabled:opacity-30"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </button>

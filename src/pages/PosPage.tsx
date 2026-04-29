@@ -151,7 +151,8 @@ function CustomerPanel({
               {query && (
                 <button
                   onClick={() => { setQuery(""); setResults([]); setShowDropdown(false); }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-muted hover:text-on-surface transition-colors cursor-pointer"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded text-on-surface-muted hover:text-on-surface transition-colors cursor-pointer"
+                  aria-label="검색어 지우기"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>

@@ -151,7 +151,8 @@ export function CustomerFormCard({ open, mode, customer, onSave, onClose }: Prop
           </h3>
           <button
             onClick={onClose}
-            className="p-1 rounded hover:bg-surface-elevated text-on-surface-muted transition-colors cursor-pointer"
+            className="p-2 -mr-1 rounded-lg hover:bg-surface-elevated text-on-surface-muted transition-colors cursor-pointer"
+            aria-label="닫기"
           >
             <X className="w-5 h-5" />
           </button>
