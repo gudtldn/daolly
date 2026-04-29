@@ -40,7 +40,7 @@ function Clock() {
       <div className="text-lg font-bold text-on-surface leading-none">
         {formatTime(now)}
       </div>
-      <div className="text-xs text-on-surface-muted mt-1">
+      <div className="text-sm text-on-surface-muted mt-1">
         {formatDate(now)}
       </div>
     </div>

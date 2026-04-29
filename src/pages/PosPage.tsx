@@ -496,8 +496,12 @@ function OrderPanel({
               {cat.name}
             </button>
           ))}
+          {categories.length === 0 && (
+            <div className="flex-1 px-4 py-3.5 text-sm text-on-surface-muted text-center">
+              단가표에서 카테고리를 먼저 설정해주세요.
+            </div>
+          )}
         </div>
-        {/* 오른쪽 더 볼 탭 있음 안내 (fade 그라디언트) */}
         {canScrollRight && (
           <div className="absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-surface to-transparent pointer-events-none border-b border-border-default" />
         )}
