@@ -622,16 +622,16 @@ function OrderPanel({
                   <div className="flex items-center justify-center gap-1.5 bg-surface border border-border-default rounded p-1">
                     <button
                       onClick={() => onUpdateQty(index, Math.max(1, item.quantity - 1))}
-                      className="w-6 h-6 flex items-center justify-center rounded text-on-surface-muted hover:bg-surface-elevated transition-colors"
+                      className="w-8 h-8 flex items-center justify-center rounded text-on-surface-muted hover:bg-surface-elevated transition-colors"
                     >
-                      <Minus className="w-3 h-3" />
+                      <Minus className="w-3.5 h-3.5" />
                     </button>
                     <span className="font-bold text-on-surface w-4 text-center">{item.quantity}</span>
                     <button
                       onClick={() => onUpdateQty(index, item.quantity + 1)}
-                      className="w-6 h-6 flex items-center justify-center rounded text-on-surface-muted hover:bg-surface-elevated transition-colors"
+                      className="w-8 h-8 flex items-center justify-center rounded text-on-surface-muted hover:bg-surface-elevated transition-colors"
                     >
-                      <Plus className="w-3 h-3" />
+                      <Plus className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </td>
