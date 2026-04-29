@@ -566,7 +566,7 @@ function OrderPanel({
                   className="w-3.5 h-3.5 accent-primary-600"
                 />
                 {opt.name}
-                <span className="text-xs text-primary-500">+{opt.price.toLocaleString()}</span>
+                <span className="text-sm text-primary-500">+{opt.price.toLocaleString()}</span>
               </label>
             );
           })}
@@ -619,7 +619,7 @@ function OrderPanel({
                   ) : (
                     <div
                       onClick={() => setEditingMemoIdx(index)}
-                      className="text-xs text-on-surface-muted mt-0.5 cursor-pointer hover:text-primary-500 transition-colors inline-block"
+                      className="text-sm text-on-surface-muted mt-0.5 cursor-pointer hover:text-primary-500 transition-colors inline-block"
                       title="메모 수정"
                     >
                       {item.optionsMemo ? `↳ ${item.optionsMemo}` : <span className="opacity-50">↳ 메모 추가...</span>}
@@ -627,17 +627,17 @@ function OrderPanel({
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  <div className="flex items-center justify-center gap-1.5 bg-surface border border-border-default rounded p-1">
+                  <div className="flex items-center justify-center gap-1.5 bg-surface border border-border-default rounded-lg p-1">
                     <button
                       onClick={() => onUpdateQty(index, Math.max(1, item.quantity - 1))}
-                      className="w-8 h-8 flex items-center justify-center rounded text-on-surface-muted hover:bg-surface-elevated transition-colors"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-on-surface-muted hover:bg-surface-elevated transition-colors"
                     >
                       <Minus className="w-3.5 h-3.5" />
                     </button>
                     <span className="font-bold text-on-surface w-4 text-center">{item.quantity}</span>
                     <button
                       onClick={() => onUpdateQty(index, item.quantity + 1)}
-                      className="w-8 h-8 flex items-center justify-center rounded text-on-surface-muted hover:bg-surface-elevated transition-colors"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-on-surface-muted hover:bg-surface-elevated transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" />
                     </button>
