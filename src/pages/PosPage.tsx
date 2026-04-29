@@ -146,7 +146,7 @@ function CustomerPanel({
                   }
                 }}
                 placeholder="이름, 전화번호 뒷자리..."
-                className={`w-full border border-border-default bg-surface-card rounded px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-muted focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 ${query ? "pr-8" : ""}`}
+                className={`w-full border border-border-default bg-surface-card rounded-lg px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-muted focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 ${query ? "pr-8" : ""}`}
               />
               {query && (
                 <button
@@ -162,7 +162,7 @@ function CustomerPanel({
               <button
                 onClick={handleAddNew}
                 title="새 고객으로 추가"
-                className="bg-primary-600 text-white px-3 py-2 rounded hover:bg-primary-700 transition-colors shrink-0 flex items-center justify-center cursor-pointer"
+                className="bg-primary-600 text-white px-3 py-2 rounded-lg hover:bg-primary-700 transition-colors shrink-0 flex items-center justify-center cursor-pointer"
               >
                 <UserPlus className="w-4 h-4" />
               </button>
@@ -170,7 +170,7 @@ function CustomerPanel({
               <button
                 onClick={() => results.length > 0 && handleSelect(results[0])}
                 disabled={!query.trim()}
-                className="bg-primary-600 text-white px-3 py-2 rounded hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0 cursor-pointer"
+                className="bg-primary-600 text-white px-3 py-2 rounded-lg hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0 cursor-pointer"
               >
                 <Search className="w-4 h-4" />
               </button>
@@ -321,25 +321,25 @@ function DirectInputForm({
         onChange={(e) => setName(e.target.value)}
         onKeyDown={handleKey}
         placeholder="품목명"
-        className="flex-1 px-3 py-2 border border-border-default bg-surface-card rounded text-sm text-on-surface focus:border-primary-500 outline-none"
+        className="flex-1 px-3 py-2 border border-border-default bg-surface-card rounded-lg text-sm text-on-surface focus:border-primary-500 outline-none"
       />
       <CurrencyInput
         value={price}
         onChange={setPrice}
         onKeyDown={handleKey}
         placeholder="가격"
-        className="w-28 px-3 py-2 border border-border-default bg-surface-card rounded text-sm text-on-surface focus:border-primary-500 outline-none text-right"
+        className="w-28 px-3 py-2 border border-border-default bg-surface-card rounded-lg text-sm text-on-surface focus:border-primary-500 outline-none text-right"
       />
       <button
         onClick={handleSubmit}
         disabled={!name.trim() || price <= 0}
-        className="px-3 py-2 bg-primary-600 text-white rounded text-sm font-medium hover:bg-primary-700 disabled:bg-secondary-300 disabled:cursor-not-allowed transition-colors"
+        className="px-3 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 disabled:bg-secondary-300 disabled:cursor-not-allowed transition-colors"
       >
         <Plus className="w-4 h-4" />
       </button>
       <button
         onClick={onCancel}
-        className="px-3 py-2 text-on-surface-muted hover:text-on-surface border border-border-default rounded text-sm transition-colors"
+        className="px-3 py-2 text-on-surface-muted hover:text-on-surface border border-border-default rounded-lg text-sm transition-colors"
       >
         취소
       </button>
@@ -769,7 +769,7 @@ function PaymentPanel({
         <button
           onClick={() => method && onSubmit(method, note)}
           disabled={isEmpty || noCustomer || noMethod || submitting}
-          className="w-full bg-primary-600 disabled:bg-secondary-300 disabled:cursor-not-allowed hover:bg-primary-700 text-white py-4 rounded text-lg font-bold shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+          className="w-full bg-primary-600 disabled:bg-secondary-300 disabled:cursor-not-allowed hover:bg-primary-700 text-white py-4 rounded-lg text-lg font-bold shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2"
         >
           <CheckCircle2 className="w-5 h-5" />
           {submitting ? "처리 중..." : "접수 완료"}

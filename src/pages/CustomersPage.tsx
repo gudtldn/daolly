@@ -214,7 +214,7 @@ function CustomerListPanel({
                 onSelect(filtered[prevIndex === -1 ? 0 : prevIndex]);
               }
             }}
-            className={`w-full pl-9 py-2 border border-border-default rounded text-sm bg-surface-card text-on-surface placeholder:text-on-surface-muted focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 ${searchKeyword ? "pr-8" : "pr-3"}`}
+            className={`w-full pl-9 py-2 border border-border-default rounded-lg text-sm bg-surface-card text-on-surface placeholder:text-on-surface-muted focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 ${searchKeyword ? "pr-8" : "pr-3"}`}
           />
           {searchKeyword && (
             <button
@@ -227,19 +227,19 @@ function CustomerListPanel({
         </div>
         <button
           onClick={onAdd}
-          className="flex items-center px-3 py-2 bg-primary-600 text-white rounded text-sm font-medium hover:bg-primary-700 transition-colors cursor-pointer">
+          className="flex items-center px-3 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors cursor-pointer">
           <Plus className="w-4 h-4 mr-1" /> 추가
         </button>
         <button
           onClick={onEdit}
           disabled={selectedId === null}
-          className="p-2 border border-border-default rounded text-on-surface-muted hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+          className="p-2 border border-border-default rounded-lg text-on-surface-muted hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
           <Pencil className="w-4 h-4" />
         </button>
         <button
           onClick={onDelete}
           disabled={selectedId === null}
-          className="p-2 border border-danger-200 dark:border-danger-800 rounded text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+          className="p-2 border border-danger-200 dark:border-danger-800 rounded-lg text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
           <Trash2 className="w-4 h-4" />
         </button>
       </div>
@@ -542,13 +542,13 @@ function WorkItemListPanel({
           </span>
         </div>
         <div className="flex space-x-2">
-          <button onClick={onAdd} className="flex items-center px-3 py-2 bg-primary-600 text-white rounded text-sm font-medium hover:bg-primary-700 transition-colors cursor-pointer">
+          <button onClick={onAdd} className="flex items-center px-3 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors cursor-pointer">
             <Plus className="w-4 h-4 mr-1" /> 추가
           </button>
-          <button onClick={() => activeWorkItemId && onEdit(activeWorkItemId)} disabled={!activeWorkItemId} className="p-2 border border-border-default rounded text-on-surface-muted hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+          <button onClick={() => activeWorkItemId && onEdit(activeWorkItemId)} disabled={!activeWorkItemId} className="p-2 border border-border-default rounded-lg text-on-surface-muted hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
             <Pencil className="w-4 h-4" />
           </button>
-          <button onClick={() => activeWorkItemId && onDelete(activeWorkItemId)} disabled={!activeWorkItemId} className="p-2 border border-danger-200 dark:border-danger-800 rounded text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+          <button onClick={() => activeWorkItemId && onDelete(activeWorkItemId)} disabled={!activeWorkItemId} className="p-2 border border-danger-200 dark:border-danger-800 rounded-lg text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
