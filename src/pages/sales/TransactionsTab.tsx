@@ -152,13 +152,13 @@ export function TransactionsTab() {
             data={filtered}
             fixedHeaderContent={() => (
               <tr className="bg-surface-elevated border-b border-border-default">
-                <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-24 text-center border-r border-border-default/50">날짜</th>
-                <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-16 text-center border-r border-border-default/50">시간</th>
-                <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-28">고객명</th>
-                <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted">결제 내용</th>
-                <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted text-center w-24">결제 수단</th>
-                <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted text-right w-24">금액</th>
-                <th className="px-4 py-2.5 text-xs font-semibold text-on-surface-muted w-12"></th>
+                <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted w-24 text-center border-r border-border-default/50">날짜</th>
+                <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted w-16 text-center border-r border-border-default/50">시간</th>
+                <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted w-28">고객명</th>
+                <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted">결제 내용</th>
+                <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted text-center w-24">결제 수단</th>
+                <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted text-right w-24">금액</th>
+                <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted w-12"></th>
               </tr>
             )}
             itemContent={(_index, r) => {

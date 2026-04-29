@@ -146,10 +146,10 @@ export function UnpaidTab() {
         {/* 테이블 헤더 */}
         <div className="bg-surface-elevated border-b border-border-default shrink-0">
           <div className={`grid ${gridCols} px-4 py-3`}>
-            <span className="text-xs font-bold text-on-surface-muted uppercase tracking-wider">고객명</span>
-            <span className="text-xs font-bold text-on-surface-muted uppercase tracking-wider">전화번호</span>
-            <span className="text-xs font-bold text-on-surface-muted uppercase tracking-wider text-right">미수금 합계</span>
-            <span className="text-xs font-bold text-on-surface-muted uppercase tracking-wider text-right">마지막 외상일</span>
+            <span className="text-sm font-bold text-on-surface-muted uppercase tracking-wider">고객명</span>
+            <span className="text-sm font-bold text-on-surface-muted uppercase tracking-wider">전화번호</span>
+            <span className="text-sm font-bold text-on-surface-muted uppercase tracking-wider text-right">미수금 합계</span>
+            <span className="text-sm font-bold text-on-surface-muted uppercase tracking-wider text-right">마지막 외상일</span>
             <span />
           </div>
         </div>
@@ -227,12 +227,12 @@ export function UnpaidTab() {
                                 key={r.workItemId}
                                 className="grid grid-cols-[120px_1fr_120px_48px] items-center px-4 py-2.5 hover:bg-surface-elevated/20 transition-colors group/row"
                               >
-                                <span className="text-xs text-on-surface-muted font-mono">{toDateStr(r.receivedAt)}</span>
+                                <span className="text-sm text-on-surface-muted font-mono">{toDateStr(r.receivedAt)}</span>
                                 <div className="flex items-center gap-2 overflow-hidden">
                                   <Receipt className="w-3 h-3 text-on-surface-muted/50 shrink-0" />
-                                  <span className="text-xs text-on-surface truncate">{r.description ?? "-"}</span>
+                                  <span className="text-sm text-on-surface truncate">{r.description ?? "-"}</span>
                                 </div>
-                                <span className="text-xs font-bold text-warning-700 dark:text-warning-400 text-right">
+                                <span className="text-sm font-bold text-warning-700 dark:text-warning-400 text-right">
                                   {r.unpaidAmount.toLocaleString()}원
                                 </span>
                                 <div className="flex justify-end">
