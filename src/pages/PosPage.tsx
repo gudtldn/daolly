@@ -110,7 +110,7 @@ function CustomerPanel({
           // Customer selected: show a minimal change-customer link. Full info is in the card below.
           <button
             onClick={onDeselect}
-            className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-on-surface-muted hover:text-primary-600 hover:bg-surface-elevated rounded-lg transition-colors cursor-pointer border border-dashed border-border-default"
+            className="w-full flex items-center justify-center gap-1.5 py-2 text-sm font-medium text-on-surface-muted hover:text-primary-600 hover:bg-surface-elevated rounded-lg transition-colors cursor-pointer border border-dashed border-border-default"
           >
             <Search className="w-3.5 h-3.5" />
             다른 고객 검색
@@ -210,7 +210,7 @@ function CustomerPanel({
             ))}
             
             {results.length === 0 && showAddOption && (
-              <div className="px-3 pt-3 pb-1 text-xs text-on-surface-muted text-center">
+              <div className="px-3 pt-3 pb-1 text-sm text-on-surface-muted text-center">
                 검색 결과가 없습니다.
               </div>
             )}
@@ -758,7 +758,7 @@ function PaymentPanel({
 
         {/* 결제 수단 */}
         <div>
-          <p className="text-xs font-medium text-on-surface-muted mb-2">결제 수단 <span className="text-danger-500">*</span></p>
+          <p className="text-sm font-medium text-on-surface-muted mb-2">결제 수단 <span className="text-danger-500">*</span></p>
           <div className="grid grid-cols-2 gap-2">
             {PAYMENT_OPTIONS.map((opt) => (
               <button
@@ -779,7 +779,7 @@ function PaymentPanel({
 
         {/* 접수 메모 */}
         <div>
-          <label className="block text-xs font-medium text-on-surface-muted mb-1.5">
+          <label className="block text-sm font-medium text-on-surface-muted mb-1.5">
             접수 메모 (선택)
           </label>
           <textarea
