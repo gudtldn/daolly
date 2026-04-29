@@ -200,7 +200,7 @@ function CustomerPanel({
                 <div className="flex items-center min-w-0 flex-1">
                   <span className="font-bold text-on-surface truncate">{c.name}</span>
                   {c.phoneNumber && (
-                    <span className="text-on-surface-muted ml-2 text-xs shrink-0">{c.phoneNumber}</span>
+                    <span className="text-on-surface-muted ml-2 text-sm shrink-0">{c.phoneNumber}</span>
                   )}
                 </div>
                 {idx === highlightIdx && (
@@ -516,7 +516,7 @@ function OrderPanel({
             className="bg-surface-card border border-border-default rounded-lg p-3 text-center shadow-sm hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all active:scale-95"
           >
             <p className="font-bold text-on-surface text-sm">{item.name}</p>
-            <p className="text-xs font-medium text-primary-600 mt-1">
+            <p className="text-sm font-medium text-primary-600 mt-1">
               {item.defaultPrice.toLocaleString()}
             </p>
           </button>

@@ -69,7 +69,7 @@ function UpdateSplashScreen({
                         style={{ width: `${progress}%` }}
                       />
                     </div>
-                    <p className="text-xs text-on-surface-muted font-mono">{progress}%</p>
+                    <p className="text-sm text-on-surface-muted font-mono">{progress}%</p>
                   </div>
                 )}
               </div>

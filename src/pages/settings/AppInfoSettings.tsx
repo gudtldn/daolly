@@ -111,7 +111,7 @@ export function AppInfoSettings() {
               </div>
               <button
                 onClick={handleCheckUpdate}
-                className="ml-auto text-xs text-on-surface-muted hover:text-on-surface transition-colors cursor-pointer"
+                className="ml-auto text-sm text-on-surface-muted hover:text-on-surface transition-colors cursor-pointer"
               >
                 다시 확인
               </button>

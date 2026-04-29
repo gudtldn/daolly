@@ -642,7 +642,7 @@ export function PriceSettings() {
             <h4 className="text-sm font-semibold text-on-surface">분류</h4>
             <button
               onClick={handleAddCategory}
-              className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 text-sm font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               추가
@@ -667,7 +667,7 @@ export function PriceSettings() {
                   />
                 ))}
                 {categories.length === 0 && (
-                  <li className="p-8 text-center text-xs text-on-surface-muted">
+                  <li className="p-8 text-center text-sm text-on-surface-muted">
                     카테고리가 없습니다.
                   </li>
                 )}
@@ -697,7 +697,7 @@ export function PriceSettings() {
               <button
                 onClick={handleAddItem}
                 disabled={!selectedCategoryId}
-                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                className="flex items-center gap-1 px-2 py-1 text-sm font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 품목 추가
@@ -717,13 +717,13 @@ export function PriceSettings() {
                     <thead className="sticky top-0 bg-surface-elevated border-b border-border-default z-10">
                       <tr>
                         <th className="w-8 pl-3" />
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-on-surface-muted uppercase tracking-wide">
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-on-surface-muted uppercase tracking-wide">
                           품목명
                         </th>
-                        <th className="px-4 py-3 text-right text-xs font-semibold text-on-surface-muted uppercase tracking-wide w-36">
+                        <th className="px-4 py-3 text-right text-sm font-semibold text-on-surface-muted uppercase tracking-wide w-36">
                           기본 단가
                         </th>
-                        <th className="px-4 py-3 text-center text-xs font-semibold text-on-surface-muted uppercase tracking-wide w-20">
+                        <th className="px-4 py-3 text-center text-sm font-semibold text-on-surface-muted uppercase tracking-wide w-20">
                           관리
                         </th>
                       </tr>
@@ -770,13 +770,13 @@ export function PriceSettings() {
             <div className="px-4 py-3 bg-surface-elevated border-b border-border-default flex items-center justify-between shrink-0">
               <div>
                 <h4 className="text-sm font-semibold text-on-surface">공통 추가 옵션</h4>
-                <p className="text-xs text-on-surface-muted mt-0.5">
+                <p className="text-sm text-on-surface-muted mt-0.5">
                   모든 품목에 공통으로 추가할 수 있는 옵션입니다.
                 </p>
               </div>
               <button
                 onClick={handleAddOption}
-                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors cursor-pointer self-start"
+                className="flex items-center gap-1 px-2 py-1 text-sm font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors cursor-pointer self-start"
               >
                 <Plus className="w-3.5 h-3.5" />
                 옵션 추가
@@ -793,13 +793,13 @@ export function PriceSettings() {
                   <thead className="sticky top-0 bg-surface-elevated border-b border-border-default z-10">
                     <tr>
                       <th className="w-8 pl-3" />
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold text-on-surface-muted uppercase tracking-wide">
+                      <th className="px-4 py-2.5 text-left text-sm font-semibold text-on-surface-muted uppercase tracking-wide">
                         옵션명
                       </th>
-                      <th className="px-4 py-2.5 text-right text-xs font-semibold text-on-surface-muted uppercase tracking-wide w-36">
+                      <th className="px-4 py-2.5 text-right text-sm font-semibold text-on-surface-muted uppercase tracking-wide w-36">
                         추가 금액
                       </th>
-                      <th className="px-4 py-2.5 text-center text-xs font-semibold text-on-surface-muted uppercase tracking-wide w-20">
+                      <th className="px-4 py-2.5 text-center text-sm font-semibold text-on-surface-muted uppercase tracking-wide w-20">
                         관리
                       </th>
                     </tr>

@@ -606,11 +606,11 @@ function WorkItemListPanel({
                       <div className="flex flex-col items-start gap-1">
                         <span className="text-base font-bold text-on-surface leading-none">{item.price.toLocaleString()}원</span>
                         {isUnpaid ? (
-                          <button onClick={(e) => { e.stopPropagation(); onPayment(item.id); }} className="px-2 py-1 bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 text-danger-600 dark:text-danger-400 rounded-lg text-xs font-bold whitespace-nowrap leading-none cursor-pointer hover:bg-danger-100 dark:hover:bg-danger-900 transition-colors">
+                          <button onClick={(e) => { e.stopPropagation(); onPayment(item.id); }} className="px-2 py-1 bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 text-danger-600 dark:text-danger-400 rounded-lg text-sm font-bold whitespace-nowrap leading-none cursor-pointer hover:bg-danger-100 dark:hover:bg-danger-900 transition-colors">
                             미수금 {(item.price - item.paidAmount).toLocaleString()}원
                           </button>
                         ) : (
-                          <span className="px-2 py-0.5 bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800 text-primary-600 dark:text-primary-400 rounded-lg text-xs font-bold whitespace-nowrap leading-none">완납</span>
+                          <span className="px-2 py-0.5 bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800 text-primary-600 dark:text-primary-400 rounded-lg text-sm font-bold whitespace-nowrap leading-none">완납</span>
                         )}
                       </div>
                     </td>
@@ -627,7 +627,7 @@ function WorkItemListPanel({
                         ) : details.length > 0 ? (
                           <table className="w-full text-sm">
                             <thead>
-                              <tr className="text-on-surface-muted text-xs">
+                              <tr className="text-on-surface-muted text-sm">
                                 <th className="text-left pb-1.5 font-medium">품목</th>
                                 <th className="text-center pb-1.5 font-medium w-16">수량</th>
                                 <th className="text-right pb-1.5 font-medium w-24">단가</th>
