@@ -517,8 +517,12 @@ function OrderPanel({
             </p>
           </button>
         ))}
+        {catItems.length === 0 && (
+          <p className="col-span-full py-6 text-center text-sm text-on-surface-muted">
+            등록된 품목이 없습니다.
+          </p>
+        )}
         <button
-          onClick={() => setShowDirectInput((v) => !v)}
           className={`border-2 border-dashed rounded-lg p-3 flex flex-col items-center justify-center transition-all text-sm font-bold active:scale-95 ${
             showDirectInput
               ? "border-primary-500 bg-primary-50 text-primary-600 dark:bg-primary-900/20"
@@ -538,7 +542,7 @@ function OrderPanel({
             return (
               <label
                 key={opt.id}
-                className={`flex items-center gap-2 text-sm px-3 py-1.5 rounded cursor-pointer border transition-colors select-none ${
+                className={`flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg cursor-pointer border transition-colors select-none ${
                   checked
                     ? "bg-primary-50 dark:bg-primary-900/20 border-primary-400 text-primary-700 dark:text-primary-300 font-semibold"
                     : "bg-surface-elevated border-border-default text-on-surface-muted hover:border-secondary-300"
@@ -786,7 +790,7 @@ function PaymentPanel({
 
       <div className="p-4 border-t border-border-default bg-surface-elevated shrink-0">
         {(noCustomer || noMethod) && (
-          <p className="text-xs text-warning-600 text-center mb-3">
+          <p className="text-sm text-warning-600 text-center mb-3">
             {noCustomer ? "고객을 먼저 선택해주세요." : "결제 수단을 선택해주세요."}
           </p>
         )}
