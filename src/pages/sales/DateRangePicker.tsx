@@ -103,7 +103,7 @@ export function DateRangePicker({ value, onApply, onClear }: Props) {
           style={popoverStyle}
           className="z-50 bg-surface-card border border-border-default rounded-xl shadow-xl p-4 w-80"
         >
-          <p className="text-xs font-bold text-on-surface-muted mb-3">기간 직접 지정</p>
+          <p className="text-sm font-bold text-on-surface-muted mb-3">기간 직접 지정</p>
 
           <div className="flex items-center gap-2">
             <div className="flex-1">

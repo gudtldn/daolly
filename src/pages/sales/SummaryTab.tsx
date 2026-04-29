@@ -124,7 +124,7 @@ export function SummaryTab() {
           <span>{error}</span>
           <button
             onClick={loadData}
-            className="shrink-0 px-2.5 py-1 text-xs font-medium bg-danger-100 dark:bg-danger-900/40 border border-danger-300 dark:border-danger-700 rounded-lg hover:bg-danger-200 dark:hover:bg-danger-900/60 transition-colors cursor-pointer"
+            className="shrink-0 px-2.5 py-1 text-sm font-medium bg-danger-100 dark:bg-danger-900/40 border border-danger-300 dark:border-danger-700 rounded-lg hover:bg-danger-200 dark:hover:bg-danger-900/60 transition-colors cursor-pointer"
           >
             다시 시도
           </button>
@@ -187,7 +187,7 @@ export function SummaryTab() {
         <div className="bg-surface-card border border-border-default p-5 rounded-lg shadow-sm">
           <div className="flex items-center gap-1.5 mb-1.5">
             <CreditCard className="w-3.5 h-3.5 text-primary-500" />
-            <p className="text-xs font-bold text-on-surface-muted">카드 결제액</p>
+            <p className="text-sm font-bold text-on-surface-muted">카드 결제액</p>
           </div>
           <div className="flex items-baseline gap-1">
             <span className="text-2xl font-bold text-on-surface">{cardIncome.toLocaleString()}</span>
@@ -203,7 +203,7 @@ export function SummaryTab() {
         <div className="bg-surface-card border border-border-default p-5 rounded-lg shadow-sm">
           <div className="flex items-center gap-1.5 mb-1.5">
             <Banknote className="w-3.5 h-3.5 text-success-500" />
-            <p className="text-xs font-bold text-on-surface-muted">현금 / 이체 합계</p>
+            <p className="text-sm font-bold text-on-surface-muted">현금 / 이체 합계</p>
           </div>
           <div className="flex items-baseline gap-1">
             <span className="text-2xl font-bold text-on-surface">{cashTransferIncome.toLocaleString()}</span>
@@ -219,7 +219,7 @@ export function SummaryTab() {
         <div className="bg-surface-card border border-border-default p-5 rounded-lg shadow-sm opacity-85">
           <div className="flex items-center gap-1.5 mb-1.5">
             <TrendingUp className="w-3.5 h-3.5 text-secondary-500" />
-            <p className="text-xs font-bold text-on-surface-muted">{periodLabel} 접수한 금액</p>
+            <p className="text-sm font-bold text-on-surface-muted">{periodLabel} 접수한 금액</p>
           </div>
           <div className="flex items-baseline gap-1">
             <span className="text-2xl font-bold text-on-surface">{summary.totalSales.toLocaleString()}</span>

@@ -111,7 +111,7 @@ export function UnpaidTab() {
           <span>{error}</span>
           <button
             onClick={loadData}
-            className="shrink-0 px-2.5 py-1 text-xs font-medium bg-danger-100 dark:bg-danger-900/40 border border-danger-300 dark:border-danger-700 rounded-lg hover:bg-danger-200 dark:hover:bg-danger-900/60 transition-colors cursor-pointer"
+            className="shrink-0 px-2.5 py-1 text-sm font-medium bg-danger-100 dark:bg-danger-900/40 border border-danger-300 dark:border-danger-700 rounded-lg hover:bg-danger-200 dark:hover:bg-danger-900/60 transition-colors cursor-pointer"
           >
             다시 시도
           </button>
@@ -161,7 +161,7 @@ export function UnpaidTab() {
                 <Clock className="w-10 h-10" />
               </div>
               <p className="text-sm font-bold">현재 미수금이 없습니다.</p>
-              <p className="text-xs opacity-60 mt-1">모든 외상이 결제되었습니다.</p>
+              <p className="text-sm opacity-60 mt-1">모든 외상이 결제되었습니다.</p>
             </div>
           ) : (
             <div className="divide-y divide-border-default">
