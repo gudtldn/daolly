@@ -86,7 +86,7 @@ export function DatabaseSettings() {
       customContent: (
         <div>
           <p className="text-sm text-on-surface mb-2">다음 백업 파일로 복원하시겠습니까?</p>
-          <p className="text-xs text-on-surface-muted font-mono bg-surface-elevated px-3 py-2 rounded mb-4 break-all">
+          <p className="text-sm text-on-surface-muted font-mono bg-surface-elevated px-3 py-2 rounded-lg mb-4 break-all">
             {filename}
           </p>
           <div className="flex items-start gap-2 bg-warning-50 dark:bg-warning-950 border border-warning-200 dark:border-warning-800 rounded-lg px-4 py-3 text-sm text-warning-700 dark:text-warning-300">
@@ -129,7 +129,7 @@ export function DatabaseSettings() {
               선택한 파일에서 데이터를 가져옵니다. 
               기존 데이터가 있는 경우 <strong className="text-primary-600 dark:text-primary-400">자동으로 백업</strong> 후 진행됩니다.
             </p>
-            <p className="text-xs text-on-surface-muted font-mono bg-surface-elevated px-3 py-2 rounded break-all">
+            <p className="text-sm text-on-surface-muted font-mono bg-surface-elevated px-3 py-2 rounded-lg break-all">
               {selected}
             </p>
             <div className="flex items-start gap-2 bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800 rounded-lg px-4 py-3 text-sm text-primary-700 dark:text-primary-300">
@@ -175,7 +175,7 @@ export function DatabaseSettings() {
             <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" />
             <div className="space-y-1">
               <p className="font-bold">주의: 모든 데이터가 삭제됩니다.</p>
-              <p className="text-xs">손님 정보, 작업 내역, 매출 기록, 단가 설정 등 모든 정보가 초기화됩니다.</p>
+              <p className="text-sm">손님 정보, 작업 내역, 매출 기록, 단가 설정 등 모든 정보가 초기화됩니다.</p>
             </div>
           </div>
           <p className="text-sm text-on-surface">
@@ -232,7 +232,7 @@ export function DatabaseSettings() {
         <section className="bg-surface-card rounded-lg border border-border-default p-5 shadow-sm">
           <h4 className="text-sm font-semibold text-on-surface mb-4">데이터베이스 위치</h4>
           <div className="flex items-center gap-3">
-            <span className="flex-1 text-xs text-on-surface-muted font-mono bg-surface-elevated px-3 py-2 rounded-lg break-all">
+            <span className="flex-1 text-sm text-on-surface-muted font-mono bg-surface-elevated px-3 py-2 rounded-lg break-all">
               {dbPath}
             </span>
             <button
@@ -250,7 +250,7 @@ export function DatabaseSettings() {
           <div className="flex items-center justify-between">
             <div>
               <h4 className="text-sm font-semibold text-on-surface">이전 버전 데이터 가져오기</h4>
-              <p className="text-xs text-on-surface-muted mt-1">
+              <p className="text-sm text-on-surface-muted mt-1">
                 WinForms 버전의 customer.db 파일을 선택하여 손님 및 작업 내역을 가져옵니다.
               </p>
             </div>
@@ -304,7 +304,7 @@ export function DatabaseSettings() {
                       <td className="px-4 py-3 text-center w-24">
                         <button
                           onClick={() => handleRestoreClick(b.filename)}
-                          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium border border-border-default rounded hover:bg-surface-elevated transition-colors cursor-pointer"
+                          className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium border border-border-default rounded-lg hover:bg-surface-elevated transition-colors cursor-pointer"
                         >
                           <UploadCloud className="w-3.5 h-3.5" />
                           복원
@@ -327,7 +327,7 @@ export function DatabaseSettings() {
               </div>
               <div>
                 <h4 className="text-sm font-bold text-danger-700 dark:text-danger-400">데이터 초기화</h4>
-                <p className="text-xs text-on-surface-muted mt-1">
+                <p className="text-sm text-on-surface-muted mt-1">
                   모든 데이터를 삭제하고 앱을 초기 상태로 되돌립니다. 삭제 전 백업이 자동으로 생성됩니다.
                 </p>
               </div>
