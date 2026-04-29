@@ -86,7 +86,7 @@ export function TransactionsTab() {
           <span>{error}</span>
           <button
             onClick={loadRecords}
-            className="shrink-0 px-2.5 py-1 text-xs font-medium bg-danger-100 dark:bg-danger-900/40 border border-danger-300 dark:border-danger-700 rounded-lg hover:bg-danger-200 dark:hover:bg-danger-900/60 transition-colors cursor-pointer"
+            className="shrink-0 px-2.5 py-1 text-sm font-medium bg-danger-100 dark:bg-danger-900/40 border border-danger-300 dark:border-danger-700 rounded-lg hover:bg-danger-200 dark:hover:bg-danger-900/60 transition-colors cursor-pointer"
           >
             다시 시도
           </button>
@@ -144,7 +144,7 @@ export function TransactionsTab() {
         <div className="px-4 py-3 bg-surface-elevated border-b border-border-default shrink-0 flex items-center gap-2">
           <Receipt className="w-4 h-4 text-on-surface-muted" />
           <h3 className="text-sm font-bold text-on-surface">상세 결제 내역</h3>
-          <span className="ml-auto text-xs text-on-surface-muted">{filtered.length}건</span>
+          <span className="ml-auto text-sm text-on-surface-muted">{filtered.length}건</span>
         </div>
 
         <div className="flex-1 font-sans">
@@ -165,10 +165,10 @@ export function TransactionsTab() {
               const { date, time, isToday } = formatSmartDateTime(r.receivedAt);
               return (
                 <>
-                  <td className={`px-4 py-3 text-xs text-center border-r border-border-default/50 ${isToday ? "text-primary-600 font-bold dark:text-primary-400" : "text-on-surface-muted"}`}>
+                  <td className={`px-4 py-3 text-sm text-center border-r border-border-default/50 ${isToday ? "text-primary-600 font-bold dark:text-primary-400" : "text-on-surface-muted"}`}>
                     {date}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-on-surface-muted text-center border-r border-border-default/50">{time}</td>
+                  <td className="px-4 py-3 font-mono text-sm text-on-surface-muted text-center border-r border-border-default/50">{time}</td>
                   <td className="px-4 py-3 font-semibold text-on-surface">{r.customerName}</td>
                   <td className="px-4 py-3 text-on-surface max-w-[200px] truncate">{r.description ?? "-"}</td>
                   <td className="px-4 py-3 text-center">

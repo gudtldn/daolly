@@ -442,7 +442,7 @@ function OrderPanel({
     const inputEl = (
       <div className="py-2 flex flex-col gap-4">
         <div>
-          <label className="block text-xs font-medium text-on-surface-muted mb-1.5">단가 수정</label>
+          <label className="block text-sm font-medium text-on-surface-muted mb-1.5">단가 수정</label>
           <CurrencyInput
             autoFocus
             value={priceRef.current}
@@ -452,7 +452,7 @@ function OrderPanel({
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-on-surface-muted mb-1.5">메모 수정</label>
+          <label className="block text-sm font-medium text-on-surface-muted mb-1.5">메모 수정</label>
           <input
             type="text"
             defaultValue={memoRef.current}
