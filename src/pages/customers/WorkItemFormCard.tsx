@@ -448,7 +448,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
               <button
                 onClick={addDetail}
                 type="button"
-                className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium cursor-pointer"
+                className="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-medium cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" /> 행 추가
               </button>
@@ -530,7 +530,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <label className="text-sm font-medium text-on-surface">가격</label>
-                <label className="flex items-center gap-1.5 text-xs text-on-surface-muted cursor-pointer">
+                <label className="flex items-center gap-1.5 text-sm text-on-surface-muted cursor-pointer">
                   <input
                     type="checkbox"
                     checked={manualPrice}
@@ -581,15 +581,15 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                 {/* 요약 카드 */}
                 <div className="grid grid-cols-3 gap-3">
                   <div className="bg-surface-elevated rounded-lg px-4 py-3 text-center">
-                    <div className="text-xs text-on-surface-muted mb-1">총액</div>
+                    <div className="text-sm text-on-surface-muted mb-1">종액</div>
                     <div className="text-lg font-bold text-on-surface">{(workItem?.price ?? 0).toLocaleString()}원</div>
                   </div>
                   <div className="bg-surface-elevated rounded-lg px-4 py-3 text-center">
-                    <div className="text-xs text-on-surface-muted mb-1">납부액</div>
+                    <div className="text-sm text-on-surface-muted mb-1">납부액</div>
                     <div className="text-lg font-bold text-primary-600 dark:text-primary-400">{totalPaid.toLocaleString()}원</div>
                   </div>
                   <div className={`rounded-lg px-4 py-3 text-center ${remaining > 0 ? "bg-danger-50 dark:bg-danger-950" : "bg-success-50 dark:bg-success-950"}`}>
-                    <div className="text-xs text-on-surface-muted mb-1">잔액</div>
+                    <div className="text-sm text-on-surface-muted mb-1">잔액</div>
                     <div className={`text-lg font-bold ${remaining > 0 ? "text-danger-600 dark:text-danger-400" : "text-success-600 dark:text-success-400"}`}>
                       {remaining > 0 ? `${remaining.toLocaleString()}원` : "완납"}
                     </div>
@@ -704,7 +704,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                     <label className="block text-sm font-medium text-on-surface mb-2">결제 등록</label>
                     <div className="flex gap-2 items-end">
                       <div className="w-52">
-                        <label className="block text-xs text-on-surface-muted mb-1">일시</label>
+                        <label className="block text-sm text-on-surface-muted mb-1">일시</label>
                         <input
                           type="datetime-local"
                           value={payDate}
@@ -713,7 +713,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                         />
                       </div>
                       <div className="flex-1">
-                        <label className="block text-xs text-on-surface-muted mb-1">금액</label>
+                        <label className="block text-sm text-on-surface-muted mb-1">금액</label>
                         <CurrencyInput
                           ref={payAmountRef}
                           value={payAmount}
@@ -723,7 +723,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                         />
                       </div>
                       <div className="w-28">
-                        <label className="block text-xs text-on-surface-muted mb-1">수단</label>
+                        <label className="block text-sm text-on-surface-muted mb-1">수단</label>
                         <select value={payMethod} onChange={(e) => setPayMethod(e.target.value)} className={inputCls}>
                           <option value="cash">현금</option>
                           <option value="card">카드</option>
