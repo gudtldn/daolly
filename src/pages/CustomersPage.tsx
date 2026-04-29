@@ -99,7 +99,7 @@ function StatusDropdown({ status, onChangeStatus }: { status: WorkItemStatus; on
                 key={s}
                 onClick={(e) => { e.stopPropagation(); onChangeStatus(s); setOpen(false); }}
                 title={c.title}
-                className={`w-full px-3 py-1.5 text-xs font-bold text-left hover:bg-surface-elevated transition-colors cursor-pointer ${s === status ? "opacity-50" : ""}`}
+                className={`w-full px-3 py-1.5 text-sm font-bold text-left hover:bg-surface-elevated transition-colors cursor-pointer ${s === status ? "opacity-50" : ""}`}
               >
                 <span className={`inline-block px-2 py-0.5 rounded ${c.cls}`}>{c.label}</span>
               </button>
@@ -284,7 +284,7 @@ function CustomerListPanel({
                     {c.note || "\u00A0"}
                   </div>
                   {unpaidMap[c.id] && (
-                    <span className="text-xs font-bold text-danger-600 dark:text-danger-400 whitespace-nowrap ml-2">
+                    <span className="text-sm font-bold text-danger-600 dark:text-danger-400 whitespace-nowrap ml-2">
                       미수금 {unpaidMap[c.id].toLocaleString()}원
                     </span>
                   )}
