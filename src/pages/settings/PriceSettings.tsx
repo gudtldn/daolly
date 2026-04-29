@@ -250,7 +250,7 @@ function SortableCategoryItem({
     <li
       ref={setNodeRef}
       style={style}
-      className={`flex items-center border-b border-border-default last:border-0 group ${
+      className={`flex items-center border-b border-border-default last:border-0 group min-w-0 ${
         isActive ? "bg-primary-50 dark:bg-primary-950/30 border-l-2 border-l-primary-500" : "border-l-2 border-l-transparent"
       }`}
     >
@@ -263,7 +263,8 @@ function SortableCategoryItem({
       </span>
       <button
         onClick={onSelect}
-        className={`flex-1 text-left px-2 py-3 text-sm transition-colors cursor-pointer ${
+        title={cat.name}
+        className={`flex-1 text-left px-2 py-3 text-sm transition-colors cursor-pointer truncate ${
           isActive
             ? "text-primary-700 dark:text-primary-300 font-semibold"
             : "text-on-surface hover:text-on-surface"
@@ -637,7 +638,7 @@ export function PriceSettings() {
 
       <div className="flex gap-4 flex-1 min-h-0">
         {/* ---- Category panel (left) ---- */}
-        <div className="w-52 shrink-0 bg-surface-card border border-border-default rounded-lg flex flex-col overflow-hidden shadow-sm">
+        <div className="w-64 shrink-0 bg-surface-card border border-border-default rounded-lg flex flex-col overflow-hidden shadow-sm">
           <div className="px-4 py-3 bg-surface-elevated border-b border-border-default flex items-center justify-between shrink-0">
             <h4 className="text-sm font-semibold text-on-surface">분류</h4>
             <button
@@ -685,11 +686,11 @@ export function PriceSettings() {
         <div className="flex-1 flex flex-col gap-4 min-h-0">
           {/* Price items panel */}
           <div className="flex-1 bg-surface-card border border-border-default rounded-lg flex flex-col overflow-hidden shadow-sm min-h-0">
-            <div className="px-4 py-3 bg-surface-elevated border-b border-border-default flex items-center justify-between shrink-0">
-              <h4 className="text-sm font-semibold text-on-surface">
-                세부 품목 단가표
+            <div className="px-4 py-3 bg-surface-elevated border-b border-border-default flex items-center justify-between shrink-0 gap-4">
+              <h4 className="text-sm font-semibold text-on-surface flex items-center min-w-0">
+                <span className="shrink-0">세부 품목 단가표</span>
                 {activeCat && (
-                  <span className="ml-1.5 text-primary-600 dark:text-primary-400 font-normal">
+                  <span className="ml-1.5 text-primary-600 dark:text-primary-400 font-normal truncate" title={activeCat.name}>
                     [{activeCat.name}]
                   </span>
                 )}

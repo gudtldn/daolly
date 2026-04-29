@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { Settings, Wrench, Info, Database, Tag } from "lucide-react";
+import { useSearchParams } from "react-router";
 import { GeneralSettings } from "@/pages/settings/GeneralSettings";
 import { AppInfoSettings } from "@/pages/settings/AppInfoSettings";
 import { DatabaseSettings } from "@/pages/settings/DatabaseSettings";
@@ -22,8 +22,14 @@ const categoryComponents: Record<CategoryId, React.FC> = {
 };
 
 export function SettingsPage() {
-  const [activeCategory, setActiveCategory] = useState<CategoryId>("general");
-  const ActiveComponent = categoryComponents[activeCategory];
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeCategory = (searchParams.get("tab") as CategoryId) || "general";
+
+  const setActiveCategory = (id: CategoryId) => {
+    setSearchParams({ tab: id });
+  };
+
+  const ActiveComponent = categoryComponents[activeCategory] || GeneralSettings;
 
   return (
     <div className="h-full flex">

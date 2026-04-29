@@ -8,6 +8,7 @@ import {
   User, Plus, Search, History, X,
   Minus, Trash2, Pen, Keyboard, Shirt,
   CheckCircle2, CreditCard, Banknote, Landmark, Clock, UserPlus,
+  Settings,
 } from "lucide-react";
 import type { Customer, Category, PriceItem, PriceOption, CreateCustomer } from "@/types";
 import {
@@ -423,6 +424,7 @@ function OrderPanel({
     );
   }, []);
 
+  const navigate = useNavigate();
   const catItems = priceItems.filter((p) => p.categoryId === activeCatId);
 
   const handleItemClick = (id: number, name: string, basePrice: number) => {
@@ -478,10 +480,10 @@ function OrderPanel({
   return (
     <div className="flex-1 min-w-0 bg-surface-card border border-border-default rounded-lg flex flex-col shadow-sm overflow-hidden">
       {/* 카테고리 탭 */}
-      <div className="relative shrink-0">
+      <div className="relative shrink-0 flex border-b border-border-default bg-surface">
         <div
           ref={catTabsRef}
-          className="flex border-b border-border-default bg-surface overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+          className="flex-1 flex overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
         >
           {categories.map((cat) => (
             <button
@@ -503,8 +505,15 @@ function OrderPanel({
           )}
         </div>
         {canScrollRight && (
-          <div className="absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-surface to-transparent pointer-events-none border-b border-border-default" />
+          <div className="absolute right-12 top-0 bottom-0 w-10 bg-gradient-to-l from-surface to-transparent pointer-events-none" />
         )}
+        <button
+          onClick={() => navigate("/settings?tab=pricing")}
+          className="w-12 flex items-center justify-center text-on-surface-muted hover:text-primary-600 hover:bg-surface-elevated transition-colors border-l border-border-default shrink-0 bg-surface z-10"
+          title="단가표 설정 바로가기"
+        >
+          <Settings className="w-4 h-4" />
+        </button>
       </div>
 
       {/* 단가 버튼 그리드 */}
@@ -527,6 +536,7 @@ function OrderPanel({
           </p>
         )}
         <button
+          onClick={() => setShowDirectInput(true)}
           className={`border-2 border-dashed rounded-lg p-3 flex flex-col items-center justify-center transition-all text-sm font-bold active:scale-95 ${
             showDirectInput
               ? "border-primary-500 bg-primary-50 text-primary-600 dark:bg-primary-900/20"
