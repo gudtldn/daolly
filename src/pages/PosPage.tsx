@@ -516,36 +516,54 @@ function OrderPanel({
         </button>
       </div>
 
-      {/* 단가 버튼 그리드 */}
-      <div className="p-4 grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-3 shrink-0 bg-surface border-b border-border-default overflow-y-auto max-h-56">
-        {catItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => handleItemClick(item.id, item.name, item.defaultPrice)}
-            className="bg-surface-card border border-border-default rounded-lg p-3 text-center shadow-sm hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all active:scale-95"
-          >
-            <p className="font-bold text-on-surface text-sm">{item.name}</p>
-            <p className="text-sm font-medium text-primary-600 mt-1">
-              {item.defaultPrice.toLocaleString()}
+      {/* 단가 버튼 그리드 영역 */}
+      <div className="p-4 shrink-0 bg-surface border-b border-border-default overflow-y-auto max-h-56 min-h-[140px] flex items-center justify-center">
+        {catItems.length > 0 ? (
+          <div className="w-full grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-3">
+            {catItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => handleItemClick(item.id, item.name, item.defaultPrice)}
+                className="bg-surface-card border border-border-default rounded-lg p-3 text-center shadow-sm hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all active:scale-95"
+              >
+                <p className="font-bold text-on-surface text-sm">{item.name}</p>
+                <p className="text-sm font-medium text-primary-600 mt-1">
+                  {item.defaultPrice.toLocaleString()}
+                </p>
+              </button>
+            ))}
+            <button
+              onClick={() => setShowDirectInput(true)}
+              className={`border-2 border-dashed rounded-lg p-3 flex flex-col items-center justify-center transition-all text-sm font-bold active:scale-95 ${
+                showDirectInput
+                  ? "border-primary-500 bg-primary-50 text-primary-600 dark:bg-primary-900/20"
+                  : "border-border-default bg-surface text-on-surface-muted hover:border-primary-400 hover:text-primary-500"
+              }`}
+            >
+              <Keyboard className="w-5 h-5 mb-1" />
+              직접 입력
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-3 animate-in fade-in zoom-in-95 duration-300">
+            <p className="text-sm text-on-surface-muted">
+              {categories.length === 0 
+                ? "단가표에 등록된 카테고리가 없습니다." 
+                : "이 분류에 등록된 품목이 없습니다."}
             </p>
-          </button>
-        ))}
-        {catItems.length === 0 && (
-          <p className="col-span-full py-6 text-center text-sm text-on-surface-muted">
-            등록된 품목이 없습니다.
-          </p>
+            <button
+              onClick={() => setShowDirectInput(true)}
+              className={`flex items-center gap-2 px-8 py-3.5 rounded-xl border-2 border-dashed transition-all text-sm font-bold active:scale-95 ${
+                showDirectInput
+                  ? "border-primary-500 bg-primary-50 text-primary-600 dark:bg-primary-900/20 shadow-inner"
+                  : "border-border-default bg-surface-card text-on-surface-muted hover:border-primary-400 hover:text-primary-600 hover:bg-surface-elevated shadow-sm"
+              }`}
+            >
+              <Keyboard className="w-5 h-5" />
+              {showDirectInput ? "직접 입력 창 활성화됨" : "품목 직접 입력하기"}
+            </button>
+          </div>
         )}
-        <button
-          onClick={() => setShowDirectInput(true)}
-          className={`border-2 border-dashed rounded-lg p-3 flex flex-col items-center justify-center transition-all text-sm font-bold active:scale-95 ${
-            showDirectInput
-              ? "border-primary-500 bg-primary-50 text-primary-600 dark:bg-primary-900/20"
-              : "border-border-default bg-surface text-on-surface-muted hover:border-primary-400 hover:text-primary-500"
-          }`}
-        >
-          <Keyboard className="w-5 h-5 mb-1" />
-          직접 입력
-        </button>
       </div>
 
       {/* 추가 옵션 체크박스 */}

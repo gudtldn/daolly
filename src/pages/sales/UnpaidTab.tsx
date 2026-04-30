@@ -4,6 +4,7 @@ import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { useNavigate } from "react-router";
 import { salesApi } from "@/bindings/sales";
 import type { UnpaidRecord } from "@/types";
+import { formatSmartDateTime } from "@/utils/dateUtils";
 
 // Group flat UnpaidRecord[] by customer for accordion display.
 interface CustomerGroup {
@@ -215,40 +216,46 @@ export function UnpaidTab() {
                     {isExpanded && (
                       <div className="bg-surface-elevated/30 border-t border-border-default/50 px-4 py-2 animate-in fade-in slide-in-from-top-1 duration-200">
                         <div className="bg-surface-card rounded-md border border-border-default/60 shadow-inner-sm overflow-hidden mb-2">
-                          <div className="grid grid-cols-[120px_1fr_120px_48px] px-4 py-2 bg-surface-elevated/50 border-b border-border-default/50">
-                            <span className="text-[0.625rem] font-bold text-on-surface-muted uppercase">날짜</span>
+                          <div className="grid grid-cols-[140px_1fr_120px_48px] px-4 py-2 bg-surface-elevated/50 border-b border-border-default/50">
+                            <span className="text-[0.625rem] font-bold text-on-surface-muted uppercase">일시</span>
                             <span className="text-[0.625rem] font-bold text-on-surface-muted uppercase">상세 내용</span>
                             <span className="text-[0.625rem] font-bold text-on-surface-muted uppercase text-right">금액</span>
                             <span />
                           </div>
                           <div className="divide-y divide-border-default/40">
-                            {customer.records.map((r) => (
-                              <div
-                                key={r.workItemId}
-                                className="grid grid-cols-[120px_1fr_120px_48px] items-center px-4 py-2.5 hover:bg-surface-elevated/20 transition-colors group/row"
-                              >
-                                <span className="text-sm text-on-surface-muted font-mono">{toDateStr(r.receivedAt)}</span>
-                                <div className="flex items-center gap-2 overflow-hidden">
-                                  <Receipt className="w-3 h-3 text-on-surface-muted/50 shrink-0" />
-                                  <span className="text-sm text-on-surface truncate">{r.description ?? "-"}</span>
+                            {customer.records.map((r) => {
+                              const { date, time } = formatSmartDateTime(r.receivedAt);
+                              return (
+                                <div
+                                  key={r.workItemId}
+                                  className="grid grid-cols-[140px_1fr_120px_48px] items-center px-4 py-2.5 hover:bg-surface-elevated/20 transition-colors group/row"
+                                >
+                                  <div className="flex flex-col">
+                                    <span className="text-xs text-on-surface-muted font-medium">{date}</span>
+                                    <span className="text-sm text-on-surface font-mono">{time}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 overflow-hidden">
+                                    <Receipt className="w-3 h-3 text-on-surface-muted/50 shrink-0" />
+                                    <span className="text-sm text-on-surface truncate">{r.description ?? "-"}</span>
+                                  </div>
+                                  <span className="text-sm font-bold text-warning-700 dark:text-warning-400 text-right">
+                                    {r.unpaidAmount.toLocaleString()}원
+                                  </span>
+                                  <div className="flex justify-end">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleGoToWorkItem(customer.customerId, r.workItemId);
+                                      }}
+                                      title="고객 관리에서 이 작업 보기"
+                                      className="p-1.5 rounded-lg text-on-surface-muted bg-surface-elevated border border-border-default hover:bg-primary-600 hover:text-white dark:hover:bg-primary-500 hover:border-primary-600 transition-all cursor-pointer shadow-sm group/btn"
+                                    >
+                                      <ExternalLink className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
                                 </div>
-                                <span className="text-sm font-bold text-warning-700 dark:text-warning-400 text-right">
-                                  {r.unpaidAmount.toLocaleString()}원
-                                </span>
-                                <div className="flex justify-end">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleGoToWorkItem(customer.customerId, r.workItemId);
-                                    }}
-                                    title="고객 관리에서 이 작업 보기"
-                                    className="p-1.5 rounded-lg text-on-surface-muted bg-surface-elevated border border-border-default hover:bg-primary-600 hover:text-white dark:hover:bg-primary-500 hover:border-primary-600 transition-all cursor-pointer shadow-sm group/btn"
-                                  >
-                                    <ExternalLink className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       </div>

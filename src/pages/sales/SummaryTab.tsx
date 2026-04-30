@@ -50,6 +50,7 @@ export function SummaryTab() {
   const [isLoading, setIsLoading] = useState(false);
 
   const activeRange = useMemo(() => customRange ?? getDateRange(period), [customRange, period]);
+  const isMultiDay = useMemo(() => activeRange.from.slice(0, 10) !== activeRange.to.slice(0, 10), [activeRange]);
 
   const loadData = useCallback(async () => {
     try {
@@ -327,7 +328,14 @@ export function SummaryTab() {
               <thead className="bg-surface-elevated sticky top-0 border-b border-border-default z-10">
                 {rightTab === "payments" ? (
                   <tr>
-                    <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted w-24 text-center border-r border-border-default/50">시간</th>
+                    {isMultiDay ? (
+                      <>
+                        <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted w-24 text-center border-r border-border-default/50">날짜</th>
+                        <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted w-16 text-center border-r border-border-default/50">시간</th>
+                      </>
+                    ) : (
+                      <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted w-24 text-center border-r border-border-default/50">시간</th>
+                    )}
                     <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted w-28">고객명</th>
                     <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted">내용</th>
                     <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted text-center w-32">수입 구분</th>
@@ -337,7 +345,14 @@ export function SummaryTab() {
                   </tr>
                 ) : (
                   <tr>
-                    <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted w-24 text-center border-r border-border-default/50">시간</th>
+                    {isMultiDay ? (
+                      <>
+                        <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted w-24 text-center border-r border-border-default/50">날짜</th>
+                        <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted w-16 text-center border-r border-border-default/50">시간</th>
+                      </>
+                    ) : (
+                      <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted w-24 text-center border-r border-border-default/50">시간</th>
+                    )}
                     <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted w-28">고객명</th>
                     <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted">내용</th>
                     <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted text-center w-32">결제 상태</th>
@@ -349,12 +364,17 @@ export function SummaryTab() {
               <tbody className="divide-y divide-border-default">
                 {rightTab === "payments" ? (
                   filteredPayments.length === 0 ? (
-                    <tr><td colSpan={7} className="px-4 py-10 text-center text-on-surface-muted text-sm">입금 내역이 없습니다.</td></tr>
+                    <tr><td colSpan={isMultiDay ? 8 : 7} className="px-4 py-10 text-center text-on-surface-muted text-sm">입금 내역이 없습니다.</td></tr>
                   ) : (
                     filteredPayments.map((r) => {
-                      const { time, isToday } = formatSmartDateTime(r.paidAt);
+                      const { date, time, isToday } = formatSmartDateTime(r.paidAt);
                       return (
                         <tr key={r.paymentId} className="hover:bg-surface-elevated transition-colors group">
+                          {isMultiDay && (
+                            <td className={`px-4 py-3 text-sm text-center border-r border-border-default/50 ${isToday ? "text-primary-600 font-bold dark:text-primary-400" : "text-on-surface-muted"}`}>
+                              {date}
+                            </td>
+                          )}
                           <td className={`px-4 py-3 text-sm text-center border-r border-border-default/50 font-mono ${isToday ? "text-primary-600 font-bold dark:text-primary-400" : "text-on-surface-muted"}`}>{time}</td>
                           <td className="px-4 py-3 font-semibold text-on-surface">{r.customerName}</td>
                           <td className="px-4 py-3 text-on-surface truncate max-w-[200px]">{r.description ?? "-"}</td>
@@ -376,13 +396,18 @@ export function SummaryTab() {
                   )
                 ) : (
                   filteredSales.length === 0 ? (
-                    <tr><td colSpan={6} className="px-4 py-10 text-center text-on-surface-muted text-sm">접수 내역이 없습니다.</td></tr>
+                    <tr><td colSpan={isMultiDay ? 7 : 6} className="px-4 py-10 text-center text-on-surface-muted text-sm">접수 내역이 없습니다.</td></tr>
                   ) : (
                     filteredSales.map((r) => {
-                      const { time, isToday } = formatSmartDateTime(r.receivedAt);
+                      const { date, time, isToday } = formatSmartDateTime(r.receivedAt);
                       const isFullyPaid = r.paidAmount >= r.price;
                       return (
                         <tr key={r.workItemId} className="hover:bg-surface-elevated transition-colors group">
+                          {isMultiDay && (
+                            <td className={`px-4 py-3 text-sm text-center border-r border-border-default/50 ${isToday ? "text-primary-600 font-bold dark:text-primary-400" : "text-on-surface-muted"}`}>
+                              {date}
+                            </td>
+                          )}
                           <td className={`px-4 py-3 text-sm text-center border-r border-border-default/50 font-mono ${isToday ? "text-primary-600 font-bold dark:text-primary-400" : "text-on-surface-muted"}`}>{time}</td>
                           <td className="px-4 py-3 font-semibold text-on-surface">{r.customerName}</td>
                           <td className="px-4 py-3 text-on-surface truncate max-w-[200px]">{r.description ?? "-"}</td>

@@ -150,25 +150,39 @@ export function TransactionsTab() {
         <div className="flex-1 font-sans">
           <TableVirtuoso
             data={filtered}
-            fixedHeaderContent={() => (
-              <tr className="bg-surface-elevated border-b border-border-default">
-                <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted w-24 text-center border-r border-border-default/50">날짜</th>
-                <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted w-16 text-center border-r border-border-default/50">시간</th>
-                <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted w-28">고객명</th>
-                <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted">결제 내용</th>
-                <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted text-center w-24">결제 수단</th>
-                <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted text-right w-24">금액</th>
-                <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted w-12"></th>
-              </tr>
-            )}
+            fixedHeaderContent={() => {
+              const isMultiDay = activeRange.from.slice(0, 10) !== activeRange.to.slice(0, 10);
+              return (
+                <tr className="bg-surface-elevated border-b border-border-default">
+                  {isMultiDay ? (
+                    <>
+                      <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted w-24 text-center border-r border-border-default/50">날짜</th>
+                      <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted w-16 text-center border-r border-border-default/50">시간</th>
+                    </>
+                  ) : (
+                    <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted w-24 text-center border-r border-border-default/50">시간</th>
+                  )}
+                  <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted w-28">고객명</th>
+                  <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted">결제 내용</th>
+                  <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted text-center w-24">결제 수단</th>
+                  <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted text-right w-24">금액</th>
+                  <th className="px-4 py-2.5 text-sm font-semibold text-on-surface-muted w-12"></th>
+                </tr>
+              );
+            }}
             itemContent={(_index, r) => {
               const { date, time, isToday } = formatSmartDateTime(r.receivedAt);
+              const isMultiDay = activeRange.from.slice(0, 10) !== activeRange.to.slice(0, 10);
               return (
                 <>
-                  <td className={`px-4 py-3 text-sm text-center border-r border-border-default/50 ${isToday ? "text-primary-600 font-bold dark:text-primary-400" : "text-on-surface-muted"}`}>
-                    {date}
+                  {isMultiDay && (
+                    <td className={`px-4 py-3 text-sm text-center border-r border-border-default/50 ${isToday ? "text-primary-600 font-bold dark:text-primary-400" : "text-on-surface-muted"}`}>
+                      {date}
+                    </td>
+                  )}
+                  <td className="px-4 py-3 font-mono text-sm text-on-surface-muted text-center border-r border-border-default/50">
+                    {time}
                   </td>
-                  <td className="px-4 py-3 font-mono text-sm text-on-surface-muted text-center border-r border-border-default/50">{time}</td>
                   <td className="px-4 py-3 font-semibold text-on-surface">{r.customerName}</td>
                   <td className="px-4 py-3 text-on-surface max-w-[200px] truncate">{r.description ?? "-"}</td>
                   <td className="px-4 py-3 text-center">
