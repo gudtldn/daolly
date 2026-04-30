@@ -38,7 +38,12 @@ export const useCartStore = create<CartStore>((set, get) => ({
   customerId: null,
   items: [],
 
-  setCustomer: (id) => set({ customerId: id }),
+  setCustomer: (id) => set((s) => {
+    if (s.customerId !== id) {
+      return { customerId: id, items: [] };
+    }
+    return { customerId: id };
+  }),
 
   addItem: (item) => {
     set((s) => {

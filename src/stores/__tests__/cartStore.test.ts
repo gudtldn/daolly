@@ -139,4 +139,40 @@ describe("cartStore", () => {
       expect(useCartStore.getState().items).toHaveLength(0);
     });
   });
+
+  describe("setCustomer", () => {
+    it("고객 ID가 변경되면 장바구니를 비움", () => {
+      useCartStore.setState({ 
+        customerId: 1, 
+        items: [{ ...sampleItem, uid: "test-uid", quantity: 1, optionsMemo: "" }] 
+      });
+      
+      useCartStore.getState().setCustomer(2);
+      
+      expect(useCartStore.getState().customerId).toBe(2);
+      expect(useCartStore.getState().items).toHaveLength(0);
+    });
+
+    it("동일한 고객 ID면 장바구니를 유지함", () => {
+      const items = [{ ...sampleItem, uid: "test-uid", quantity: 1, optionsMemo: "" }];
+      useCartStore.setState({ customerId: 1, items });
+      
+      useCartStore.getState().setCustomer(1);
+      
+      expect(useCartStore.getState().customerId).toBe(1);
+      expect(useCartStore.getState().items).toEqual(items);
+    });
+
+    it("고객 선택 해제 시에도 장바구니를 비움", () => {
+      useCartStore.setState({ 
+        customerId: 1, 
+        items: [{ ...sampleItem, uid: "test-uid", quantity: 1, optionsMemo: "" }] 
+      });
+      
+      useCartStore.getState().setCustomer(null);
+      
+      expect(useCartStore.getState().customerId).toBeNull();
+      expect(useCartStore.getState().items).toHaveLength(0);
+    });
+  });
 });
