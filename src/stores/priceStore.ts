@@ -10,7 +10,7 @@ import type {
   CreatePriceOption,
   UpdatePriceOption,
 } from "@/types";
-import { categoryApi, priceItemApi, priceOptionApi } from "@/bindings";
+import { categoryApi, priceItemApi, priceOptionApi, priceSettingsApi } from "@/bindings";
 
 interface PriceState {
   categories: Category[];
@@ -37,6 +37,8 @@ interface PriceActions {
   updatePriceOption: (id: number, data: UpdatePriceOption) => Promise<PriceOption>;
   deletePriceOption: (id: number) => Promise<void>;
   reorderPriceOptions: (reordered: PriceOption[]) => void;
+  exportSettings: (path: string) => Promise<void>;
+  importSettings: (path: string) => Promise<void>;
 }
 
 type PriceStore = PriceState & PriceActions;
@@ -153,5 +155,20 @@ export const usePriceStore = create<PriceStore>((set, get) => ({
 
   reorderPriceOptions: (reordered) => {
     set({ priceOptions: reordered });
+  },
+
+  exportSettings: async (path) => {
+    await priceSettingsApi.exportToFile(path);
+  },
+
+  importSettings: async (path) => {
+    set({ isLoading: true });
+    try {
+      await priceSettingsApi.importFromFile(path);
+      await Promise.all([get().loadCategories(), get().loadPriceOptions()]);
+      set({ selectedCategoryId: null, priceItems: [] });
+    } finally {
+      set({ isLoading: false });
+    }
   },
 }));

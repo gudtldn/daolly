@@ -15,9 +15,19 @@ vi.mock("@/bindings", () => ({
     update: vi.fn(),
     delete: vi.fn(),
   },
+  priceOptionApi: {
+    list: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+  },
+  priceSettingsApi: {
+    exportToFile: vi.fn(),
+    importFromFile: vi.fn(),
+  },
 }));
 
-import { categoryApi, priceItemApi } from "@/bindings";
+import { categoryApi, priceItemApi, priceOptionApi, priceSettingsApi } from "@/bindings";
 
 const mockCatList = vi.mocked(categoryApi.list);
 const mockCatCreate = vi.mocked(categoryApi.create);
@@ -25,6 +35,9 @@ const mockCatDelete = vi.mocked(categoryApi.delete);
 const mockPriceList = vi.mocked(priceItemApi.list);
 const mockPriceCreate = vi.mocked(priceItemApi.create);
 const mockPriceDelete = vi.mocked(priceItemApi.delete);
+const mockOptList = vi.mocked(priceOptionApi.list);
+const mockExport = vi.mocked(priceSettingsApi.exportToFile);
+const mockImport = vi.mocked(priceSettingsApi.importFromFile);
 
 const cat1: Category = { id: 1, name: "상의", sortOrder: 1 };
 const cat2: Category = { id: 2, name: "하의", sortOrder: 2 };
@@ -110,4 +123,31 @@ describe("priceStore", () => {
       expect(usePriceStore.getState().priceItems).toContainEqual(price1);
     });
   });
-});
+
+  describe("import/export", () => {
+    it("exportSettings calls API", async () => {
+      mockExport.mockResolvedValue(undefined);
+      await usePriceStore.getState().exportSettings("test.json");
+      expect(mockExport).toHaveBeenCalledWith("test.json");
+    });
+
+    it("importSettings calls API and reloads", async () => {
+      mockImport.mockResolvedValue(undefined);
+      mockCatList.mockResolvedValue([cat1]);
+      mockOptList.mockResolvedValue([]);
+
+      await usePriceStore.getState().importSettings("test.json");
+
+      expect(mockImport).toHaveBeenCalledWith("test.json");
+      expect(mockCatList).toHaveBeenCalled();
+      expect(mockOptList).toHaveBeenCalled();
+      expect(usePriceStore.getState().selectedCategoryId).toBeNull();
+    });
+
+    it("importSettings handles error", async () => {
+      mockImport.mockRejectedValue(new Error("fail"));
+      await expect(usePriceStore.getState().importSettings("test.json")).rejects.toThrow();
+      expect(usePriceStore.getState().isLoading).toBe(false);
+    });
+  });
+  });

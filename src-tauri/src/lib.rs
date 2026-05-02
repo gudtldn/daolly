@@ -111,6 +111,9 @@ pub fn run() {
             commands::price_options::create_price_option,
             commands::price_options::update_price_option,
             commands::price_options::delete_price_option,
+            // price_settings
+            commands::price_settings::export_price_settings_to_file,
+            commands::price_settings::import_price_settings_from_file,
             // payments
             commands::payments::list_payments,
             commands::payments::create_payment,

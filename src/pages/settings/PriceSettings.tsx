@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { Tag, Plus, Pen, Trash2, GripVertical } from "lucide-react";
+import { Tag, Plus, Pen, Trash2, GripVertical, FileUp, FileDown } from "lucide-react";
+import { open, save } from "@tauri-apps/plugin-dialog";
+import { toast } from "sonner";
 import {
   DndContext,
   closestCenter,
@@ -432,6 +434,8 @@ export function PriceSettings() {
     updatePriceOption,
     deletePriceOption,
     reorderPriceOptions,
+    exportSettings,
+    importSettings,
   } = usePriceStore();
 
   const { showCustom, showConfirm } = useDialogStore();
@@ -629,11 +633,66 @@ export function PriceSettings() {
     );
   };
 
+  const handleExport = async () => {
+    try {
+      const path = await save({
+        filters: [{ name: "JSON", extensions: ["json"] }],
+        defaultPath: "daolly_price_settings.json",
+      });
+      if (!path) return;
+      await exportSettings(path);
+      toast.success("단가표를 내보냈습니다.");
+    } catch (e) {
+      toast.error(`내보내기 실패: ${e}`);
+    }
+  };
+
+  const handleImport = async () => {
+    try {
+      const path = await open({
+        filters: [{ name: "JSON", extensions: ["json"] }],
+        multiple: false,
+      });
+      if (!path || Array.isArray(path)) return;
+
+      const ok = await showConfirm({
+        title: "단가표 가져오기",
+        message: "기존 단가표가 모두 삭제되고 선택한 파일의 내용으로 대체됩니다. 정말 진행하시겠습니까?",
+        confirmText: "가져오기",
+        isDestructive: true,
+      });
+      if (!ok) return;
+
+      await importSettings(path);
+      toast.success("단가표를 가져왔습니다.");
+    } catch (e) {
+      toast.error(`가져오기 실패: ${e}`);
+    }
+  };
+
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center gap-2 mb-6 shrink-0">
-        <Tag className="w-5 h-5 text-on-surface-muted" />
-        <h3 className="text-lg font-bold text-on-surface">단가표 및 옵션 관리</h3>
+      <div className="flex items-center justify-between mb-6 shrink-0">
+        <div className="flex items-center gap-2">
+          <Tag className="w-5 h-5 text-on-surface-muted" />
+          <h3 className="text-lg font-bold text-on-surface">단가표 및 옵션 관리</h3>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-on-surface bg-surface-card border border-border-default rounded-lg hover:bg-surface-elevated transition-colors cursor-pointer"
+          >
+            <FileUp className="w-4 h-4" />
+            내보내기
+          </button>
+          <button
+            onClick={handleImport}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors cursor-pointer"
+          >
+            <FileDown className="w-4 h-4" />
+            가져오기
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-4 flex-1 min-h-0">
