@@ -396,7 +396,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
               autoFocus
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="세탁 내용 요약"
+              placeholder="작업 내용 요약"
               className={inputCls}
             />
           </div>

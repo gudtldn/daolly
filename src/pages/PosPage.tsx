@@ -837,7 +837,7 @@ function PaymentPanel({
             rows={3}
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="예: 드라이클리닝 주의, 급행 요청 등"
+            placeholder="예: 드라이클리닝 주의, 작업 예정일 등"
             className="w-full px-3 py-2 bg-surface border border-border-default rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 text-on-surface resize-none text-sm"
           />
         </div>
