@@ -8,7 +8,7 @@ import {
   User, Plus, Search, History, X,
   Minus, Trash2, Pen, Keyboard, Shirt,
   CheckCircle2, CreditCard, Banknote, Landmark, Clock, UserPlus,
-  Settings,
+  Settings, Loader2,
 } from "lucide-react";
 import type { Customer, Category, PriceItem, PriceOption, CreateCustomer } from "@/types";
 import {
@@ -51,6 +51,9 @@ function CustomerPanel({
     setQuery,
     results,
     setResults,
+    isLoading,
+    performSearch,
+    debouncedQuery,
   } = useSearch(customerApi.list, {
     onSuccess: () => {
       setHighlightIdx(0);
@@ -96,8 +99,9 @@ function CustomerPanel({
     }).catch(() => {});
   }, [selectedCustomer]);
 
+  const isSearchPending = query.trim() !== debouncedQuery.trim() || isLoading;
   const isExactMatch = results.some((c) => c.name === query.trim());
-  const showAddOption = query.trim() && !isExactMatch;
+  const showAddOption = query.trim() && !isExactMatch && !isSearchPending;
 
   return (
     <div className="w-[300px] shrink-0 bg-surface-card border border-border-default rounded-lg flex flex-col shadow-sm overflow-hidden">
@@ -130,6 +134,10 @@ function CustomerPanel({
                     setLastSource("keyboard");
                   }
                   if (e.key === "Enter") {
+                    if (isSearchPending) {
+                      if (!isLoading) performSearch(query);
+                      return;
+                    }
                     if (results.length > 0 && highlightIdx < results.length) {
                       handleSelect(results[highlightIdx]);
                     } else if (showAddOption) {
@@ -169,11 +177,17 @@ function CustomerPanel({
               </button>
             ) : (
               <button
-                onClick={() => results.length > 0 && handleSelect(results[0])}
-                disabled={!query.trim()}
-                className="bg-primary-600 text-white px-3 py-2 rounded-lg hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0 cursor-pointer"
+                onClick={() => {
+                  if (isSearchPending) {
+                    if (!isLoading) performSearch(query);
+                  } else if (results.length > 0) {
+                    handleSelect(results[0]);
+                  }
+                }}
+                disabled={!query.trim() || isLoading}
+                className="bg-primary-600 text-white px-3 py-2 rounded-lg hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0 flex items-center justify-center cursor-pointer"
               >
-                <Search className="w-4 h-4" />
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
               </button>
             )}
           </div>
@@ -183,64 +197,73 @@ function CustomerPanel({
             ref={dropdownRef}
             className="absolute left-4 right-4 top-full mt-1 bg-surface-card border border-border-default rounded-lg shadow-lg z-20 max-h-48 overflow-x-hidden overflow-y-auto"
           >
-            {results.map((c, idx) => (
-              <button
-                key={c.id}
-                ref={setItemRef(idx)}
-                onClick={() => handleSelect(c)}
-                onMouseMove={() => {
-                  if (lastSource !== "mouse" || highlightIdx !== idx) {
-                    setLastSource("mouse");
-                    setHighlightIdx(idx);
-                  }
-                }}
-                className={`w-full text-left px-3 py-2.5 text-sm border-b border-border-default last:border-0 transition-colors flex items-center justify-between gap-2 cursor-pointer ${
-                  idx === highlightIdx ? "bg-primary-50 dark:bg-primary-900/30" : ""
-                }`}
-              >
-                <div className="flex items-center min-w-0 flex-1">
-                  <span className="font-bold text-on-surface truncate">{c.name}</span>
-                  {c.phoneNumber && (
-                    <span className="text-on-surface-muted ml-2 text-sm shrink-0">{c.phoneNumber}</span>
-                  )}
-                </div>
-                {idx === highlightIdx && (
-                  <span className="text-[0.6rem] text-on-surface-muted bg-surface-elevated px-1.5 py-0.5 rounded border border-border-default shrink-0 animate-in fade-in duration-200">Enter</span>
-                )}
-              </button>
-            ))}
-            
-            {results.length === 0 && showAddOption && (
-              <div className="px-3 pt-3 pb-1 text-sm text-on-surface-muted text-center">
-                검색 결과가 없습니다.
+            {isSearchPending ? (
+              <div className="px-3 py-6 text-sm text-on-surface-muted flex flex-col items-center justify-center gap-2">
+                <Loader2 className="w-5 h-5 animate-spin text-primary-500" />
+                <span>검색 결과 확인 중...</span>
               </div>
-            )}
-            {showAddOption && (
+            ) : (
               <>
-                {results.length > 0 && <div className="border-t border-border-default/50 my-1" />}
-                <button
-                  ref={setItemRef(results.length)}
-                  onClick={handleAddNew}
-                  onMouseMove={() => {
-                    if (lastSource !== "mouse" || highlightIdx !== results.length) {
-                      setLastSource("mouse");
-                      setHighlightIdx(results.length);
-                    }
-                  }}
-                  className={`w-full text-left px-4 py-3.5 text-sm transition-colors cursor-pointer ${
-                    highlightIdx === results.length ? "bg-primary-50 dark:bg-primary-900/30" : ""
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2.5 text-primary-600 font-bold min-w-0">
-                      <UserPlus className="w-4 h-4 shrink-0" />
-                      <span className="truncate">"{query.trim()}"님 신규 등록</span>
+                {results.map((c, idx) => (
+                  <button
+                    key={c.id}
+                    ref={setItemRef(idx)}
+                    onClick={() => handleSelect(c)}
+                    onMouseMove={() => {
+                      if (lastSource !== "mouse" || highlightIdx !== idx) {
+                        setLastSource("mouse");
+                        setHighlightIdx(idx);
+                      }
+                    }}
+                    className={`w-full text-left px-3 py-2.5 text-sm border-b border-border-default last:border-0 transition-colors flex items-center justify-between gap-2 cursor-pointer ${
+                      idx === highlightIdx ? "bg-primary-50 dark:bg-primary-900/30" : ""
+                    }`}
+                  >
+                    <div className="flex items-center min-w-0 flex-1">
+                      <span className="font-bold text-on-surface truncate">{c.name}</span>
+                      {c.phoneNumber && (
+                        <span className="text-on-surface-muted ml-2 text-sm shrink-0">{c.phoneNumber}</span>
+                      )}
                     </div>
-                    {highlightIdx === results.length && (
-                      <span className="text-[0.65rem] text-on-surface-muted bg-surface-elevated px-1.5 py-0.5 rounded border border-border-default shrink-0 animate-in fade-in duration-200">Enter</span>
+                    {idx === highlightIdx && (
+                      <span className="text-[0.6rem] text-on-surface-muted bg-surface-elevated px-1.5 py-0.5 rounded border border-border-default shrink-0 animate-in fade-in duration-200">Enter</span>
                     )}
+                  </button>
+                ))}
+                
+                {results.length === 0 && showAddOption && (
+                  <div className="px-3 pt-3 pb-1 text-sm text-on-surface-muted text-center">
+                    검색 결과가 없습니다.
                   </div>
-                </button>
+                )}
+                {showAddOption && (
+                  <>
+                    {results.length > 0 && <div className="border-t border-border-default/50 my-1" />}
+                    <button
+                      ref={setItemRef(results.length)}
+                      onClick={handleAddNew}
+                      onMouseMove={() => {
+                        if (lastSource !== "mouse" || highlightIdx !== results.length) {
+                          setLastSource("mouse");
+                          setHighlightIdx(results.length);
+                        }
+                      }}
+                      className={`w-full text-left px-4 py-3.5 text-sm transition-colors cursor-pointer ${
+                        highlightIdx === results.length ? "bg-primary-50 dark:bg-primary-900/30" : ""
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5 text-primary-600 font-bold min-w-0">
+                          <UserPlus className="w-4 h-4 shrink-0" />
+                          <span className="truncate">"{query.trim()}"님 신규 등록</span>
+                        </div>
+                        {highlightIdx === results.length && (
+                          <span className="text-[0.65rem] text-on-surface-muted bg-surface-elevated px-1.5 py-0.5 rounded border border-border-default shrink-0 animate-in fade-in duration-200">Enter</span>
+                        )}
+                      </div>
+                    </button>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -517,7 +540,7 @@ function OrderPanel({
       </div>
 
       {/* 단가 버튼 그리드 영역 */}
-      <div className="p-4 shrink-0 bg-surface border-b border-border-default overflow-y-auto max-h-56 min-h-[140px] flex items-center justify-center">
+      <div className={`p-4 shrink-0 bg-surface border-b border-border-default overflow-y-auto max-h-56 min-h-[140px] flex flex-col ${catItems.length === 0 ? "items-center justify-center" : ""}`}>
         {catItems.length > 0 ? (
           <div className="w-full grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-3">
             {catItems.map((item) => (
