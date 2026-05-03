@@ -380,6 +380,56 @@ function DirectInputForm({
 // OrderPanel (가운데 flex-1)
 // ============================================================
 
+function FullEditContent({
+  initialPrice,
+  initialMemo,
+  onUpdate,
+}: {
+  initialPrice: number;
+  initialMemo: string;
+  onUpdate: (price: number, memo: string) => void;
+}) {
+  const [price, setPrice] = useState(initialPrice);
+  const [memo, setMemo] = useState(initialMemo);
+  const { close } = useDialogStore();
+
+  useEffect(() => {
+    onUpdate(price, memo);
+  }, [price, memo, onUpdate]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      close(true);
+    }
+  };
+
+  return (
+    <div className="py-2 flex flex-col gap-4">
+      <div>
+        <label className="block text-sm font-medium text-on-surface-muted mb-1.5">단가 수정</label>
+        <CurrencyInput
+          autoFocus
+          value={price}
+          onChange={setPrice}
+          onKeyDown={handleKeyDown}
+          className="w-full border border-border-default rounded-lg px-3 py-2 text-lg font-bold text-primary-600 bg-surface focus:border-primary-500 outline-none text-left"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-on-surface-muted mb-1.5">메모 수정</label>
+        <input
+          type="text"
+          value={memo}
+          onChange={(e) => setMemo(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="메모를 입력하세요"
+          className="w-full border border-border-default rounded-lg px-3 py-2 text-sm text-on-surface bg-surface focus:border-primary-500 outline-none"
+        />
+      </div>
+    </div>
+  );
+}
+
 function OrderPanel({
   items,
   onAddItem,
@@ -464,34 +514,19 @@ function OrderPanel({
   const openFullEdit = (i: number) => {
     priceRef.current = items[i].unitPrice;
     memoRef.current = items[i].optionsMemo ?? "";
-    const inputEl = (
-      <div className="py-2 flex flex-col gap-4">
-        <div>
-          <label className="block text-sm font-medium text-on-surface-muted mb-1.5">단가 수정</label>
-          <CurrencyInput
-            autoFocus
-            value={priceRef.current}
-            onChange={(v) => { priceRef.current = v; }}
-            onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.form?.requestSubmit?.(); }}
-            className="w-full border border-border-default rounded-lg px-3 py-2 text-lg font-bold text-primary-600 bg-surface focus:border-primary-500 outline-none text-left"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-on-surface-muted mb-1.5">메모 수정</label>
-          <input
-            type="text"
-            defaultValue={memoRef.current}
-            onChange={(e) => { memoRef.current = e.target.value; }}
-            onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.form?.requestSubmit?.(); }}
-            placeholder="메모를 입력하세요"
-            className="w-full border border-border-default rounded-lg px-3 py-2 text-sm text-on-surface bg-surface focus:border-primary-500 outline-none"
-          />
-        </div>
-      </div>
-    );
+
     showCustom({
       title: `${items[i].name} - 수정`,
-      customContent: inputEl,
+      customContent: (
+        <FullEditContent
+          initialPrice={priceRef.current}
+          initialMemo={memoRef.current}
+          onUpdate={(p, m) => {
+            priceRef.current = p;
+            memoRef.current = m;
+          }}
+        />
+      ),
       confirmText: "적용",
     }).then((confirmed) => {
       if (confirmed) {
