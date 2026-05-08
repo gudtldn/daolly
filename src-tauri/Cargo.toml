@@ -1,6 +1,7 @@
 [package]
 name = "daolly"
 version = "0.2.5"
+default-run = "daolly"
 description = "다올리 (Daolly) - 자영업 사장님들을 위한 고객 및 매출 관리 프로그램"
 authors = ["gudtldn <me@gudtldn.dev>"]
 edition = "2024"
