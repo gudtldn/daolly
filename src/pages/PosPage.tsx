@@ -5,18 +5,36 @@ import { useSearch } from "@/hooks/useSearch";
 import { useListInteraction } from "@/hooks/useListInteraction";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import {
-  User, Plus, Search, History, X,
+  User, Plus, Search, X,
   Minus, Trash2, Pen, Keyboard, Shirt,
   CheckCircle2, CreditCard, Banknote, Landmark, Clock, UserPlus,
-  Settings, Loader2,
+  Settings, Loader2, ClipboardList, ExternalLink,
 } from "lucide-react";
-import type { Customer, Category, PriceItem, CreateCustomer } from "@/types";
+import type { Customer, Category, PriceItem, CreateCustomer, WorkItem, WorkItemStatus } from "@/types";
 import {
   customerApi, categoryApi, priceItemApi, workItemApi,
 } from "@/bindings";
 import { useCartStore, type CartItem, type PaymentMethod } from "@/stores/cartStore";
 import { useDialogStore } from "@/stores/dialogStore";
 import { CustomerFormCard } from "@/pages/customers/CustomerFormCard";
+
+// ============================================================
+// CustomerPanel 전용 상수/헬퍼
+// ============================================================
+
+const RECENT_LIMIT = 5;
+const STATUS_DOT_COLOR: Record<WorkItemStatus, string> = {
+  Received: "bg-primary-500",
+  Completed: "bg-success-500",
+  PickedUp: "bg-secondary-400 dark:bg-secondary-500",
+};
+
+function fmtDateShort(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  if (d.getFullYear() === now.getFullYear()) return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+}
 
 // ============================================================
 // CustomerPanel (왼쪽 300px)
@@ -32,11 +50,13 @@ function CustomerPanel({
   selectedCustomer: Customer | null;
   onSelect: (c: Customer) => void;
   onDeselect: () => void;
-  onViewHistory: (customerId: number) => void;
+  onViewHistory: (customerId: number, workItemId?: number) => void;
   onAddNew: (name: string) => void;
 }) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [unpaid, setUnpaid] = useState(0);
+  const [recentItems, setRecentItems] = useState<WorkItem[]>([]);
+  const [isLoadingItems, setIsLoadingItems] = useState(false);
 
   const {
     source: lastSource,
@@ -98,6 +118,24 @@ function CustomerPanel({
       setUnpaid(m[selectedCustomer.id] ?? 0);
     }).catch(() => {});
   }, [selectedCustomer]);
+
+  useEffect(() => {
+    if (!selectedCustomer) { setRecentItems([]); return; }
+    let cancelled = false;
+    setIsLoadingItems(true);
+    workItemApi.list(selectedCustomer.id)
+      .then((items) => {
+        if (cancelled) return;
+        const sorted = [...items].sort(
+          (a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
+        );
+        setRecentItems(sorted.slice(0, RECENT_LIMIT));
+      })
+      .catch(() => { if (!cancelled) setRecentItems([]); })
+      .finally(() => { if (!cancelled) setIsLoadingItems(false); });
+    return () => { cancelled = true; };
+  }, [selectedCustomer?.id]);
+
 
   const isSearchPending = query.trim() !== debouncedQuery.trim() || isLoading;
   const isExactMatch = results.some((c) => c.name === query.trim());
@@ -297,12 +335,65 @@ function CustomerPanel({
                 </div>
               )}
             </div>
-            <button
-              onClick={() => onViewHistory(selectedCustomer.id)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-on-surface-muted border border-border-default rounded-lg hover:bg-surface-elevated hover:text-on-surface transition-colors">
-              <History className="w-3.5 h-3.5" />
-              지난 접수 확인
-            </button>
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-on-surface-muted uppercase tracking-wide">최근 접수</span>
+                {!isLoadingItems && recentItems.length > 0 && (
+                  <button
+                    onClick={() => onViewHistory(selectedCustomer.id)}
+                    title="전체 보기"
+                    className="p-1 rounded-md text-on-surface-muted hover:text-primary-600 hover:bg-surface-elevated transition-colors cursor-pointer"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {isLoadingItems ? (
+                <div className="space-y-2">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="h-[52px] bg-surface-elevated rounded-lg animate-pulse" />
+                  ))}
+                </div>
+              ) : recentItems.length === 0 ? (
+                <div className="py-6 flex flex-col items-center gap-2 text-on-surface-muted">
+                  <ClipboardList className="w-8 h-8 opacity-30" />
+                  <p className="text-xs">접수 내역이 없습니다.</p>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {recentItems.map((item) => {
+                    const unpaidAmt = item.price - item.paidAmount;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => onViewHistory(selectedCustomer.id, item.id)}
+                        className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors cursor-pointer hover:border-primary-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 dark:hover:border-primary-700 ${
+                          item.status === "PickedUp"
+                            ? "opacity-55 border-border-default bg-surface"
+                            : "border-border-default bg-surface"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="text-sm font-medium text-on-surface truncate flex-1">
+                            {item.description ?? "품목 정보 없음"}
+                          </span>
+                          <span className={`text-sm font-bold shrink-0 ${unpaidAmt > 0 ? "text-warning-600 dark:text-warning-400" : "text-on-surface"}`}>
+                            {item.price.toLocaleString()}원
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT_COLOR[item.status]}`} />
+                          <span className="text-xs text-on-surface-muted">
+                            {fmtDateShort(item.receivedAt)}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-center text-on-surface-muted gap-3">
@@ -887,8 +978,8 @@ export function PosPage() {
     setCustomer(null);
   };
 
-  const handleViewHistory = (customerId: number) => {
-    navigate("/customers", { state: { focusCustomerId: customerId } });
+  const handleViewHistory = (customerId: number, workItemId?: number) => {
+    navigate("/customers", { state: { focusCustomerId: customerId, ...(workItemId && { focusWorkItemId: workItemId }) } });
   };
 
   const handleAddNewCustomer = (name: string) => {
