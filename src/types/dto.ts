@@ -35,18 +35,6 @@ export interface UpdatePriceItem {
   sortOrder?: number | null;
 }
 
-export interface CreatePriceOption {
-  name: string;
-  price: number;
-  sortOrder: number;
-}
-
-export interface UpdatePriceOption {
-  name?: string | null;
-  price?: number | null;
-  sortOrder?: number | null;
-}
-
 export interface DetailInput {
   /** 통계용 FK. 직접 입력시 null */
   priceItemId?: number | null;

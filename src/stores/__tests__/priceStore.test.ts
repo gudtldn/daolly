@@ -15,19 +15,13 @@ vi.mock("@/bindings", () => ({
     update: vi.fn(),
     delete: vi.fn(),
   },
-  priceOptionApi: {
-    list: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-  },
   priceSettingsApi: {
     exportToFile: vi.fn(),
     importFromFile: vi.fn(),
   },
 }));
 
-import { categoryApi, priceItemApi, priceOptionApi, priceSettingsApi } from "@/bindings";
+import { categoryApi, priceItemApi, priceSettingsApi } from "@/bindings";
 
 const mockCatList = vi.mocked(categoryApi.list);
 const mockCatCreate = vi.mocked(categoryApi.create);
@@ -35,7 +29,6 @@ const mockCatDelete = vi.mocked(categoryApi.delete);
 const mockPriceList = vi.mocked(priceItemApi.list);
 const mockPriceCreate = vi.mocked(priceItemApi.create);
 const mockPriceDelete = vi.mocked(priceItemApi.delete);
-const mockOptList = vi.mocked(priceOptionApi.list);
 const mockExport = vi.mocked(priceSettingsApi.exportToFile);
 const mockImport = vi.mocked(priceSettingsApi.importFromFile);
 
@@ -134,13 +127,11 @@ describe("priceStore", () => {
     it("importSettings calls API and reloads", async () => {
       mockImport.mockResolvedValue(undefined);
       mockCatList.mockResolvedValue([cat1]);
-      mockOptList.mockResolvedValue([]);
 
       await usePriceStore.getState().importSettings("test.json");
 
       expect(mockImport).toHaveBeenCalledWith("test.json");
       expect(mockCatList).toHaveBeenCalled();
-      expect(mockOptList).toHaveBeenCalled();
       expect(usePriceStore.getState().selectedCategoryId).toBeNull();
     });
 

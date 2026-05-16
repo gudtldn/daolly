@@ -2,20 +2,16 @@ import { create } from "zustand";
 import type {
   Category,
   PriceItem,
-  PriceOption,
   CreateCategory,
   UpdateCategory,
   CreatePriceItem,
   UpdatePriceItem,
-  CreatePriceOption,
-  UpdatePriceOption,
 } from "@/types";
-import { categoryApi, priceItemApi, priceOptionApi, priceSettingsApi } from "@/bindings";
+import { categoryApi, priceItemApi, priceSettingsApi } from "@/bindings";
 
 interface PriceState {
   categories: Category[];
   priceItems: PriceItem[];
-  priceOptions: PriceOption[];
   selectedCategoryId: number | null;
   isLoading: boolean;
 }
@@ -23,7 +19,6 @@ interface PriceState {
 interface PriceActions {
   loadCategories: () => Promise<void>;
   loadPriceItems: (categoryId?: number | null) => Promise<void>;
-  loadPriceOptions: () => Promise<void>;
   selectCategory: (id: number | null) => void;
   createCategory: (data: CreateCategory) => Promise<Category>;
   updateCategory: (id: number, data: UpdateCategory) => Promise<Category>;
@@ -33,10 +28,6 @@ interface PriceActions {
   updatePriceItem: (id: number, data: UpdatePriceItem) => Promise<PriceItem>;
   deletePriceItem: (id: number) => Promise<void>;
   reorderPriceItems: (categoryId: number, reordered: PriceItem[]) => void;
-  createPriceOption: (data: CreatePriceOption) => Promise<PriceOption>;
-  updatePriceOption: (id: number, data: UpdatePriceOption) => Promise<PriceOption>;
-  deletePriceOption: (id: number) => Promise<void>;
-  reorderPriceOptions: (reordered: PriceOption[]) => void;
   exportSettings: (path: string) => Promise<void>;
   importSettings: (path: string) => Promise<void>;
 }
@@ -46,7 +37,6 @@ type PriceStore = PriceState & PriceActions;
 export const usePriceStore = create<PriceStore>((set, get) => ({
   categories: [],
   priceItems: [],
-  priceOptions: [],
   selectedCategoryId: null,
   isLoading: false,
 
@@ -64,11 +54,6 @@ export const usePriceStore = create<PriceStore>((set, get) => ({
     } finally {
       set({ isLoading: false });
     }
-  },
-
-  loadPriceOptions: async () => {
-    const priceOptions = await priceOptionApi.list();
-    set({ priceOptions });
   },
 
   selectCategory: (id) => {
@@ -132,31 +117,6 @@ export const usePriceStore = create<PriceStore>((set, get) => ({
     }));
   },
 
-  createPriceOption: async (data) => {
-    const opt = await priceOptionApi.create(data);
-    set((s) => ({ priceOptions: [...s.priceOptions, opt] }));
-    return opt;
-  },
-
-  updatePriceOption: async (id, data) => {
-    const updated = await priceOptionApi.update(id, data);
-    set((s) => ({
-      priceOptions: s.priceOptions.map((o) => (o.id === id ? updated : o)),
-    }));
-    return updated;
-  },
-
-  deletePriceOption: async (id) => {
-    await priceOptionApi.delete(id);
-    set((s) => ({
-      priceOptions: s.priceOptions.filter((o) => o.id !== id),
-    }));
-  },
-
-  reorderPriceOptions: (reordered) => {
-    set({ priceOptions: reordered });
-  },
-
   exportSettings: async (path) => {
     await priceSettingsApi.exportToFile(path);
   },
@@ -165,7 +125,7 @@ export const usePriceStore = create<PriceStore>((set, get) => ({
     set({ isLoading: true });
     try {
       await priceSettingsApi.importFromFile(path);
-      await Promise.all([get().loadCategories(), get().loadPriceOptions()]);
+      await get().loadCategories();
       set({ selectedCategoryId: null, priceItems: [] });
     } finally {
       set({ isLoading: false });

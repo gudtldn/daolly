@@ -1,4 +1,4 @@
-use crate::db::entities::{category, price_item, price_option};
+use crate::db::entities::{category, price_item};
 use sea_orm::*;
 use serde::{Deserialize, Serialize};
 
@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 pub struct PriceSettingsExportData {
     pub version: i32,
     pub categories: Vec<CategoryExport>,
-    pub options: Vec<OptionExport>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -26,14 +25,6 @@ pub struct ItemExport {
     pub sort_order: i32,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct OptionExport {
-    pub name: String,
-    pub price: i64,
-    pub sort_order: i32,
-}
-
 pub async fn export_data(db: &DatabaseConnection) -> Result<PriceSettingsExportData, DbErr> {
     // 1. Fetch all data
     let categories = category::Entity::find()
@@ -43,11 +34,6 @@ pub async fn export_data(db: &DatabaseConnection) -> Result<PriceSettingsExportD
 
     let items = price_item::Entity::find()
         .order_by_asc(price_item::Column::SortOrder)
-        .all(db)
-        .await?;
-
-    let options = price_option::Entity::find()
-        .order_by_asc(price_option::Column::SortOrder)
         .all(db)
         .await?;
 
@@ -71,19 +57,9 @@ pub async fn export_data(db: &DatabaseConnection) -> Result<PriceSettingsExportD
         });
     }
 
-    let option_exports = options
-        .into_iter()
-        .map(|o| OptionExport {
-            name: o.name,
-            price: o.price,
-            sort_order: o.sort_order,
-        })
-        .collect();
-
     Ok(PriceSettingsExportData {
         version: 1,
         categories: category_exports,
-        options: option_exports,
     })
 }
 
@@ -95,7 +71,6 @@ pub async fn import_data(
         Box::pin(async move {
             // 1. Delete all existing settings
             // price_items will be deleted by CASCADE when categories are deleted
-            price_option::Entity::delete_many().exec(txn).await?;
             category::Entity::delete_many().exec(txn).await?;
 
             // 2. Insert new settings
@@ -127,23 +102,6 @@ pub async fn import_data(
                 }
             }
 
-            if !data.options.is_empty() {
-                let options_to_insert: Vec<price_option::ActiveModel> = data
-                    .options
-                    .into_iter()
-                    .map(|opt_data| price_option::ActiveModel {
-                        name: Set(opt_data.name),
-                        price: Set(opt_data.price),
-                        sort_order: Set(opt_data.sort_order),
-                        ..Default::default()
-                    })
-                    .collect();
-
-                price_option::Entity::insert_many(options_to_insert)
-                    .exec(txn)
-                    .await?;
-            }
-
             Ok(())
         })
     })
@@ -166,7 +124,6 @@ mod tests {
 
         assert_eq!(data.version, 1);
         assert!(data.categories.is_empty());
-        assert!(data.options.is_empty());
     }
 
     #[tokio::test]
@@ -194,24 +151,12 @@ mod tests {
         .await
         .unwrap();
 
-        price_option::ActiveModel {
-            name: Set("특수오염".into()),
-            price: Set(5000),
-            sort_order: Set(0),
-            ..Default::default()
-        }
-        .insert(&db)
-        .await
-        .unwrap();
-
         let data = export_data(&db).await.unwrap();
 
         assert_eq!(data.categories.len(), 1);
         assert_eq!(data.categories[0].name, "상의");
         assert_eq!(data.categories[0].items.len(), 1);
         assert_eq!(data.categories[0].items[0].name, "와이셔츠");
-        assert_eq!(data.options.len(), 1);
-        assert_eq!(data.options[0].name, "특수오염");
     }
 
     #[tokio::test]
@@ -236,7 +181,6 @@ mod tests {
                 sort_order: 0,
                 items: vec![],
             }],
-            options: vec![],
         };
 
         import_data(&db, new_data).await.unwrap();
@@ -279,7 +223,6 @@ mod tests {
                     items: vec![],
                 },
             ],
-            options: vec![],
         };
 
         let res = import_data(&db, invalid_data).await;

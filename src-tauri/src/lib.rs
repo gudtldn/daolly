@@ -106,11 +106,6 @@ pub fn run() {
             commands::work_items::replace_work_item_details,
             commands::work_items::delete_work_item,
             commands::work_items::get_all_unpaid_amounts,
-            // price_options
-            commands::price_options::list_price_options,
-            commands::price_options::create_price_option,
-            commands::price_options::update_price_option,
-            commands::price_options::delete_price_option,
             // price_settings
             commands::price_settings::export_price_settings_to_file,
             commands::price_settings::import_price_settings_from_file,

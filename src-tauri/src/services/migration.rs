@@ -5,9 +5,7 @@ use sea_orm::{
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use crate::db::entities::{
-    category, customer, payment, price_item, price_option, work_item, work_item_detail,
-};
+use crate::db::entities::{category, customer, payment, price_item, work_item, work_item_detail};
 
 /// 모든 데이터를 삭제합니다.
 pub async fn clear_database(db: &DatabaseConnection) -> Result<(), DbErr> {
@@ -18,7 +16,6 @@ pub async fn clear_database(db: &DatabaseConnection) -> Result<(), DbErr> {
             payment::Entity::delete_many().exec(txn).await?;
             work_item::Entity::delete_many().exec(txn).await?;
             customer::Entity::delete_many().exec(txn).await?;
-            price_option::Entity::delete_many().exec(txn).await?;
             price_item::Entity::delete_many().exec(txn).await?;
             category::Entity::delete_many().exec(txn).await?;
             Ok(())

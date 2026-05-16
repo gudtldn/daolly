@@ -23,13 +23,6 @@ export interface PriceItem {
   sortOrder: number;
 }
 
-export interface PriceOption {
-  id: number;
-  name: string;
-  price: number;
-  sortOrder: number;
-}
-
 export type WorkItemStatus = "Received" | "Completed" | "PickedUp";
 
 export interface WorkItem {

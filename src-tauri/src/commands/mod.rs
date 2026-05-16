@@ -7,7 +7,6 @@ pub mod customers;
 pub mod database;
 pub mod payments;
 pub mod price_items;
-pub mod price_options;
 pub mod price_settings;
 pub mod sales;
 pub mod work_items;

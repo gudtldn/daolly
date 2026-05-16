@@ -10,9 +10,9 @@ import {
   CheckCircle2, CreditCard, Banknote, Landmark, Clock, UserPlus,
   Settings, Loader2,
 } from "lucide-react";
-import type { Customer, Category, PriceItem, PriceOption, CreateCustomer } from "@/types";
+import type { Customer, Category, PriceItem, CreateCustomer } from "@/types";
 import {
-  customerApi, categoryApi, priceItemApi, priceOptionApi, workItemApi,
+  customerApi, categoryApi, priceItemApi, workItemApi,
 } from "@/bindings";
 import { useCartStore, type CartItem, type PaymentMethod } from "@/stores/cartStore";
 import { useDialogStore } from "@/stores/dialogStore";
@@ -445,15 +445,8 @@ function OrderPanel({
 }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [priceItems, setPriceItems] = useState<PriceItem[]>([]);
-  const [priceOptions, setPriceOptions] = useState<PriceOption[]>([]);
   const [activeCatId, setActiveCatId] = useState<number | null>(null);
   const [showDirectInput, setShowDirectInput] = useState(false);
-  const [selectedOptionIds, setSelectedOptionIds] = useState<Set<number>>(new Set());
-
-  // Reset selected options when switching category to prevent accidental carry-over.
-  useEffect(() => {
-    setSelectedOptionIds(new Set());
-  }, [activeCatId]);
   const [editingPriceIdx, setEditingPriceIdx] = useState<number | null>(null);
   const [editingMemoIdx, setEditingMemoIdx] = useState<number | null>(null);
   const { showCustom } = useDialogStore();
@@ -487,11 +480,10 @@ function OrderPanel({
   }, [categories]);
 
   useEffect(() => {
-    Promise.all([categoryApi.list(), priceItemApi.list(), priceOptionApi.list()]).then(
-      ([cats, pItems, opts]) => {
+    Promise.all([categoryApi.list(), priceItemApi.list()]).then(
+      ([cats, pItems]) => {
         setCategories(cats);
         setPriceItems(pItems);
-        setPriceOptions(opts);
         if (cats.length > 0) setActiveCatId(cats[0].id);
       },
     );
@@ -501,14 +493,7 @@ function OrderPanel({
   const catItems = priceItems.filter((p) => p.categoryId === activeCatId);
 
   const handleItemClick = (id: number, name: string, basePrice: number) => {
-    const selectedOpts = priceOptions.filter((o) => selectedOptionIds.has(o.id));
-    const optionsMemo =
-      selectedOpts.length > 0
-        ? selectedOpts.map((o) => `${o.name}(+${o.price.toLocaleString()})`).join(", ")
-        : "";
-    const totalPrice = basePrice + selectedOpts.reduce((s, o) => s + o.price, 0);
-    onAddItem({ priceItemId: id, name, unitPrice: totalPrice, optionsMemo });
-    setSelectedOptionIds(new Set());
+    onAddItem({ priceItemId: id, name, unitPrice: basePrice, optionsMemo: "" });
   };
 
   const openFullEdit = (i: number) => {
@@ -623,41 +608,6 @@ function OrderPanel({
           </div>
         )}
       </div>
-
-      {/* 추가 옵션 체크박스 */}
-      {priceOptions.length > 0 && (
-        <div className="px-4 py-2 border-b border-border-default shrink-0 bg-surface flex flex-wrap gap-2">
-          {priceOptions.map((opt) => {
-            const checked = selectedOptionIds.has(opt.id);
-            return (
-              <label
-                key={opt.id}
-                className={`flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg cursor-pointer border transition-colors select-none ${
-                  checked
-                    ? "bg-primary-50 dark:bg-primary-900/20 border-primary-400 text-primary-700 dark:text-primary-300 font-semibold"
-                    : "bg-surface-elevated border-border-default text-on-surface-muted hover:border-secondary-300"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() =>
-                    setSelectedOptionIds((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(opt.id)) next.delete(opt.id);
-                      else next.add(opt.id);
-                      return next;
-                    })
-                  }
-                  className="w-3.5 h-3.5 accent-primary-600"
-                />
-                {opt.name}
-                <span className="text-sm text-primary-500">+{opt.price.toLocaleString()}</span>
-              </label>
-            );
-          })}
-        </div>
-      )}
 
       {/* 직접 입력 폼 */}
       {showDirectInput && (
