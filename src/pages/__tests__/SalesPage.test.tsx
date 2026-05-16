@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeAll } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithRouter } from "@/test/test-utils";
 import { SalesPage } from "@/pages/SalesPage";
+import { useUIStore } from "@/stores/uiStore";
 
 // salesApi calls invoke() which is not available in jsdom.
 vi.mock("@/bindings/sales", () => ({
@@ -19,6 +20,26 @@ vi.mock("@/bindings/sales", () => ({
 // Suppress unhandled promise rejection warnings from async useEffect.
 beforeAll(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
+});
+
+beforeEach(() => {
+  sessionStorage.clear();
+  useUIStore.setState({
+    salesPage: {
+      activeTab: "summary",
+      summary: {
+        period: "today",
+        customRange: null,
+        search: "",
+        rightTab: "payments",
+      },
+      transactions: {
+        period: "today",
+        customRange: null,
+        search: "",
+      },
+    },
+  });
 });
 
 describe("SalesPage", () => {

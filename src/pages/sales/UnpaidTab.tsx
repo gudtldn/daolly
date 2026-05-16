@@ -79,7 +79,8 @@ export function UnpaidTab() {
     navigate("/customers", { 
       state: { 
         focusCustomerId: customerId,
-        focusWorkItemId: workItemId
+        focusWorkItemId: workItemId,
+        canGoBack: true
       } 
     });
   };

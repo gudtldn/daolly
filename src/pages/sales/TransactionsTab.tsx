@@ -14,6 +14,7 @@ import {
   getDateRange,
   PaymentMethodBadge,
 } from "@/pages/sales/salesUtils";
+import { useUIStore } from "@/stores/uiStore";
 
 // ============================================================
 // TransactionsTab
@@ -25,9 +26,13 @@ import {
  */
 export function TransactionsTab() {
   const navigate = useNavigate();
-  const [period, setPeriod] = useState<PresetId>("today");
-  const [customRange, setCustomRange] = useState<DateRange | null>(null);
-  const [search, setSearch] = useState("");
+  const { period, customRange, search } = useUIStore((s) => s.salesPage.transactions);
+  const setState = useUIStore((s) => s.setTransactionsState);
+
+  const setPeriod = (p: PresetId) => setState({ period: p });
+  const setCustomRange = (r: DateRange | null) => setState({ customRange: r });
+  const setSearch = (s: string) => setState({ search: s });
+  
   const [records, setRecords] = useState<SalesRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -73,7 +78,8 @@ export function TransactionsTab() {
     navigate("/customers", { 
       state: { 
         focusCustomerId: r.customerId, 
-        focusWorkItemId: r.workItemId 
+        focusWorkItemId: r.workItemId,
+        canGoBack: true
       } 
     });
   };

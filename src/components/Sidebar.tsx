@@ -9,6 +9,7 @@ import {
   PanelLeftOpen,
 } from "lucide-react";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { useCartStore } from "@/stores/cartStore";
 import { Logo } from "@/components/Logo";
 
 const mainNavItems = [
@@ -25,6 +26,12 @@ const bottomNavItems = [
 export function Sidebar() {
   const collapsed = useSettingsStore((s) => s.ui.sidebarCollapsed);
   const toggleSidebar = useSettingsStore((s) => s.toggleSidebar);
+
+  const handleNavClick = (to: string) => {
+    if (to === "/pos") {
+      useCartStore.getState().clear();
+    }
+  };
 
   return (
     <aside
@@ -66,6 +73,7 @@ export function Sidebar() {
           <NavLink
             key={item.to}
             to={item.to}
+            onClick={() => handleNavClick(item.to)}
             title={collapsed ? item.label : undefined}
             className={({ isActive }) =>
               `flex items-center whitespace-nowrap ${

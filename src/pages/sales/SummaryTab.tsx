@@ -24,6 +24,7 @@ import {
   getDateRange,
   PaymentMethodBadge,
 } from "@/pages/sales/salesUtils";
+import { useUIStore } from "@/stores/uiStore";
 
 // ============================================================
 // SummaryTab
@@ -35,10 +36,13 @@ import {
  */
 export function SummaryTab() {
   const navigate = useNavigate();
-  const [period, setPeriod] = useState<PresetId>("today");
-  const [customRange, setCustomRange] = useState<DateRange | null>(null);
-  const [search, setSearch] = useState("");
-  const [rightTab, setRightTab] = useState<"payments" | "receptions">("payments");
+  const { period, customRange, search, rightTab } = useUIStore((s) => s.salesPage.summary);
+  const setState = useUIStore((s) => s.setSummaryState);
+  
+  const setPeriod = (p: PresetId) => setState({ period: p });
+  const setCustomRange = (r: DateRange | null) => setState({ customRange: r });
+  const setSearch = (s: string) => setState({ search: s });
+  const setRightTab = (t: "payments" | "receptions") => setState({ rightTab: t });
   
   // 데이터 상태
   const [paymentRecords, setPaymentRecords] = useState<PaymentRecord[]>([]);
@@ -114,7 +118,7 @@ export function SummaryTab() {
   );
 
   const handleGoToCustomer = (customerId: number, workItemId: number) => {
-    navigate("/customers", { state: { focusCustomerId: customerId, focusWorkItemId: workItemId } });
+    navigate("/customers", { state: { focusCustomerId: customerId, focusWorkItemId: workItemId, canGoBack: true } });
   };
 
   return (

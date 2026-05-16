@@ -1,8 +1,8 @@
-import { useState } from "react";
 import { TrendingUp, Receipt, Clock } from "lucide-react";
 import { SummaryTab } from "@/pages/sales/SummaryTab";
 import { TransactionsTab } from "@/pages/sales/TransactionsTab";
 import { UnpaidTab } from "@/pages/sales/UnpaidTab";
+import { useUIStore } from "@/stores/uiStore";
 
 const TABS = [
   { id: "summary", label: "매출 요약", icon: TrendingUp },
@@ -10,10 +10,9 @@ const TABS = [
   { id: "unpaid", label: "미수금 관리", icon: Clock },
 ] as const;
 
-type TabId = (typeof TABS)[number]["id"];
-
 export function SalesPage() {
-  const [activeTab, setActiveTab] = useState<TabId>("summary");
+  const activeTab = useUIStore((s) => s.salesPage.activeTab);
+  const setActiveTab = useUIStore((s) => s.setSalesPageTab);
 
   return (
     <div className="h-full flex flex-col min-h-0">

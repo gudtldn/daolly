@@ -644,7 +644,7 @@ function OrderPanel({
           <div className="absolute right-12 top-0 bottom-0 w-10 bg-gradient-to-l from-surface to-transparent pointer-events-none" />
         )}
         <button
-          onClick={() => navigate("/settings?tab=pricing")}
+          onClick={() => navigate("/settings?tab=pricing", { state: { canGoBack: true } })}
           className="w-12 flex items-center justify-center text-on-surface-muted hover:text-primary-600 hover:bg-surface-elevated transition-colors border-l border-border-default shrink-0 bg-surface z-10"
           title="단가표 설정 바로가기"
         >
@@ -982,7 +982,7 @@ export function PosPage() {
   };
 
   const handleViewHistory = (customerId: number, workItemId?: number) => {
-    navigate("/customers", { state: { focusCustomerId: customerId, ...(workItemId && { focusWorkItemId: workItemId }) } });
+    navigate("/customers", { state: { focusCustomerId: customerId, ...(workItemId && { focusWorkItemId: workItemId }), canGoBack: true } });
   };
 
   const handleAddNewCustomer = (name: string) => {
