@@ -46,12 +46,14 @@ function CustomerPanel({
   onDeselect,
   onViewHistory,
   onAddNew,
+  refreshToken,
 }: {
   selectedCustomer: Customer | null;
   onSelect: (c: Customer) => void;
   onDeselect: () => void;
   onViewHistory: (customerId: number, workItemId?: number) => void;
   onAddNew: (name: string) => void;
+  refreshToken: number;
 }) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [unpaid, setUnpaid] = useState(0);
@@ -117,7 +119,7 @@ function CustomerPanel({
     workItemApi.getAllUnpaidAmounts().then((m) => {
       setUnpaid(m[selectedCustomer.id] ?? 0);
     }).catch(() => {});
-  }, [selectedCustomer]);
+  }, [selectedCustomer, refreshToken]);
 
   useEffect(() => {
     if (!selectedCustomer) { setRecentItems([]); return; }
@@ -134,7 +136,7 @@ function CustomerPanel({
       .catch(() => { if (!cancelled) setRecentItems([]); })
       .finally(() => { if (!cancelled) setIsLoadingItems(false); });
     return () => { cancelled = true; };
-  }, [selectedCustomer?.id]);
+  }, [selectedCustomer?.id, refreshToken]);
 
 
   const isSearchPending = query.trim() !== debouncedQuery.trim() || isLoading;
@@ -976,6 +978,7 @@ export function PosPage() {
   const handleDeselectCustomer = () => {
     setSelectedCustomer(null);
     setCustomer(null);
+    setSubmitCount((n) => n + 1);
   };
 
   const handleViewHistory = (customerId: number, workItemId?: number) => {
@@ -1002,15 +1005,9 @@ export function PosPage() {
     const customerName = selectedCustomer?.name ?? "";
     setSubmitting(true);
     try {
-      const workItem = await submit(method, note || undefined);
-      const prevId = selectedCustomer?.id;
-      setSelectedCustomer(null);
+      await submit(method, note || undefined);
       setSubmitCount((n) => n + 1);
-      toast.success(`${customerName}님 접수 완료`, {
-        action: prevId
-          ? { label: "접수 확인", onClick: () => navigate("/customers", { state: { focusCustomerId: prevId, focusWorkItemId: workItem.id } }) }
-          : undefined,
-      });
+      toast.success(`${customerName}님 접수 완료`);
     } catch (e) {
       toast.error(`접수 실패: ${String(e)}`);
     } finally {
@@ -1020,12 +1017,13 @@ export function PosPage() {
 
   return (
     <div className="h-full flex gap-4 overflow-hidden">
-      <CustomerPanel 
-        selectedCustomer={selectedCustomer} 
-        onSelect={handleSelectCustomer} 
-        onDeselect={handleDeselectCustomer} 
+      <CustomerPanel
+        selectedCustomer={selectedCustomer}
+        onSelect={handleSelectCustomer}
+        onDeselect={handleDeselectCustomer}
         onViewHistory={handleViewHistory}
         onAddNew={handleAddNewCustomer}
+        refreshToken={submitCount}
       />
       {/* 고객 미선택 시 OrderPanel, PaymentPanel 비활성화 overlay */}
       <div className="flex-1 min-w-0 flex gap-4 overflow-hidden relative">

@@ -28,6 +28,7 @@ interface CartActions {
   updateOptionsMemo: (index: number, memo: string) => void;
   updateItem: (index: number, updates: Partial<CartItem>) => void;
   clear: () => void;
+  clearItems: () => void;
   submit: (method: PaymentMethod, note?: string) => Promise<WorkItem>;
   totalPrice: () => number;
 }
@@ -92,6 +93,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
   },
 
   clear: () => set({ customerId: null, items: [] }),
+  clearItems: () => set({ items: [] }),
 
   totalPrice: () => {
     return get().items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
@@ -128,7 +130,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
       });
     }
 
-    get().clear();
+    get().clearItems();
     return workItem;
   },
 }));

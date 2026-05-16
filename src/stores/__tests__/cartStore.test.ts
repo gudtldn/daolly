@@ -125,9 +125,9 @@ describe("cartStore", () => {
         ],
       });
       expect(result).toEqual(mockWorkItem);
-      // 카트 초기화 확인
+      // 아이템만 초기화, 고객은 유지 (접수 후 동일 고객 연속 접수 지원)
       expect(useCartStore.getState().items).toHaveLength(0);
-      expect(useCartStore.getState().customerId).toBeNull();
+      expect(useCartStore.getState().customerId).toBe(1);
     });
   });
 
