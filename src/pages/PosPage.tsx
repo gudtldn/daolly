@@ -47,6 +47,7 @@ function CustomerPanel({
   onViewHistory,
   onAddNew,
   refreshToken,
+  recentCustomers,
 }: {
   selectedCustomer: Customer | null;
   onSelect: (c: Customer) => void;
@@ -54,6 +55,7 @@ function CustomerPanel({
   onViewHistory: (customerId: number, workItemId?: number) => void;
   onAddNew: (name: string) => void;
   refreshToken: number;
+  recentCustomers: Customer[];
 }) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [unpaid, setUnpaid] = useState(0);
@@ -398,9 +400,41 @@ function CustomerPanel({
             </div>
           </div>
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-center text-on-surface-muted gap-3">
-            <User className="w-12 h-12 opacity-20" />
-            <p className="text-sm">위 검색창에서 고객을 선택해주세요.</p>
+          <div className="h-full flex flex-col p-2">
+            <div className="flex flex-col items-center justify-center text-center text-on-surface-muted gap-3 py-10">
+              <User className="w-10 h-10 opacity-20" />
+              <p className="text-sm">위 검색창에서 고객을 선택해주세요.</p>
+            </div>
+            
+            {recentCustomers.length > 0 && (
+              <div className="w-full mt-4">
+                <div className="flex items-center gap-2 mb-3 px-2">
+                  <div className="h-px bg-border-default flex-1" />
+                  <span className="text-xs font-bold text-on-surface-muted uppercase tracking-wider">최근 선택 고객</span>
+                  <div className="h-px bg-border-default flex-1" />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  {recentCustomers.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => onSelect(c)}
+                      className="flex items-center justify-between w-full px-3 py-2.5 bg-surface hover:bg-surface-elevated border border-border-default hover:border-primary-300 rounded-lg transition-all cursor-pointer group text-left"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-7 h-7 rounded-full bg-primary-100 dark:bg-primary-900/40 flex items-center justify-center text-primary-600 font-bold text-xs shrink-0">
+                          {c.name.charAt(0)}
+                        </div>
+                        <div className="flex flex-col items-start min-w-0">
+                          <span className="font-bold text-on-surface text-sm truncate">{c.name}</span>
+                          {c.phoneNumber && <span className="text-xs text-on-surface-muted truncate">{c.phoneNumber}</span>}
+                        </div>
+                      </div>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-primary-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -953,12 +987,21 @@ export function PosPage() {
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState("");
 
+  const [recentCustomers, setRecentCustomers] = useState<Customer[]>([]);
+
   const { items, addItem, removeItem, updateQuantity, updateItem, setCustomer, submit } =
     useCartStore();
   const navigate = useNavigate();
 
-  // 다른 페이지에서 돌아왔을 때 cartStore.customerId로 고객 복원
+  // 다른 페이지에서 돌아왔을 때 cartStore.customerId로 고객 복원 및 최근 목록 로드
   useEffect(() => {
+    try {
+      const stored = localStorage.getItem("pos_recent_customers");
+      if (stored) setRecentCustomers(JSON.parse(stored));
+    } catch (e) {
+      console.warn("Failed to load recent customers:", e);
+    }
+
     const storedId = useCartStore.getState().customerId;
     if (storedId && !selectedCustomer) {
       customerApi.get(storedId).then((found) => {
@@ -973,6 +1016,13 @@ export function PosPage() {
   const handleSelectCustomer = (c: Customer) => {
     setSelectedCustomer(c);
     setCustomer(c.id);
+
+    setRecentCustomers((prev) => {
+      const filtered = prev.filter((p) => p.id !== c.id);
+      const next = [c, ...filtered].slice(0, 5);
+      localStorage.setItem("pos_recent_customers", JSON.stringify(next));
+      return next;
+    });
   };
 
   const handleDeselectCustomer = () => {
@@ -1024,6 +1074,7 @@ export function PosPage() {
         onViewHistory={handleViewHistory}
         onAddNew={handleAddNewCustomer}
         refreshToken={submitCount}
+        recentCustomers={recentCustomers}
       />
       {/* 고객 미선택 시 OrderPanel, PaymentPanel 비활성화 overlay */}
       <div className="flex-1 min-w-0 flex gap-4 overflow-hidden relative">
