@@ -1,6 +1,5 @@
 import { NavLink } from "react-router";
 import {
-  LayoutDashboard,
   ShoppingCart,
   Users,
   TrendingUp,
@@ -13,7 +12,6 @@ import { useCartStore } from "@/stores/cartStore";
 import { Logo } from "@/components/Logo";
 
 const mainNavItems = [
-  { to: "/dashboard", icon: LayoutDashboard, label: "대시보드" },
   { to: "/pos", icon: ShoppingCart, label: "접수 / 출고" },
   { to: "/customers", icon: Users, label: "고객 관리" },
   { to: "/sales", icon: TrendingUp, label: "매출 관리" },
