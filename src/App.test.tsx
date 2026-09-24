@@ -34,6 +34,18 @@ vi.mock("@/bindings", () => ({
   },
 }));
 
+// 매출 관리 페이지는 salesApi를 직접 import하므로 별도 mock 필요
+vi.mock("@/bindings/sales", () => ({
+  salesApi: {
+    listSalesRecords: vi.fn().mockResolvedValue([]),
+    listPaymentRecords: vi.fn().mockResolvedValue([]),
+    getRevenueSummary: vi.fn().mockResolvedValue({ totalSales: 0, actualIncome: 0 }),
+    listUnpaidRecords: vi.fn().mockResolvedValue([]),
+    listWeeklyChart: vi.fn().mockResolvedValue([]),
+    listTopItems: vi.fn().mockResolvedValue([]),
+  },
+}));
+
 import App from "@/App";
 
 describe("App", () => {
@@ -61,13 +73,13 @@ describe("App", () => {
     // 업데이트 스플래시 이후 본문 노출 대기
     await screen.findByRole("banner");
 
-    // 사이드바의 "대시보드" 링크 클릭
-    const dashboardLink = screen.getByText("대시보드").closest("a")!;
-    await user.click(dashboardLink);
+    // 사이드바의 "매출 관리" 링크 클릭
+    const salesLink = screen.getByText("매출 관리").closest("a")!;
+    await user.click(salesLink);
 
-    // Header 내부의 h2가 "대시보드"로 변경되어야 함
+    // Header 내부의 h2가 "매출 관리"로 변경되어야 함
     const header = document.querySelector("header");
-    expect(header!.querySelector("h2")).toHaveTextContent("대시보드");
+    expect(header!.querySelector("h2")).toHaveTextContent("매출 관리");
   });
 
   it("고객 관리 메뉴가 초기 활성 상태이다", async () => {
