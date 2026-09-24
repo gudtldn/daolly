@@ -158,6 +158,7 @@ pub fn run() {
             // orders
             commands::orders::receive_order,
             commands::orders::amend_order,
+            commands::orders::pickup_order,
             // price_settings
             commands::price_settings::export_price_settings_to_file,
             commands::price_settings::import_price_settings_from_file,

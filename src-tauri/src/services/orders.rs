@@ -271,6 +271,36 @@ pub async fn change_status<C: ConnectionTrait>(
     Ok(active.update(db).await?)
 }
 
+/// 출고: 수령 처리와 남은 금액 받기를 한 번에 합니다. (예전에는 상태 변경과 결제 등록을
+/// 따로 해야 했음) `method`가 있으면 남은 금액을 그 수단으로 받고, 없으면 미수금으로 둡니다.
+pub async fn pickup<C>(db: &C, id: i32, method: Option<String>) -> Result<Receipt, AppError>
+where
+    C: ConnectionTrait + TransactionTrait,
+{
+    let txn = db.begin().await?;
+    let current = find_order(&txn, id).await?;
+    if current.status == WorkItemStatus::PickedUp {
+        return Err(invalid("이미 출고한 세탁물입니다."));
+    }
+    let balance = current.price - current.paid_amount;
+    if let Some(method) = method {
+        let method = payments::normalize_method(Some(&method))?;
+        if balance > 0 {
+            payments::insert(&txn, id, balance, method, None).await?;
+        }
+    }
+
+    let now = timestamp::now();
+    let mut active: work_item::ActiveModel = current.clone().into();
+    apply_status(&mut active, &current, WorkItemStatus::PickedUp, None, &now)?;
+    active.last_modified_at = Set(now);
+    active.update(&txn).await?;
+
+    let receipt = load_receipt(&txn, id).await?;
+    txn.commit().await?;
+    Ok(receipt)
+}
+
 /// 접수를 취소합니다. 받은 결제도 함께 취소되어 매출에서 빠지고, 기록은 남습니다.
 /// (예전에는 행을 지워 결제 기록까지 사라졌음) 함께 취소한 결제는 접수와 같은 시각으로
 /// 표시해 되돌릴 때 찾을 수 있게 합니다.
@@ -867,5 +897,42 @@ mod tests {
         );
         // 두 번 되돌려도 문제없음
         restore(&db, wi.id).await.unwrap();
+    }
+
+    /// 출고: 수령 처리와 잔금 수납을 한 번에. 수단 없이 출고하면 잔금은 미수금으로 남음
+    #[tokio::test]
+    async fn pickup_collects_balance_at_once() {
+        let (db, cid) = setup().await;
+        let wi = received(&db, cid, false).await; // 10,000원
+        payments::create(&db, wi.id, 4000, Some("cash".into()), None)
+            .await
+            .unwrap();
+
+        let (done, _, paid) = pickup(&db, wi.id, Some("card".into())).await.unwrap();
+        assert_eq!(done.status, WorkItemStatus::PickedUp);
+        assert!(done.picked_up_at.is_some());
+        assert_eq!(done.paid_amount, 10000);
+        assert_eq!(
+            paid.last().map(|p| (p.amount, p.method.clone())),
+            Some((6000, Some("card".into())))
+        );
+
+        // 두 번 출고할 수 없음
+        assert!(pickup(&db, wi.id, Some("card".into())).await.is_err());
+
+        // 수단 없이 출고하면 미수금으로 남음
+        let mut other = order(cid, vec![line("바지", 4000, 1)]);
+        other.request_id = "req-2".into();
+        let (other, _, _) = receive(&db, other).await.unwrap();
+        let (left, _, payments) = pickup(&db, other.id, None).await.unwrap();
+        assert_eq!(left.status, WorkItemStatus::PickedUp);
+        assert_eq!(left.paid_amount, 0);
+        assert!(payments.is_empty());
+
+        // 외상은 결제 수단이 아님
+        let mut third = order(cid, vec![line("코트", 9000, 1)]);
+        third.request_id = "req-3".into();
+        let (third, _, _) = receive(&db, third).await.unwrap();
+        assert!(pickup(&db, third.id, Some("credit".into())).await.is_err());
     }
 }

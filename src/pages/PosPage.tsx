@@ -18,6 +18,7 @@ import {
 import { useCartStore, type CartItem, type PaymentMethod } from "@/stores/cartStore";
 import { useDialogStore } from "@/stores/dialogStore";
 import { CustomerFormCard } from "@/pages/customers/CustomerFormCard";
+import { PickupDialog, PAYMENT_LABELS } from "@/pages/pos/PickupDialog";
 
 // ============================================================
 // CustomerPanel 전용 상수/헬퍼
@@ -62,6 +63,9 @@ function CustomerPanel({
   const [unpaid, setUnpaid] = useState(0);
   const [recentItems, setRecentItems] = useState<WorkItem[]>([]);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
+  // 출고할 세탁물 (출고 창), 출고 후 목록·미수금 다시 불러오기
+  const [pickupTarget, setPickupTarget] = useState<WorkItem | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   const {
     source: lastSource,
@@ -122,7 +126,7 @@ function CustomerPanel({
     workItemApi.getAllUnpaidAmounts().then((m) => {
       setUnpaid(m[selectedCustomer.id] ?? 0);
     }).catch(() => {});
-  }, [selectedCustomer, refreshToken]);
+  }, [selectedCustomer, refreshToken, reloadToken]);
 
   useEffect(() => {
     if (!selectedCustomer) { setRecentItems([]); return; }
@@ -134,12 +138,14 @@ function CustomerPanel({
         const sorted = [...items].sort(
           (a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
         );
-        setRecentItems(sorted.slice(0, RECENT_LIMIT));
+        // 찾아갈 세탁물(출고 전)은 오래됐어도 모두 보여 주고, 나머지는 최근 것만
+        const shown = new Set(sorted.slice(0, RECENT_LIMIT).map((i) => i.id));
+        setRecentItems(sorted.filter((i) => shown.has(i.id) || i.status !== "PickedUp"));
       })
       .catch(() => { if (!cancelled) setRecentItems([]); })
       .finally(() => { if (!cancelled) setIsLoadingItems(false); });
     return () => { cancelled = true; };
-  }, [selectedCustomer?.id, refreshToken]);
+  }, [selectedCustomer?.id, refreshToken, reloadToken]);
 
 
   const isSearchPending = query.trim() !== debouncedQuery.trim() || isLoading;
@@ -370,14 +376,15 @@ function CustomerPanel({
                   {recentItems.map((item) => {
                     const unpaidAmt = item.price - item.paidAmount;
                     return (
-                      <button
+                      <div
                         key={item.id}
-                        onClick={() => onViewHistory(selectedCustomer.id, item.id)}
-                        className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors cursor-pointer hover:border-primary-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 dark:hover:border-primary-700 ${
-                          item.status === "PickedUp"
-                            ? "opacity-55 border-border-default bg-surface"
-                            : "border-border-default bg-surface"
+                        className={`flex items-stretch rounded-lg border border-border-default bg-surface transition-colors hover:border-primary-300 dark:hover:border-primary-700 ${
+                          item.status === "PickedUp" ? "opacity-55" : ""
                         }`}
+                      >
+                      <button
+                        onClick={() => onViewHistory(selectedCustomer.id, item.id)}
+                        className="flex-1 min-w-0 text-left px-3 py-2.5 rounded-lg transition-colors cursor-pointer hover:bg-primary-50 dark:hover:bg-primary-900/20"
                       >
                         <div className="flex items-center justify-between gap-2 mb-1">
                           <span className="text-sm font-medium text-on-surface truncate flex-1">
@@ -394,6 +401,15 @@ function CustomerPanel({
                           </span>
                         </div>
                       </button>
+                      {item.status !== "PickedUp" && (
+                        <button
+                          onClick={() => setPickupTarget(item)}
+                          className="shrink-0 my-2 mr-2 px-3 rounded-md text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 transition-colors cursor-pointer"
+                        >
+                          출고
+                        </button>
+                      )}
+                      </div>
                     );
                   })}
                 </div>
@@ -439,6 +455,24 @@ function CustomerPanel({
           </div>
         )}
       </div>
+
+      <PickupDialog
+        item={pickupTarget}
+        onClose={() => setPickupTarget(null)}
+        onPickedUp={(receipt, method, collected) => {
+          setPickupTarget(null);
+          setReloadToken((n) => n + 1);
+          const desc = receipt.description ?? "세탁물";
+          const left = receipt.price - receipt.paidAmount;
+          if (method) {
+            toast.success(`${desc} 출고 완료 (${PAYMENT_LABELS[method]} ${collected.toLocaleString()}원 받음)`);
+          } else if (left > 0) {
+            toast.success(`${desc} 출고 완료 (미수금 ${left.toLocaleString()}원)`);
+          } else {
+            toast.success(`${desc} 출고 완료`);
+          }
+        }}
+      />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import type {
   WorkItemStatus,
   ReceiveOrder,
   AmendOrder,
+  PaymentMethod,
 } from "@/types";
 
 export const workItemApi = {
@@ -22,6 +23,11 @@ export const workItemApi = {
   /** 접수 (품목, 선결제 포함)를 한 번에 저장 */
   receive(order: ReceiveOrder): Promise<WorkItemFull> {
     return invoke("receive_order", { order });
+  },
+
+  /** 출고: 수령 처리와 남은 금액 받기를 한 번에 (method가 없으면 미수금으로 둠) */
+  pickup(id: number, method: PaymentMethod | null): Promise<WorkItemFull> {
+    return invoke("pickup_order", { id, method });
   },
 
   /** 상태·내용·품목을 한 번에 수정 */

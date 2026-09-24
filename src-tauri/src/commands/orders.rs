@@ -23,6 +23,21 @@ pub async fn receive_order(
     })
 }
 
+/// 출고: 수령 처리와 남은 금액 받기를 한 번에 합니다. method가 없으면 미수금으로 둡니다.
+#[tauri::command]
+pub async fn pickup_order(
+    db: State<'_, DatabaseConnection>,
+    id: i32,
+    method: Option<String>,
+) -> CmdResult<WorkItemFull> {
+    let (work_item, details, payments) = services::orders::pickup(db.inner(), id, method).await?;
+    Ok(WorkItemFull {
+        work_item,
+        details,
+        payments,
+    })
+}
+
 /// 접수의 상태·내용·품목을 한 번에 고칩니다.
 #[tauri::command]
 pub async fn amend_order(
