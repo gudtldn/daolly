@@ -1,3 +1,4 @@
+use sea_orm::prelude::Expr;
 use sea_orm::*;
 
 use crate::db::entities::customer;
@@ -11,11 +12,18 @@ pub async fn list(
     let mut query = customer::Entity::find().filter(customer::Column::DeletedAt.is_null());
 
     if let Some(keyword) = search {
-        query = query.filter(
-            Condition::any()
-                .add(customer::Column::Name.contains(&keyword))
-                .add(customer::Column::PhoneNumber.contains(&keyword)),
-        );
+        let mut condition = Condition::any()
+            .add(customer::Column::Name.contains(&keyword))
+            .add(customer::Column::PhoneNumber.contains(&keyword));
+        // 전화번호는 하이픈을 넣어 저장하므로 숫자만 비교 (12345678, 01012345678로도 찾기)
+        let digits: String = keyword.chars().filter(char::is_ascii_digit).collect();
+        if !digits.is_empty() {
+            condition = condition.add(Expr::cust_with_values(
+                "REPLACE(REPLACE(phone_number, '-', ''), ' ', '') LIKE ?",
+                [format!("%{digits}%")],
+            ));
+        }
+        query = query.filter(condition);
     }
 
     query = query.order_by_asc(customer::Column::Name);
@@ -172,6 +180,21 @@ mod tests {
         let results = list(&db, Some("홍".into())).await.unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].name, "홍길동");
+    }
+
+    /// V5: 010-1234-5678로 저장된 번호를 하이픈 없이 찾기
+    #[tokio::test]
+    async fn search_phone_by_digits() {
+        let db = setup_test_db().await.unwrap();
+        create(&db, "홍길동".into(), Some("010-1234-5678".into()), None)
+            .await
+            .unwrap();
+
+        for keyword in ["12345678", "01012345678", "1234-5678", "5678", "010 1234"] {
+            let found = list(&db, Some(keyword.into())).await.unwrap();
+            assert_eq!(found.len(), 1, "{keyword}");
+        }
+        assert!(list(&db, Some("9999".into())).await.unwrap().is_empty());
     }
 
     #[tokio::test]

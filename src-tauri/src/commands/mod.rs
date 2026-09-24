@@ -21,7 +21,8 @@ pub type CmdResult<T> = Result<T, AppError>;
 pub fn require_non_empty(value: &str, field: &str) -> Result<(), AppError> {
     if value.trim().is_empty() {
         Err(AppError::Validation(format!(
-            "{field}은(는) 비워둘 수 없습니다"
+            "{} 비워 둘 수 없습니다.",
+            topic(field)
         )))
     } else {
         Ok(())
@@ -32,7 +33,8 @@ pub fn require_non_empty(value: &str, field: &str) -> Result<(), AppError> {
 pub fn require_positive(value: i64, field: &str) -> Result<(), AppError> {
     if value <= 0 {
         Err(AppError::Validation(format!(
-            "{field}은(는) 0보다 커야 합니다"
+            "{} 0보다 커야 합니다.",
+            topic(field)
         )))
     } else {
         Ok(())
@@ -54,9 +56,41 @@ pub fn normalize_time(value: Option<String>, field: &str) -> Result<Option<Strin
 pub fn require_non_negative(value: i64, field: &str) -> Result<(), AppError> {
     if value < 0 {
         Err(AppError::Validation(format!(
-            "{field}은(는) 0 이상이어야 합니다"
+            "{} 0 이상이어야 합니다.",
+            topic(field)
         )))
     } else {
         Ok(())
+    }
+}
+
+/// 낱말 뒤에 받침에 맞는 '은/는'을 붙입니다. ("고객 이름" → "고객 이름은", "결제 금액" → "결제 금액은")
+fn topic(word: &str) -> String {
+    let particle = match word.chars().last() {
+        // 한글 음절: (코드 - 0xAC00) % 28 이 0이 아니면 받침이 있음
+        Some(c @ '가'..='힣') if !(c as u32 - 0xAC00).is_multiple_of(28) => "은",
+        Some('가'..='힣') => "는",
+        _ => "은(는)",
+    };
+    format!("{word}{particle}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn topic_particle_follows_final_consonant() {
+        assert_eq!(topic("고객 이름"), "고객 이름은");
+        assert_eq!(topic("카테고리 이름"), "카테고리 이름은");
+        assert_eq!(topic("결제 금액"), "결제 금액은");
+        assert_eq!(topic("품목 가격"), "품목 가격은");
+        assert_eq!(topic("작업 설명"), "작업 설명은");
+        assert_eq!(topic("단가"), "단가는");
+        assert_eq!(topic("ID"), "ID은(는)");
+        assert_eq!(
+            require_positive(0, "결제 금액").unwrap_err().to_string(),
+            "결제 금액은 0보다 커야 합니다."
+        );
     }
 }

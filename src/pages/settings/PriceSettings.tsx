@@ -3,6 +3,7 @@ import { Tag, Plus, Pen, Trash2, GripVertical, FileUp, FileDown } from "lucide-r
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
 import { errorMessage } from "@/utils/errors";
+import { particle } from "@/utils/korean";
 import {
   DndContext,
   closestCenter,
@@ -426,7 +427,7 @@ export function PriceSettings() {
   const handleDeleteItem = async (item: PriceItem) => {
     const ok = await showConfirm({
       title: "품목 삭제",
-      message: `"${item.name}"을(를) 삭제하시겠습니까?`,
+      message: `"${item.name}"${particle(item.name, "을", "를")} 삭제하시겠습니까?`,
       confirmText: "삭제",
       isDestructive: true,
     });
