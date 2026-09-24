@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { CalendarDays, ArrowRight, X } from "lucide-react";
+import { parseLocalDate, toLocalDateString } from "@/utils/dateUtils";
 
 interface DateRange {
   from: string; // YYYY-MM-DD 형식의 시작일
@@ -14,8 +15,8 @@ interface Props {
 }
 
 function formatDisplay(range: DateRange): string {
-  const from = new Date(range.from);
-  const to = new Date(range.to);
+  const from = parseLocalDate(range.from);
+  const to = parseLocalDate(range.to);
   const currentYear = new Date().getFullYear();
 
   const fmtFull = (d: Date) =>
@@ -41,7 +42,7 @@ function formatDisplay(range: DateRange): string {
 export function DateRangePicker({ value, onApply, onClear }: Props) {
   const [open, setOpen] = useState(false);
   const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
-  const today = new Date().toLocaleDateString("sv"); // local time YYYY-MM-DD
+  const today = toLocalDateString(new Date());
   const [from, setFrom] = useState(value?.from ?? today);
   const [to, setTo] = useState(value?.to ?? today);
   const triggerRef = useRef<HTMLDivElement>(null);

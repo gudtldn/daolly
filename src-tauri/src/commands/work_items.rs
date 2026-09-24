@@ -3,7 +3,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tauri::State;
 
-use crate::commands::{AppError, CmdResult, require_non_empty, require_non_negative};
+use crate::commands::{
+    AppError, CmdResult, normalize_time, require_non_empty, require_non_negative,
+};
 use crate::db::entities::{payment, work_item, work_item::WorkItemStatus, work_item_detail};
 use crate::services;
 use crate::services::work_items::DetailInput;
@@ -78,13 +80,14 @@ pub async fn create_work_item(
     data: CreateWorkItem,
 ) -> CmdResult<work_item::Model> {
     require_non_negative(data.price, "청구 금액")?;
+    let received_at = normalize_time(data.received_at, "접수 일시")?;
     Ok(services::work_items::create(
         db.inner(),
         data.customer_id,
         data.description,
         data.price,
         data.note,
-        data.received_at,
+        received_at,
         data.details,
     )
     .await?)
@@ -102,6 +105,12 @@ pub async fn update_work_item(
     if let Some(price) = data.price {
         require_non_negative(price, "청구 금액")?;
     }
+    let received_at = normalize_time(data.received_at, "접수 일시")?;
+    // 빈 문자열은 '수령 일시 지우기'
+    let picked_up_at = match data.picked_up_at {
+        Some(v) if v.is_empty() => Some(v),
+        other => normalize_time(other, "수령 일시")?,
+    };
     let existing = work_item::Entity::find_by_id(id)
         .one(db.inner())
         .await?
@@ -113,8 +122,8 @@ pub async fn update_work_item(
         data.description,
         data.price,
         data.note,
-        data.received_at,
-        data.picked_up_at,
+        received_at,
+        picked_up_at,
     )
     .await?)
 }

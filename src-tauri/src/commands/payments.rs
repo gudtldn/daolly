@@ -2,7 +2,7 @@ use sea_orm::DatabaseConnection;
 use serde::Deserialize;
 use tauri::State;
 
-use crate::commands::{CmdResult, require_positive};
+use crate::commands::{CmdResult, normalize_time, require_positive};
 use crate::db::entities::payment;
 use crate::services;
 
@@ -42,12 +42,13 @@ pub async fn create_payment(
     data: CreatePayment,
 ) -> CmdResult<payment::Model> {
     require_positive(data.amount, "결제 금액")?;
+    let paid_at = normalize_time(data.paid_at, "결제 일시")?;
     Ok(services::payments::create(
         db.inner(),
         data.work_item_id,
         data.amount,
         data.method,
-        data.paid_at,
+        paid_at,
     )
     .await?)
 }
@@ -59,7 +60,8 @@ pub async fn update_payment(
     data: UpdatePayment,
 ) -> CmdResult<payment::Model> {
     require_positive(data.amount, "결제 금액")?;
-    Ok(services::payments::update(db.inner(), id, data.amount, data.method, data.paid_at).await?)
+    let paid_at = normalize_time(data.paid_at, "결제 일시")?;
+    Ok(services::payments::update(db.inner(), id, data.amount, data.method, paid_at).await?)
 }
 
 #[tauri::command]

@@ -1,6 +1,7 @@
 import { CreditCard, Banknote, Clock, Landmark } from "lucide-react";
-import { getStartOfLocalDateAsUTC, getEndOfLocalDateAsUTC } from "@/utils/dateUtils";
+import { toLocalDateString } from "@/utils/dateUtils";
 
+/** 조회 기간: 이 PC 기준 날짜 "YYYY-MM-DD"이며 양끝을 포함합니다. */
 export interface DateRange {
   from: string;
   to: string;
@@ -21,44 +22,29 @@ export type PresetId = (typeof PERIODS)[number]["id"];
  */
 export function getDateRange(period: PresetId): DateRange {
   const today = new Date();
+  const range = (from: Date, to: Date = today): DateRange => ({
+    from: toLocalDateString(from),
+    to: toLocalDateString(to),
+  });
   switch (period) {
     case "today":
-      return { 
-        from: getStartOfLocalDateAsUTC(today), 
-        to: getEndOfLocalDateAsUTC(today) 
-      };
+      return range(today);
     case "yesterday": {
       const y = new Date(today);
       y.setDate(y.getDate() - 1);
-      return { 
-        from: getStartOfLocalDateAsUTC(y), 
-        to: getEndOfLocalDateAsUTC(y) 
-      };
+      return range(y, y);
     }
     case "week": {
       const day = today.getDay(); // 0=일요일
       const diff = day === 0 ? 6 : day - 1; // 월요일=0
       const mon = new Date(today);
       mon.setDate(today.getDate() - diff);
-      return { 
-        from: getStartOfLocalDateAsUTC(mon), 
-        to: getEndOfLocalDateAsUTC(today) 
-      };
+      return range(mon);
     }
-    case "month": {
-      const first = new Date(today.getFullYear(), today.getMonth(), 1);
-      return { 
-        from: getStartOfLocalDateAsUTC(first), 
-        to: getEndOfLocalDateAsUTC(today) 
-      };
-    }
-    case "year": {
-      const first = new Date(today.getFullYear(), 0, 1);
-      return { 
-        from: getStartOfLocalDateAsUTC(first), 
-        to: getEndOfLocalDateAsUTC(today) 
-      };
-    }
+    case "month":
+      return range(new Date(today.getFullYear(), today.getMonth(), 1));
+    case "year":
+      return range(new Date(today.getFullYear(), 0, 1));
   }
 }
 
@@ -96,7 +82,7 @@ export function PaymentMethodBadge({ method }: { method: string }) {
       </span>
     );
   }
-  if (m === "transfer" || m === "이체") {
+  if (m === "transfer" || m === "이체" || m === "계좌이체") {
     return (
       <span className={`${baseClass} ${smallText} bg-secondary-100 text-secondary-600 dark:bg-secondary-700 dark:text-secondary-300 border-secondary-200/50`}>
         <Landmark className="w-3 h-3" /> 이체

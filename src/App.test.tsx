@@ -57,7 +57,15 @@ vi.mock("@/bindings/sales", () => ({
   salesApi: {
     listSalesRecords: vi.fn().mockResolvedValue([]),
     listPaymentRecords: vi.fn().mockResolvedValue([]),
-    getRevenueSummary: vi.fn().mockResolvedValue({ totalSales: 0, actualIncome: 0 }),
+    getRevenueSummary: vi.fn().mockResolvedValue({
+      totalSales: 0,
+      actualIncome: 0,
+      cardIncome: 0,
+      cashIncome: 0,
+      transferIncome: 0,
+      otherIncome: 0,
+      backPaymentIncome: 0,
+    }),
     listUnpaidRecords: vi.fn().mockResolvedValue([]),
     listWeeklyChart: vi.fn().mockResolvedValue([]),
     listTopItems: vi.fn().mockResolvedValue([]),

@@ -3,6 +3,7 @@ mod commands;
 mod db;
 mod services;
 mod startup;
+mod timestamp;
 mod updater;
 
 #[cfg(test)]

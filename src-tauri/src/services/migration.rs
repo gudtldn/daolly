@@ -1,9 +1,10 @@
-use chrono::Utc;
+use chrono::Local;
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbErr, EntityTrait, Set, TransactionTrait};
 use std::collections::HashSet;
 use std::path::PathBuf;
 
 use crate::db::entities::{category, customer, payment, price_item, work_item, work_item_detail};
+use crate::timestamp;
 
 /// 모든 데이터를 삭제합니다.
 pub async fn clear_database(db: &DatabaseConnection) -> Result<(), DbErr> {
@@ -76,7 +77,7 @@ async fn import_legacy(
         ))
         .await?;
 
-    let now = Utc::now().to_rfc3339();
+    let now = timestamp::now();
     let mut imported_customer_ids = HashSet::new();
     let mut customer_models = Vec::new();
 
@@ -150,13 +151,15 @@ async fn import_legacy(
         let mut completed_at = None;
         let mut paid_amount = 0;
 
-        // ISO 8601 변환
+        // 레거시 날짜(YYYY-MM-DD)는 이 PC 현지 자정으로 보고 저장 형식(UTC)으로 변환
         let recv_at = reception_date
-            .as_ref()
-            .map(|d| format!("{}T00:00:00", d))
-            .unwrap_or_else(|| Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string());
+            .as_deref()
+            .and_then(|d| timestamp::normalize_legacy(d, &Local))
+            .unwrap_or_else(|| now.clone());
 
-        let proc_at = processing_date.as_ref().map(|d| format!("{}T00:00:00", d));
+        let proc_at = processing_date
+            .as_deref()
+            .and_then(|d| timestamp::normalize_legacy(d, &Local));
 
         // 1. 납품일자가 있으면 무조건 수거완료(PickedUp)
         if proc_at.is_some() {

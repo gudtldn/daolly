@@ -1,7 +1,7 @@
-use chrono::Utc;
 use sea_orm::*;
 
 use crate::db::entities::customer;
+use crate::timestamp;
 
 pub async fn list(
     db: &DatabaseConnection,
@@ -64,7 +64,7 @@ pub async fn create(
         .map(|s| format_phone(&s));
     let note = note.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty());
 
-    let now = Utc::now().to_rfc3339();
+    let now = timestamp::now();
     let model = customer::ActiveModel {
         name: Set(name),
         phone_number: Set(phone_number),
@@ -97,7 +97,7 @@ pub async fn update(
     active.name = Set(name);
     active.phone_number = Set(phone_number);
     active.note = Set(note);
-    active.last_modified_at = Set(Utc::now().to_rfc3339());
+    active.last_modified_at = Set(timestamp::now());
 
     active.update(db).await
 }

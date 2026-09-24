@@ -1,0 +1,74 @@
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { WorkItemFormCard } from "../WorkItemFormCard";
+import type { WorkItemFull } from "@/types";
+
+vi.mock("@/bindings", () => ({
+  paymentApi: { create: vi.fn(), list: vi.fn(), update: vi.fn(), delete: vi.fn() },
+}));
+
+const workItem: WorkItemFull = {
+  id: 7,
+  customerId: 1,
+  status: "Received",
+  description: "와이셔츠",
+  price: 3000,
+  paidAmount: 0,
+  note: null,
+  receivedAt: "2026-09-24T01:15:37.123Z",
+  completedAt: null,
+  pickedUpAt: null,
+  createdAt: "2026-09-24T01:15:37.123Z",
+  lastModifiedAt: "2026-09-24T01:15:37.123Z",
+  details: [
+    { id: 1, workItemId: 7, priceItemId: 3, itemName: "와이셔츠", unitPrice: 3000, quantity: 1, optionsMemo: null },
+  ],
+  payments: [],
+};
+
+function renderEdit(onSave = vi.fn().mockResolvedValue(undefined)) {
+  render(
+    <WorkItemFormCard open mode="edit" customerId={1} workItem={workItem} onSave={onSave} onClose={vi.fn()} />,
+  );
+  return onSave;
+}
+
+describe("WorkItemFormCard 날짜 전송", () => {
+  it("날짜를 건드리지 않고 저장하면 접수/수령 일시를 보내지 않는다", async () => {
+    const user = userEvent.setup();
+    const onSave = renderEdit();
+
+    await user.type(screen.getByPlaceholderText("작업 관련 메모"), "메모만 수정");
+    await user.click(screen.getByRole("button", { name: "저장" }));
+
+    const data = onSave.mock.calls[0][0];
+    expect(data.note).toBe("메모만 수정");
+    expect(data.receivedAt).toBeNull();
+    expect(data.pickedUpAt).toBeNull();
+  });
+
+  it("접수 일시를 바꾸면 UTC ISO 형식으로 보낸다", async () => {
+    const user = userEvent.setup();
+    const onSave = renderEdit();
+
+    const input = document.querySelector('input[type="datetime-local"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "2026-09-24T20:00" } });
+    await user.click(screen.getByRole("button", { name: "저장" }));
+
+    const data = onSave.mock.calls[0][0];
+    expect(data.receivedAt).toBe(new Date("2026-09-24T20:00").toISOString());
+    expect(data.receivedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  });
+
+  it("접수 일시 칸을 비우고 저장하면 바꾸지 않은 것으로 본다", async () => {
+    const user = userEvent.setup();
+    const onSave = renderEdit();
+
+    const input = document.querySelector('input[type="datetime-local"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "" } });
+    await user.click(screen.getByRole("button", { name: "저장" }));
+
+    expect(onSave.mock.calls[0][0].receivedAt).toBeNull();
+  });
+});

@@ -1,9 +1,9 @@
-use chrono::Utc;
 use sea_orm::*;
 use serde::Deserialize;
 use std::collections::HashMap;
 
 use crate::db::entities::{payment, work_item, work_item::WorkItemStatus, work_item_detail};
+use crate::timestamp;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -109,7 +109,7 @@ pub async fn create(
         .unwrap_or_else(|| build_description(&details));
     let note = note.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty());
 
-    let now = Utc::now().to_rfc3339();
+    let now = timestamp::now();
     let recv = received_at.unwrap_or_else(|| now.clone());
     let tx = db.begin().await?;
 
@@ -184,7 +184,7 @@ pub async fn update(
     if let Some(pick) = picked_up_at {
         active.picked_up_at = Set(if pick.is_empty() { None } else { Some(pick) });
     }
-    active.last_modified_at = Set(Utc::now().to_rfc3339());
+    active.last_modified_at = Set(timestamp::now());
 
     active.update(db).await
 }
@@ -194,7 +194,7 @@ pub async fn update_status(
     existing: work_item::Model,
     status: WorkItemStatus,
 ) -> Result<work_item::Model, DbErr> {
-    let now = Utc::now().to_rfc3339();
+    let now = timestamp::now();
     let mut active: work_item::ActiveModel = existing.into();
     active.last_modified_at = Set(now.clone());
 

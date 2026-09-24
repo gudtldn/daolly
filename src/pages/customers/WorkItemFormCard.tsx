@@ -12,9 +12,19 @@ function toLocalInput(iso: string | null): string {
   const pad = (n: number) => n.toString().padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+/** datetime-local 값(현지 시각)을 저장 형식(UTC ISO)으로 변환. 빈 값은 "" */
 function fromLocalInput(local: string): string {
-  // Return local time as-is (with seconds) - no UTC conversion
-  return local ? local + ":00" : "";
+  return local ? new Date(local).toISOString() : "";
+}
+
+/**
+ * 날짜 입력이 처음 값과 달라졌을 때만 저장 형식으로 돌려줍니다.
+ * 바뀌지 않았으면 null(변경 없음), 비웠으면 ""(지우기).
+ * 비울 수 없는 값(접수·결제 일시)은 `|| null`로 ""를 변경 없음으로 취급합니다.
+ */
+function changedDate(current: string, initial: string): string | null {
+  if (current === initial) return null;
+  return fromLocalInput(current);
 }
 
 // 결제 수단 키 -> 한글 표시 변환 (영문 key 기준, 구형 DB 한글 key fallback 포함)
@@ -71,6 +81,9 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
   const descRef = useRef<HTMLInputElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
   const itemRefs = useRef<Map<number, HTMLInputElement>>(new Map());
+  // 열 때의 날짜 입력값. 사용자가 바꾼 날짜만 보내기 위함
+  // (예전에는 메모만 고쳐도 접수 일시를 다시 저장해 초 단위가 사라지고 형식이 바뀌었음)
+  const initialDates = useRef({ receivedAt: "", pickedUpAt: "", payDate: "" });
 
   // 결제 탭 상태
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -83,6 +96,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
   const [editAmount, setEditAmount] = useState(0);
   const [editMethod, setEditMethod] = useState("");
   const [editDate, setEditDate] = useState("");
+  const [editDateInitial, setEditDateInitial] = useState("");
 
   // 자동 합산 가격
   const autoPrice = details.reduce((sum, d) => sum + d.unitPrice * d.quantity, 0);
@@ -108,6 +122,8 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       setStatus(workItem.status);
       setReceivedAt(toLocalInput(workItem.receivedAt));
       setPickedUpAt(toLocalInput(workItem.pickedUpAt));
+      initialDates.current.receivedAt = toLocalInput(workItem.receivedAt);
+      initialDates.current.pickedUpAt = toLocalInput(workItem.pickedUpAt);
       setDetails(
         workItem.details.length > 0
           ? workItem.details.map((d) => ({
@@ -129,6 +145,8 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       setStatus("Received");
       setReceivedAt(toLocalInput(new Date().toISOString()));
       setPickedUpAt("");
+      initialDates.current.receivedAt = toLocalInput(new Date().toISOString());
+      initialDates.current.pickedUpAt = "";
       setDetails([emptyDetail()]);
       setManualPrice(false);
       setPriceInput(0);
@@ -147,6 +165,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
     }
     setPayMethod("cash");
     setPayDate(toLocalInput(new Date().toISOString()));
+    initialDates.current.payDate = toLocalInput(new Date().toISOString());
     setPayLoading(false);
     setEditingPaymentId(null);
   }, [open, mode, workItem, initialTab]);
@@ -166,7 +185,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
     if (!workItem || payAmount <= 0) return;
     setPayLoading(true);
     try {
-      await paymentApi.create({ workItemId: workItem.id, amount: payAmount, method: payMethod, paidAt: payDate ? fromLocalInput(payDate) : undefined });
+      await paymentApi.create({ workItemId: workItem.id, amount: payAmount, method: payMethod, paidAt: changedDate(payDate, initialDates.current.payDate) || undefined });
       const updated = await paymentApi.list(workItem.id);
       setPayments(updated);
       const newPaid = updated.reduce((s, p) => s + p.amount, 0);
@@ -186,6 +205,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
     setEditAmount(p.amount);
     setEditMethod(p.method ?? "cash");
     setEditDate(toLocalInput(p.paidAt));
+    setEditDateInitial(toLocalInput(p.paidAt));
   };
 
   // 결제 수정 저장
@@ -196,7 +216,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       await paymentApi.update(editingPaymentId, {
         amount: editAmount,
         method: editMethod || null,
-        paidAt: editDate ? fromLocalInput(editDate) : undefined,
+        paidAt: changedDate(editDate, editDateInitial) || undefined,
       });
       const updated = await paymentApi.list(workItem.id);
       setPayments(updated);
@@ -293,13 +313,14 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
 
       if (mode === "create") {
         const statusOverride = status !== "Received" ? status : undefined;
-        const pickupDate = pickedUpAt ? fromLocalInput(pickedUpAt) : undefined;
+        const pickupDate = changedDate(pickedUpAt, initialDates.current.pickedUpAt) ?? undefined;
         await onSave({
           customerId,
           description: trimmedDesc,
           price: effectivePrice,
           note: note.trim() || null,
-          receivedAt: receivedAt ? fromLocalInput(receivedAt) : null,
+          // 기본값(연 시각)을 그대로 두면 서버가 저장 시각을 사용
+          receivedAt: changedDate(receivedAt, initialDates.current.receivedAt) || null,
           details: detailInputs,
         } as CreateWorkItem, undefined, statusOverride, pickupDate);
       } else {
@@ -309,8 +330,9 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
             description: trimmedDesc,
             price: effectivePrice,
             note: note.trim(),
-            receivedAt: receivedAt ? fromLocalInput(receivedAt) : null,
-            pickedUpAt: pickedUpAt ? fromLocalInput(pickedUpAt) : "",
+            // null = 변경 없음, "" = 수령 일시 지우기
+            receivedAt: changedDate(receivedAt, initialDates.current.receivedAt) || null,
+            pickedUpAt: changedDate(pickedUpAt, initialDates.current.pickedUpAt),
           } as UpdateWorkItem,
           detailInputs,
           statusChanged,

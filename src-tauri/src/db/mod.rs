@@ -293,4 +293,69 @@ mod tests {
         customers::delete(&db, 1).await.unwrap();
         assert_eq!(scalar(&db, "SELECT COUNT(*) FROM work_items").await, 0);
     }
+
+    async fn text(db: &DatabaseConnection, sql: &str) -> String {
+        db.query_one(Statement::from_string(DbBackend::Sqlite, sql))
+            .await
+            .unwrap()
+            .unwrap()
+            .try_get_by_index(0)
+            .unwrap()
+    }
+
+    /// 0.2.7이 남긴 DB(시각 형식이 섞임)를 열면 백업 후 시각이 정규화되고 인덱스가 생김
+    #[tokio::test]
+    async fn upgrading_v0_2_7_database_normalizes_timestamps() {
+        let dir = tempfile::tempdir().unwrap();
+        {
+            let db = connect(&dir.path().join(DB_FILE_NAME), false)
+                .await
+                .unwrap();
+            // 0.2.7까지의 마이그레이션만 적용된 상태
+            Migrator::up(&db, Some(2)).await.unwrap();
+            db.execute_unprepared(
+                "INSERT INTO customers (id, name, created_at, last_modified_at)
+                 VALUES (1, '고객', '2026-09-20T01:00:00.123456789+00:00', '2026-09-20T01:00:00+00:00')",
+            )
+            .await
+            .unwrap();
+            db.execute_unprepared(
+                "INSERT INTO work_items (id, customer_id, status, price, paid_amount, received_at, created_at, last_modified_at)
+                 VALUES (1, 1, 'Received', 1000, 0, '2026-09-23T23:00:00', '2026-09-23T14:00:00+00:00', '2026-09-23T14:00:00+00:00')",
+            )
+            .await
+            .unwrap();
+            db.close().await.unwrap();
+        }
+
+        let db = init(dir.path()).await.unwrap();
+
+        assert_eq!(
+            scalar(&db, "SELECT COUNT(*) FROM seaql_migrations").await,
+            3
+        );
+        assert_eq!(
+            text(&db, "SELECT created_at FROM customers").await,
+            "2026-09-20T01:00:00.123Z"
+        );
+        // 타임존 없는 값은 이 PC의 현지 시각으로 해석
+        assert_eq!(
+            text(&db, "SELECT received_at FROM work_items").await,
+            crate::timestamp::normalize_legacy("2026-09-23T23:00:00", &chrono::Local).unwrap()
+        );
+        assert_eq!(
+            scalar(
+                &db,
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_work_items_received_at'"
+            )
+            .await,
+            1
+        );
+        let kinds: Vec<BackupKind> = list_backups(dir.path())
+            .unwrap()
+            .iter()
+            .map(|b| b.kind)
+            .collect();
+        assert_eq!(kinds, vec![BackupKind::PreMigration]);
+    }
 }

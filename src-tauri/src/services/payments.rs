@@ -1,7 +1,7 @@
-use chrono::Utc;
 use sea_orm::*;
 
 use crate::db::entities::{payment, work_item};
+use crate::timestamp;
 
 pub async fn list(
     db: &DatabaseConnection,
@@ -26,7 +26,7 @@ pub async fn create(
         .map(|s| s.trim().to_owned())
         .filter(|s| !s.is_empty());
 
-    let now = Utc::now().to_rfc3339();
+    let now = timestamp::now();
     let paid_at_val = paid_at.unwrap_or_else(|| now.clone());
     let tx = db.begin().await?;
 
@@ -117,7 +117,7 @@ async fn sync_paid_amount(tx: &DatabaseTransaction, work_item_id: i32) -> Result
 
     let mut active: work_item::ActiveModel = wi.into();
     active.paid_amount = Set(total);
-    active.last_modified_at = Set(Utc::now().to_rfc3339());
+    active.last_modified_at = Set(timestamp::now());
     active.update(tx).await?;
 
     Ok(())
