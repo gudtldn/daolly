@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { Virtuoso } from "react-virtuoso";
 import type { VirtuosoHandle } from "react-virtuoso";
 import { useLocation } from "react-router";
+import { toast } from "sonner";
 import { useSearch } from "@/hooks/useSearch";
 import { useSortableData } from "@/hooks/useSortableData";
 import { useListInteraction, type InteractionSource } from "@/hooks/useListInteraction";
@@ -22,7 +23,11 @@ import type { Customer, WorkItemFull, WorkItemDetail, WorkItemStatus, ReceiveOrd
 import { useCustomerStore } from "@/stores/customerStore";
 import { useWorkItemStore } from "@/stores/workItemStore";
 import { useDialogStore } from "@/stores/dialogStore";
-import { workItemApi } from "@/bindings";
+import { customerApi, workItemApi } from "@/bindings";
+import { errorMessage } from "@/utils/errors";
+
+// 삭제 후 '되돌리기'를 누를 수 있는 시간
+const UNDO_DURATION_MS = 10_000;
 import { CustomerFormCard } from "@/pages/customers/CustomerFormCard";
 import { WorkItemFormCard } from "@/pages/customers/WorkItemFormCard";
 
@@ -731,11 +736,33 @@ export function CustomersPage() {
       isDestructive: true,
     });
     if (!confirmed) return;
-    await deleteCustomer(selectedCustomer.id);
+    const deleted = selectedCustomer;
+    await deleteCustomer(deleted.id);
     await loadCustomers(searchKeyword);
     const { customers: remaining } = useCustomerStore.getState();
     if (remaining.length > 0) select(remaining[0]);
     loadUnpaid();
+    toast.success(`"${deleted.name}" 고객을 삭제했습니다.`, {
+      duration: UNDO_DURATION_MS,
+      action: {
+        label: "되돌리기",
+        onClick: async () => {
+          try {
+            await customerApi.restore(deleted.id);
+            await loadCustomers(searchKeyword);
+            const restored = useCustomerStore.getState().customers.find((c) => c.id === deleted.id);
+            if (restored) {
+              select(restored);
+              setScrollToCustomerId(restored.id);
+            }
+            loadUnpaid();
+            toast.success(`"${deleted.name}" 고객을 되돌렸습니다.`);
+          } catch (e) {
+            toast.error(`되돌리지 못했습니다: ${errorMessage(e)}`);
+          }
+        },
+      },
+    });
   };
 
   const handleCardSave = async (data: CreateCustomer | UpdateCustomer) => {
@@ -768,6 +795,22 @@ export function CustomersPage() {
     if (!confirmed) return;
     await useWorkItemStore.getState().delete(id);
     loadUnpaid();
+    toast.success(`"${item.description}" 작업을 삭제했습니다.`, {
+      duration: UNDO_DURATION_MS,
+      action: {
+        label: "되돌리기",
+        onClick: async () => {
+          try {
+            await workItemApi.restore(id);
+            await useWorkItemStore.getState().load();
+            loadUnpaid();
+            toast.success(`"${item.description}" 작업을 되돌렸습니다.`);
+          } catch (e) {
+            toast.error(`되돌리지 못했습니다: ${errorMessage(e)}`);
+          }
+        },
+      },
+    });
   };
 
   const handleWiChangeStatus = async (id: number, status: WorkItemStatus) => {

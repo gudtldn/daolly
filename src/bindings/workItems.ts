@@ -37,6 +37,11 @@ export const workItemApi = {
     return invoke("delete_work_item", { id });
   },
 
+  /** 삭제(취소)한 접수 되돌리기. 함께 취소한 결제도 되살림 */
+  restore(id: number): Promise<void> {
+    return invoke("restore_work_item", { id });
+  },
+
   getAllUnpaidAmounts(): Promise<Record<number, number>> {
     return invoke("get_all_unpaid_amounts");
   },

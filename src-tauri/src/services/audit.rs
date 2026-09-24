@@ -22,6 +22,11 @@ pub(crate) enum Entry<'a> {
         order: &'a work_item::Model,
         voided: &'a [payment::Model],
     },
+    /// 취소한 접수 되돌리기 (함께 되살린 결제 포함)
+    OrderRestored {
+        order: &'a work_item::Model,
+        restored: &'a [payment::Model],
+    },
     /// 접수 가격 변경
     OrderRepriced {
         order: &'a work_item::Model,
@@ -29,6 +34,8 @@ pub(crate) enum Entry<'a> {
     },
     /// 고객 삭제 (보관)
     CustomerDeleted { customer: &'a customer::Model },
+    /// 삭제한 고객 되돌리기
+    CustomerRestored { customer: &'a customer::Model },
 }
 
 pub(crate) async fn record<C: ConnectionTrait>(conn: &C, entry: Entry<'_>) -> Result<(), DbErr> {
@@ -60,6 +67,13 @@ pub(crate) async fn record<C: ConnectionTrait>(conn: &C, entry: Entry<'_>) -> Re
             None,
             json!({ "order": order, "voidedPayments": voided }),
         ),
+        Entry::OrderRestored { order, restored } => (
+            "order.restore",
+            Some(order.customer_id),
+            Some(order.id),
+            None,
+            json!({ "order": order, "restoredPayments": restored }),
+        ),
         Entry::OrderRepriced { order, new_price } => (
             "order.reprice",
             Some(order.customer_id),
@@ -69,6 +83,13 @@ pub(crate) async fn record<C: ConnectionTrait>(conn: &C, entry: Entry<'_>) -> Re
         ),
         Entry::CustomerDeleted { customer } => (
             "customer.delete",
+            Some(customer.id),
+            None,
+            None,
+            json!({ "customer": customer }),
+        ),
+        Entry::CustomerRestored { customer } => (
+            "customer.restore",
             Some(customer.id),
             None,
             None,

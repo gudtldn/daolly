@@ -272,24 +272,25 @@ pub async fn change_status<C: ConnectionTrait>(
 }
 
 /// 접수를 취소합니다. 받은 결제도 함께 취소되어 매출에서 빠지고, 기록은 남습니다.
-/// (예전에는 행을 지워 결제 기록까지 사라졌음)
+/// (예전에는 행을 지워 결제 기록까지 사라졌음) 함께 취소한 결제는 접수와 같은 시각으로
+/// 표시해 되돌릴 때 찾을 수 있게 합니다.
 pub async fn cancel<C>(db: &C, id: i32) -> Result<(), AppError>
 where
     C: ConnectionTrait + TransactionTrait,
 {
     let txn = db.begin().await?;
     let order = find_order(&txn, id).await?;
+    let now = timestamp::now();
     let voided = payment::Entity::find()
         .filter(payment::Column::WorkItemId.eq(id))
         .filter(payment::Column::VoidedAt.is_null())
         .all(&txn)
         .await?;
     for p in &voided {
-        payments::void(&txn, p).await?;
+        payments::void(&txn, p, &now).await?;
     }
     payments::sync_paid_amount(&txn, id).await?;
 
-    let now = timestamp::now();
     let mut active: work_item::ActiveModel = order.clone().into();
     active.deleted_at = Set(Some(now.clone()));
     active.last_modified_at = Set(now);
@@ -299,6 +300,47 @@ where
         Entry::OrderCancelled {
             order: &order,
             voided: &voided,
+        },
+    )
+    .await?;
+    txn.commit().await?;
+    Ok(())
+}
+
+/// 취소한 접수를 되돌립니다. 접수와 함께 취소한 결제도 되살립니다.
+pub async fn restore<C>(db: &C, id: i32) -> Result<(), AppError>
+where
+    C: ConnectionTrait + TransactionTrait,
+{
+    let txn = db.begin().await?;
+    let order = work_item::Entity::find_by_id(id)
+        .one(&txn)
+        .await?
+        .ok_or(AppError::NotFound("접수"))?;
+    let Some(cancelled_at) = order.deleted_at.clone() else {
+        return Ok(()); // 이미 되돌림
+    };
+    let restored = payment::Entity::find()
+        .filter(payment::Column::WorkItemId.eq(id))
+        .filter(payment::Column::VoidedAt.eq(cancelled_at.as_str()))
+        .all(&txn)
+        .await?;
+    for p in &restored {
+        let mut active: payment::ActiveModel = p.clone().into();
+        active.voided_at = Set(None);
+        active.update(&txn).await?;
+    }
+    payments::sync_paid_amount(&txn, id).await?;
+
+    let mut active: work_item::ActiveModel = order.clone().into();
+    active.deleted_at = Set(None);
+    active.last_modified_at = Set(timestamp::now());
+    active.update(&txn).await?;
+    audit::record(
+        &txn,
+        Entry::OrderRestored {
+            order: &order,
+            restored: &restored,
         },
     )
     .await?;
@@ -797,5 +839,33 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(again.completed_at, done.completed_at);
+    }
+
+    /// 되돌리기: 접수와, 접수와 함께 취소한 결제만 되살림 (그 전에 따로 취소한 결제는 그대로)
+    #[tokio::test]
+    async fn restore_brings_back_cancelled_order() {
+        let (db, cid) = setup().await;
+        let wi = received(&db, cid, false).await; // 10,000원
+        let earlier = payments::create(&db, wi.id, 3000, Some("cash".into()), None)
+            .await
+            .unwrap();
+        payments::delete(&db, earlier.id).await.unwrap();
+        payments::create(&db, wi.id, 2000, Some("card".into()), None)
+            .await
+            .unwrap();
+
+        cancel(&db, wi.id).await.unwrap();
+        restore(&db, wi.id).await.unwrap();
+
+        let (order, _, active) = work_items::get_full(&db, wi.id).await.unwrap().unwrap();
+        assert_eq!(order.paid_amount, 2000);
+        assert_eq!(active.len(), 1);
+        assert_eq!(active[0].amount, 2000);
+        assert_eq!(
+            audit::actions(&db).await,
+            vec!["payment.void", "order.cancel", "order.restore"]
+        );
+        // 두 번 되돌려도 문제없음
+        restore(&db, wi.id).await.unwrap();
     }
 }

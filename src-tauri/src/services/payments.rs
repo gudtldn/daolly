@@ -104,7 +104,7 @@ pub async fn update(
     let wi = find_work_item(&tx, before.work_item_id).await?;
     check_not_overpaid(wi.price, wi.paid_amount - before.amount + amount)?;
 
-    void(&tx, &before).await?;
+    void(&tx, &before, &timestamp::now()).await?;
     let paid_at = paid_at.unwrap_or_else(|| before.paid_at.clone());
     let after = insert(&tx, wi.id, amount, method, Some(paid_at)).await?;
     audit::record(
@@ -124,20 +124,21 @@ pub async fn update(
 pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<(), AppError> {
     let tx = db.begin().await?;
     let payment = find_active(&tx, id).await?;
-    void(&tx, &payment).await?;
+    void(&tx, &payment, &timestamp::now()).await?;
     sync_paid_amount(&tx, payment.work_item_id).await?;
     audit::record(&tx, Entry::PaymentVoided { payment: &payment }).await?;
     tx.commit().await?;
     Ok(())
 }
 
-/// 결제에 취소 표시를 합니다. paid_amount는 호출하는 쪽에서 맞춥니다.
+/// 결제에 `at` 시각으로 취소 표시를 합니다. paid_amount는 호출하는 쪽에서 맞춥니다.
 pub(crate) async fn void<C: ConnectionTrait>(
     conn: &C,
     payment: &payment::Model,
+    at: &str,
 ) -> Result<(), DbErr> {
     let mut active: payment::ActiveModel = payment.clone().into();
-    active.voided_at = Set(Some(timestamp::now()));
+    active.voided_at = Set(Some(at.to_owned()));
     active.update(conn).await?;
     Ok(())
 }

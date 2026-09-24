@@ -137,6 +137,7 @@ pub fn run() {
             commands::customers::create_customer,
             commands::customers::update_customer,
             commands::customers::delete_customer,
+            commands::customers::restore_customer,
             // categories
             commands::categories::list_categories,
             commands::categories::create_category,
@@ -152,6 +153,7 @@ pub fn run() {
             commands::work_items::get_work_item,
             commands::work_items::update_work_item_status,
             commands::work_items::delete_work_item,
+            commands::work_items::restore_work_item,
             commands::work_items::get_all_unpaid_amounts,
             // orders
             commands::orders::receive_order,

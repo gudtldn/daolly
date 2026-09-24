@@ -57,6 +57,12 @@ pub async fn delete_work_item(db: State<'_, DatabaseConnection>, id: i32) -> Cmd
     services::orders::cancel(db.inner(), id).await
 }
 
+/// 삭제(취소)한 접수 되돌리기
+#[tauri::command]
+pub async fn restore_work_item(db: State<'_, DatabaseConnection>, id: i32) -> CmdResult<()> {
+    services::orders::restore(db.inner(), id).await
+}
+
 #[tauri::command]
 pub async fn get_all_unpaid_amounts(
     db: State<'_, DatabaseConnection>,

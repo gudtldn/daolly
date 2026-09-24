@@ -115,6 +115,29 @@ pub async fn update(
     active.update(db).await
 }
 
+/// 삭제한 고객을 되돌립니다. 없는 고객이면 false
+pub async fn restore(db: &DatabaseConnection, id: i32) -> Result<bool, DbErr> {
+    let tx = db.begin().await?;
+    let Some(existing) = customer::Entity::find_by_id(id).one(&tx).await? else {
+        return Ok(false);
+    };
+    if existing.deleted_at.is_some() {
+        audit::record(
+            &tx,
+            Entry::CustomerRestored {
+                customer: &existing,
+            },
+        )
+        .await?;
+        let mut active: customer::ActiveModel = existing.into();
+        active.deleted_at = Set(None);
+        active.last_modified_at = Set(timestamp::now());
+        active.update(&tx).await?;
+    }
+    tx.commit().await?;
+    Ok(true)
+}
+
 /// 고객을 목록에서 삭제합니다. 지난 접수·결제는 매출 기록으로 남습니다.
 /// (예전에는 접수·결제까지 함께 지워져 지난 매출이 사라졌음) 없는 고객이면 false
 pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<bool, DbErr> {
@@ -206,9 +229,13 @@ mod tests {
         assert!(list(&db, None).await.unwrap().is_empty());
         // 두 번 지울 수 없음
         assert!(!delete(&db, c.id).await.unwrap());
+
+        // 되돌리기
+        assert!(restore(&db, c.id).await.unwrap());
+        assert_eq!(list(&db, None).await.unwrap().len(), 1);
         assert_eq!(
             crate::services::audit::actions(&db).await,
-            vec!["customer.delete"]
+            vec!["customer.delete", "customer.restore"]
         );
     }
 

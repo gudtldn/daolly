@@ -73,6 +73,15 @@ pub async fn update_customer(
     .await?)
 }
 
+/// 삭제한 고객 되돌리기
+#[tauri::command]
+pub async fn restore_customer(db: State<'_, DatabaseConnection>, id: i32) -> CmdResult<()> {
+    if !services::customers::restore(db.inner(), id).await? {
+        return Err(AppError::NotFound("고객"));
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn delete_customer(db: State<'_, DatabaseConnection>, id: i32) -> CmdResult<()> {
     if !services::customers::delete(db.inner(), id).await? {
