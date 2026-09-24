@@ -1,7 +1,5 @@
 use chrono::Utc;
-use sea_orm::{
-    ConnectionTrait, Database, DatabaseConnection, DbErr, EntityTrait, Set, TransactionTrait,
-};
+use sea_orm::{ConnectionTrait, DatabaseConnection, DbErr, EntityTrait, Set, TransactionTrait};
 use std::collections::HashSet;
 use std::path::PathBuf;
 
@@ -31,19 +29,21 @@ pub async fn clear_database(db: &DatabaseConnection) -> Result<(), DbErr> {
 pub async fn migrate_from_legacy(
     db: &DatabaseConnection,
     legacy_path: PathBuf,
-) -> Result<(), Box<dyn std::error::Error>> {
-    // 1. 레거시 DB 연결
-    let legacy_url = format!("sqlite:{}?mode=ro", legacy_path.display());
-    let legacy_db = Database::connect(&legacy_url).await?;
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // 1. 레거시 DB 연결 (읽기 전용)
+    let legacy_db = crate::db::connect(&legacy_path, true).await?;
+    let result = import_legacy(db, &legacy_db).await;
+    let _ = legacy_db.close_by_ref().await;
+    result
+}
 
-    // 2. 외래 키 체크 일시 중지
-    db.execute(sea_orm::Statement::from_string(
-        sea_orm::DatabaseBackend::Sqlite,
-        "PRAGMA foreign_keys = OFF",
-    ))
-    .await?;
-
-    // 3. 트랜잭션 시작
+async fn import_legacy(
+    db: &DatabaseConnection,
+    legacy_db: &DatabaseConnection,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // 2~3. 트랜잭션 시작 (실패하면 전체 롤백)
+    // 외래 키 검사는 켠 채로 둡니다: 자식 → 부모 순으로 지우고 부모 → 자식 순으로 넣으므로
+    // 끌 필요가 없고, 끈 채로 실패하면 이후 CASCADE가 동작하지 않는 문제가 있었습니다.
     let tx = db.begin().await?;
 
     // 3.1 기존 데이터 완전 초기화 (Clean Slate)
@@ -207,13 +207,6 @@ pub async fn migrate_from_legacy(
 
     tx.commit().await?;
 
-    // 6. 외래 키 체크 다시 활성화
-    db.execute(sea_orm::Statement::from_string(
-        sea_orm::DatabaseBackend::Sqlite,
-        "PRAGMA foreign_keys = ON",
-    ))
-    .await?;
-
     Ok(())
 }
 
@@ -222,18 +215,14 @@ mod tests {
     use super::*;
     use crate::db::entities::{customer, payment, work_item};
     use crate::test_helpers::setup_test_db;
-    use sea_orm::EntityTrait;
-    use std::fs;
+    use sea_orm::{Database, EntityTrait};
 
     #[tokio::test]
     async fn test_full_migration_flow() {
         // 1. 테스트용 레거시 DB 생성
-        let legacy_path = PathBuf::from("test_legacy.db");
+        let dir = tempfile::tempdir().unwrap();
+        let legacy_path = dir.path().join("test_legacy.db");
         let legacy_url = format!("sqlite:{}?mode=rwc", legacy_path.display());
-
-        if legacy_path.exists() {
-            fs::remove_file(&legacy_path).unwrap();
-        }
 
         {
             let legacy_db = Database::connect(&legacy_url).await.unwrap();
@@ -292,8 +281,61 @@ mod tests {
         assert_eq!(payments.len(), 1);
         assert_eq!(payments[0].amount, 5000);
         assert_eq!(payments[0].method, Some("transfer".to_owned()));
+    }
 
-        // 4. 테스트 파일 정리
-        fs::remove_file(legacy_path).unwrap();
+    /// 이관이 중간에 실패해도 기존 데이터는 그대로이고, 외래 키 검사(CASCADE)가 계속 동작해야 함
+    #[tokio::test]
+    async fn failed_import_keeps_data_and_foreign_keys() {
+        let dir = tempfile::tempdir().unwrap();
+        let legacy_path = dir.path().join("broken_legacy.db");
+        {
+            let legacy_url = format!("sqlite:{}?mode=rwc", legacy_path.display());
+            let legacy_db = Database::connect(&legacy_url).await.unwrap();
+            // garments 테이블이 없어 고객 이관 후 실패
+            legacy_db
+                .execute_unprepared("CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT, phone_number TEXT, note TEXT)")
+                .await
+                .unwrap();
+        }
+
+        let db = setup_test_db().await.unwrap();
+        let existing = crate::services::customers::create(&db, "기존 고객".into(), None, None)
+            .await
+            .unwrap();
+        let wi = crate::services::work_items::create(
+            &db,
+            existing.id,
+            Some("접수".into()),
+            1000,
+            None,
+            None,
+            vec![],
+        )
+        .await
+        .unwrap();
+
+        assert!(migrate_from_legacy(&db, legacy_path).await.is_err());
+
+        // 트랜잭션 롤백으로 기존 데이터 유지
+        let names: Vec<String> = customer::Entity::find()
+            .all(&db)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|c| c.name)
+            .collect();
+        assert_eq!(names, vec!["기존 고객"]);
+
+        // 외래 키가 켜져 있어 고객 삭제 시 접수도 함께 삭제됨
+        crate::services::customers::delete(&db, existing.id)
+            .await
+            .unwrap();
+        assert!(
+            work_item::Entity::find_by_id(wi.id)
+                .one(&db)
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 }

@@ -12,6 +12,7 @@
     "window-state:default",
     "updater:default",
     "dialog:default",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    "log:default"
   ]
 }

@@ -39,4 +39,5 @@ export type {
   BackupOutcome,
   BackupSettings,
   StartupNotice,
+  StartupStatus,
 } from "./backup";

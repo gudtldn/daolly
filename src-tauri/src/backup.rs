@@ -571,8 +571,10 @@ async fn validate_connection(conn: &DatabaseConnection) -> Result<(), BackupErro
 }
 
 /// 복원을 예약합니다: 검증 → 현재 데이터 백업 → 다음 기동 때 적용할 파일 배치.
+///
+/// `db`가 None이면(DB를 열지 못한 복구 모드) 현재 DB 파일을 그대로 복사해 보관합니다.
 pub async fn stage_restore(
-    db: &DatabaseConnection,
+    db: Option<&DatabaseConnection>,
     data_dir: &Path,
     filename: &str,
 ) -> Result<(), BackupError> {
@@ -586,12 +588,37 @@ pub async fn stage_restore(
     validate_backup(&source).await?;
 
     let _guard = BACKUP_LOCK.lock().await;
-    create_backup_locked(db, data_dir, BackupKind::PreRestore).await?;
+    match db {
+        Some(db) => {
+            create_backup_locked(db, data_dir, BackupKind::PreRestore).await?;
+        }
+        None => preserve_current_file(data_dir)?,
+    }
 
     let pending = data_dir.join(PENDING_RESTORE_FILE);
     let partial = data_dir.join(format!("{PENDING_RESTORE_FILE}.partial"));
     std::fs::copy(&source, &partial)?;
     std::fs::rename(&partial, &pending)?;
+    Ok(())
+}
+
+/// 열 수 없는 현재 DB 파일을 '복원 전' 백업으로 그대로 복사해 둡니다.
+/// (DB 연결이 없어 VACUUM INTO를 쓸 수 없고, 연결이 없으니 파일 복사도 안전함)
+fn preserve_current_file(data_dir: &Path) -> Result<(), BackupError> {
+    let current = data_dir.join(db::DB_FILE_NAME);
+    if !current.is_file() {
+        return Ok(());
+    }
+    let dir = data_dir.join(BACKUPS_DIR);
+    std::fs::create_dir_all(&dir)?;
+    let timestamp = now_local();
+    let path = (1..)
+        .map(|seq| dir.join(format_file_name(timestamp, BackupKind::PreRestore, seq)))
+        .find(|path| !path.exists())
+        .expect("unbounded sequence");
+    let partial = path.with_extension("db.partial");
+    std::fs::copy(&current, &partial)?;
+    std::fs::rename(&partial, &path)?;
     Ok(())
 }
 
@@ -868,7 +895,7 @@ mod tests {
             .await
             .unwrap();
 
-        stage_restore(&db, dir.path(), &target.info.filename)
+        stage_restore(Some(&db), dir.path(), &target.info.filename)
             .await
             .unwrap();
 
@@ -881,7 +908,34 @@ mod tests {
         assert!(kinds.contains(&BackupKind::PreRestore));
 
         for bad in ["../daolly.db", "a/b.db", "missing.db", "daolly.txt"] {
-            assert!(stage_restore(&db, dir.path(), bad).await.is_err(), "{bad}");
+            assert!(
+                stage_restore(Some(&db), dir.path(), bad).await.is_err(),
+                "{bad}"
+            );
         }
+    }
+
+    /// 복구 모드(DB를 열지 못함)에서도 현재 파일을 보관한 뒤 복원을 예약
+    #[tokio::test]
+    async fn stage_restore_without_connection_preserves_current_file() {
+        let (dir, db) = setup().await;
+        let target = create_backup(&db, dir.path(), BackupKind::Manual)
+            .await
+            .unwrap();
+        db.close().await.unwrap();
+        std::fs::write(dir.path().join(db::DB_FILE_NAME), b"damaged").unwrap();
+
+        stage_restore(None, dir.path(), &target.info.filename)
+            .await
+            .unwrap();
+
+        assert!(dir.path().join(PENDING_RESTORE_FILE).is_file());
+        let preserved = list_backups(dir.path())
+            .unwrap()
+            .into_iter()
+            .find(|b| b.kind == BackupKind::PreRestore)
+            .expect("현재 파일 보관");
+        let bytes = std::fs::read(dir.path().join(BACKUPS_DIR).join(preserved.filename)).unwrap();
+        assert_eq!(bytes, b"damaged");
     }
 }

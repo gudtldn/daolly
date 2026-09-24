@@ -19,6 +19,14 @@ const FAILED_RESTORE_FILE: &str = "daolly.db.failed_restore";
 /// SQLite가 DB 옆에 만드는 파일들. 교체 대상 이름에 남아 있으면 복원본에 잘못 적용될 수 있음
 const SIDECAR_SUFFIXES: [&str; 3] = ["-journal", "-wal", "-shm"];
 
+/// 기동 결과. DB를 열지 못하면 앱은 종료하지 않고 복구 화면으로 시작합니다.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "state", rename_all = "camelCase")]
+pub enum StartupStatus {
+    Ready,
+    Failed { message: String },
+}
+
 /// 기동 후 화면에 알릴 내용
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -211,7 +219,7 @@ mod tests {
             .await
             .unwrap();
 
-        backup::stage_restore(&db, dir.path(), &snapshot.info.filename)
+        backup::stage_restore(Some(&db), dir.path(), &snapshot.info.filename)
             .await
             .unwrap();
         db.close().await.unwrap();

@@ -418,7 +418,7 @@ export function DatabaseSettings() {
                     <th className="px-4 py-3 text-left font-medium">생성 일시</th>
                     <th className="px-4 py-3 text-left font-medium w-32">종류</th>
                     <th className="px-4 py-3 text-right font-medium w-24">크기</th>
-                    <th className="w-24"></th>
+                    <th className="w-28"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-default bg-surface-card">
@@ -431,11 +431,11 @@ export function DatabaseSettings() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right text-on-surface-muted w-24">{formatBytes(b.sizeBytes)}</td>
-                      <td className="px-4 py-3 text-center w-24">
+                      <td className="px-4 py-3 text-center w-28">
                         <button
                           onClick={() => handleRestoreClick(b)}
                           disabled={restoreLoading}
-                          className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium border border-border-default rounded-lg hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-50"
+                          className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium whitespace-nowrap border border-border-default rounded-lg hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-50"
                         >
                           <UploadCloud className="w-3.5 h-3.5" />
                           복원

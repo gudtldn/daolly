@@ -11,6 +11,8 @@ import { Layout } from "@/components/Layout";
 import { useThemeEffect } from "@/hooks/useThemeEffect";
 import { databaseApi } from "@/bindings/database";
 import { useDialogStore } from "@/stores/dialogStore";
+import { RecoveryScreen } from "@/components/RecoveryScreen";
+import type { StartupStatus } from "@/types";
 import { PosPage } from "@/pages/PosPage";
 import { CustomersPage } from "@/pages/CustomersPage";
 import { SalesPage } from "@/pages/SalesPage";
@@ -109,6 +111,18 @@ function App() {
   }>({ status: "checking", progress: 0 });
   const [isClosing, setIsClosing] = useState(false);
   const [showApp, setShowApp] = useState(false);
+  // DB를 열지 못했으면 복구 화면을 보여줌 (확인 전에는 본문을 그리지 않음)
+  const [startup, setStartup] = useState<StartupStatus | null>(null);
+
+  useEffect(() => {
+    databaseApi
+      .getStartupStatus()
+      .then(setStartup)
+      .catch((e) => {
+        console.error("Failed to get startup status:", e);
+        setStartup({ state: "ready" });
+      });
+  }, []);
 
   // 스플래시 페이드아웃 및 앱 노출 시퀀스
   const finishSplash = useCallback((delay = 0) => {
@@ -215,7 +229,11 @@ function App() {
       )}
       {/* 본문은 항상 뒤에 렌더링해두어 페이드아웃 시 자연스럽게 보이게 함 */}
       <div className={`h-full bg-surface transition-opacity duration-700 ${isClosing ? "opacity-100" : "opacity-0"}`}>
-        <AppContent />
+        {startup?.state === "failed" ? (
+          <RecoveryScreen message={startup.message} />
+        ) : startup?.state === "ready" ? (
+          <AppContent />
+        ) : null}
       </div>
       <GlobalDialog />
       <Toaster

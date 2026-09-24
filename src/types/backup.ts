@@ -40,3 +40,8 @@ export interface BackupSettings {
 export type StartupNotice =
   | { type: "restoreApplied" }
   | { type: "restoreFailed"; reason: string };
+
+/** 기동 결과. failed이면 DB를 열지 못해 복구 화면을 보여줍니다. */
+export type StartupStatus =
+  | { state: "ready" }
+  | { state: "failed"; message: string };

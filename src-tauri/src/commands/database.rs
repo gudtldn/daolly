@@ -4,7 +4,7 @@ use crate::backup::{self, BackupInfo, BackupKind, BackupOutcome, BackupSettings}
 use crate::commands::CmdResult;
 use crate::db::DB_FILE_NAME;
 use crate::services;
-use crate::startup::{StartupNotice, StartupNotices};
+use crate::startup::{StartupNotice, StartupNotices, StartupStatus};
 use sea_orm::DatabaseConnection;
 use tauri::{Manager, State};
 use tauri_plugin_opener::OpenerExt;
@@ -101,17 +101,36 @@ pub async fn list_backups(app: tauri::AppHandle) -> DbResult<Vec<BackupInfo>> {
 }
 
 /// 백업 파일을 검증하고 현재 데이터를 백업한 뒤, 재시작하면서 복원합니다.
+/// DB를 열지 못한 복구 모드에서도 동작합니다.
 #[tauri::command]
-pub async fn restore_db(
-    app: tauri::AppHandle,
-    db: State<'_, DatabaseConnection>,
-    filename: String,
-) -> DbResult<()> {
+pub async fn restore_db(app: tauri::AppHandle, filename: String) -> DbResult<()> {
     let dir = data_dir(&app)?;
-    backup::stage_restore(db.inner(), &dir, &filename)
+    let db = app.try_state::<DatabaseConnection>();
+    backup::stage_restore(db.as_ref().map(|s| s.inner()), &dir, &filename)
         .await
         .map_err(|e| e.to_string())?;
+    log::info!("복원 예약: {filename}");
     app.restart();
+}
+
+/// 기동 결과 (DB를 열지 못했으면 복구 화면을 띄우기 위함)
+#[tauri::command]
+pub fn get_startup_status(status: State<'_, StartupStatus>) -> StartupStatus {
+    status.inner().clone()
+}
+
+/// 로그 파일이 있는 폴더를 엽니다.
+#[tauri::command]
+pub async fn open_log_folder(app: tauri::AppHandle) -> DbResult<()> {
+    let dir = app
+        .path()
+        .app_log_dir()
+        .map_err(|e| format!("로그 폴더를 찾을 수 없습니다: {e}"))?;
+    std::fs::create_dir_all(&dir).map_err(|e| format!("로그 폴더를 만들지 못했습니다: {e}"))?;
+    app.opener()
+        .open_path(dir.to_string_lossy().as_ref(), None::<&str>)
+        .map_err(|e| format!("폴더를 열지 못했습니다: {e}"))?;
+    Ok(())
 }
 
 /// 추가 백업 폴더 설정과 마지막 복사 결과를 반환합니다.
