@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { X, Plus, Trash2, Pencil, Check } from "lucide-react";
-import type { WorkItemFull, WorkItemStatus, CreateWorkItem, UpdateWorkItem, DetailInput, Payment } from "@/types";
+import type { WorkItemFull, WorkItemStatus, ReceiveOrder, UpdateWorkItem, DetailInput, Payment } from "@/types";
 import { paymentApi } from "@/bindings";
+import { errorMessage } from "@/utils/errors";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { NumberInput } from "@/components/NumberInput";
 
@@ -54,7 +55,8 @@ interface Props {
   workItem?: WorkItemFull | null;
   /** edit 모드에서 초기 탭 선택 */
   initialTab?: Tab;
-  onSave: (data: CreateWorkItem | UpdateWorkItem, details?: DetailInput[], status?: WorkItemStatus, pickedUpAt?: string) => Promise<void>;
+  /** create: 접수 요청 하나 / edit: 수정 내용, 품목, 바뀐 상태 */
+  onSave: (data: ReceiveOrder | UpdateWorkItem, details?: DetailInput[], status?: WorkItemStatus) => Promise<void>;
   onClose: () => void;
   /** 결제 변경 후 외부 상태 갱신 */
   onPaymentChange?: () => void;
@@ -84,6 +86,8 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
   // 열 때의 날짜 입력값. 사용자가 바꾼 날짜만 보내기 위함
   // (예전에는 메모만 고쳐도 접수 일시를 다시 저장해 초 단위가 사라지고 형식이 바뀌었음)
   const initialDates = useRef({ receivedAt: "", pickedUpAt: "", payDate: "" });
+  // 새 접수의 요청 ID (열 때마다 새로 만듦). 저장을 두 번 눌러도 접수는 한 번만 생김
+  const requestId = useRef("");
 
   // 결제 탭 상태
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -147,6 +151,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       setPickedUpAt("");
       initialDates.current.receivedAt = toLocalInput(new Date().toISOString());
       initialDates.current.pickedUpAt = "";
+      requestId.current = crypto.randomUUID();
       setDetails([emptyDetail()]);
       setManualPrice(false);
       setPriceInput(0);
@@ -193,7 +198,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       setPayAmount(remaining > 0 ? remaining : 0);
       onPaymentChange?.();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     } finally {
       setPayLoading(false);
     }
@@ -226,7 +231,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       setEditingPaymentId(null);
       onPaymentChange?.();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     } finally {
       setPayLoading(false);
     }
@@ -257,7 +262,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       setPayAmount(remaining > 0 ? remaining : 0);
       onPaymentChange?.();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     } finally {
       setPayLoading(false);
     }
@@ -288,6 +293,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
   };
 
   const handleSubmit = async () => {
+    if (saving) return;
     const trimmedDesc = description.trim();
     if (!trimmedDesc) {
       setError("작업내용을 입력해주세요.");
@@ -312,17 +318,20 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       }));
 
       if (mode === "create") {
-        const statusOverride = status !== "Received" ? status : undefined;
-        const pickupDate = changedDate(pickedUpAt, initialDates.current.pickedUpAt) ?? undefined;
-        await onSave({
+        const order: ReceiveOrder = {
+          requestId: requestId.current,
           customerId,
           description: trimmedDesc,
-          price: effectivePrice,
           note: note.trim() || null,
           // 기본값(연 시각)을 그대로 두면 서버가 저장 시각을 사용
           receivedAt: changedDate(receivedAt, initialDates.current.receivedAt) || null,
-          details: detailInputs,
-        } as CreateWorkItem, undefined, statusOverride, pickupDate);
+          lines: detailInputs,
+          // 직접 입력하지 않으면 서버가 품목 합계로 계산
+          priceOverride: manualPrice ? priceInput : null,
+          status,
+          pickedUpAt: status === "PickedUp" ? changedDate(pickedUpAt, initialDates.current.pickedUpAt) || null : null,
+        };
+        await onSave(order);
       } else {
         const statusChanged = workItem && status !== workItem.status ? status : undefined;
         await onSave(
@@ -340,7 +349,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       }
       onClose();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     } finally {
       setSaving(false);
     }

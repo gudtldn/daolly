@@ -1,5 +1,7 @@
 // Tauri 커맨드 입력 DTO 타입
 
+import type { PaymentMethod, WorkItemStatus } from "./models";
+
 export interface CreateCustomer {
   name: string;
   phoneNumber?: string | null;
@@ -44,14 +46,31 @@ export interface DetailInput {
   optionsMemo?: string | null;
 }
 
-export interface CreateWorkItem {
+/** 접수와 함께 받은 결제 */
+export interface Prepayment {
+  method: PaymentMethod;
+  /** 없으면 전액 */
+  amount?: number | null;
+}
+
+/** 접수 요청: 품목과 선결제를 한 번에 저장하고, 총액은 서버가 품목으로 계산 */
+export interface ReceiveOrder {
+  /** 같은 접수를 두 번 보내도 한 번만 저장되도록 화면이 만드는 ID */
+  requestId: string;
   customerId: number;
-  /** None이면 details에서 자동 생성 */
+  /** 없으면 품목으로 자동 생성 */
   description?: string | null;
-  price: number;
   note?: string | null;
   receivedAt?: string | null;
-  details: DetailInput[];
+  lines: DetailInput[];
+  /** 가격을 직접 정한 경우. 없으면 품목 합계 */
+  priceOverride?: number | null;
+  /** 없으면 외상 */
+  payment?: Prepayment | null;
+  /** 처음 상태. 없으면 접수 */
+  status?: WorkItemStatus | null;
+  /** 상태가 수령일 때의 수령 일시 */
+  pickedUpAt?: string | null;
 }
 
 export interface UpdateWorkItem {

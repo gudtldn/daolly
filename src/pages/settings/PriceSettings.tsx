@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Tag, Plus, Pen, Trash2, GripVertical, FileUp, FileDown } from "lucide-react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
+import { errorMessage } from "@/utils/errors";
 import {
   DndContext,
   closestCenter,
@@ -456,7 +457,7 @@ export function PriceSettings() {
       await exportSettings(path);
       toast.success("단가표를 내보냈습니다.");
     } catch (e) {
-      toast.error(`내보내기 실패: ${e}`);
+      toast.error(`내보내기 실패: ${errorMessage(e)}`);
     }
   };
 
@@ -479,7 +480,7 @@ export function PriceSettings() {
       await importSettings(path);
       toast.success("단가표를 가져왔습니다.");
     } catch (e) {
-      toast.error(`가져오기 실패: ${e}`);
+      toast.error(`가져오기 실패: ${errorMessage(e)}`);
     }
   };
 

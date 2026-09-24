@@ -1,6 +1,7 @@
 mod backup;
 mod commands;
 mod db;
+mod error;
 mod services;
 mod startup;
 mod timestamp;
@@ -149,12 +150,13 @@ pub fn run() {
             // work_items
             commands::work_items::list_work_items,
             commands::work_items::get_work_item,
-            commands::work_items::create_work_item,
             commands::work_items::update_work_item,
             commands::work_items::update_work_item_status,
             commands::work_items::replace_work_item_details,
             commands::work_items::delete_work_item,
             commands::work_items::get_all_unpaid_amounts,
+            // orders
+            commands::orders::receive_order,
             // price_settings
             commands::price_settings::export_price_settings_to_file,
             commands::price_settings::import_price_settings_from_file,

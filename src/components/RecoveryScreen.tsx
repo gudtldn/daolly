@@ -5,6 +5,7 @@ import { databaseApi } from "@/bindings/database";
 import { updateApi, isUpdateStatus } from "@/bindings/updates";
 import { useDialogStore } from "@/stores/dialogStore";
 import { reportError } from "@/utils/logging";
+import { errorMessage } from "@/utils/errors";
 import type { BackupInfo, BackupKind, UpdateStatus } from "@/types";
 
 const KIND_LABELS: Record<BackupKind, string> = {
@@ -16,10 +17,6 @@ const KIND_LABELS: Record<BackupKind, string> = {
   preImport: "가져오기 전",
   legacy: "이전 버전",
 };
-
-function errorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
 
 /**
  * DB를 열지 못했을 때(손상, 업데이트 실패 등) 앱을 종료하는 대신 보여주는 화면.

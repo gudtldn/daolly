@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
+import { errorMessage } from "@/utils/errors";
 import { useSearch } from "@/hooks/useSearch";
 import { useListInteraction } from "@/hooks/useListInteraction";
 import { CurrencyInput } from "@/components/CurrencyInput";
@@ -1046,7 +1047,7 @@ export function PosPage() {
       handleSelectCustomer(created);
       toast.success(`${created.name} 고객님이 등록되었습니다.`);
     } catch (e) {
-      toast.error(`고객 등록 실패: ${String(e)}`);
+      toast.error(`고객 등록 실패: ${errorMessage(e)}`);
       throw e; // CustomerFormCard에서 에러 처리를 할 수 있도록 던짐
     }
   };
@@ -1059,7 +1060,7 @@ export function PosPage() {
       setSubmitCount((n) => n + 1);
       toast.success(`${customerName}님 접수 완료`);
     } catch (e) {
-      toast.error(`접수 실패: ${String(e)}`);
+      toast.error(`접수 실패: ${errorMessage(e)}`);
     } finally {
       setSubmitting(false);
     }

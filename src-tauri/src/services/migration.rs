@@ -191,6 +191,7 @@ async fn import_legacy(
             picked_up_at: Set(picked_up_at),
             created_at: Set(now.clone()),
             last_modified_at: Set(now.clone()),
+            request_id: Set(None),
         };
         work_item::Entity::insert(model).exec(&tx).await?;
 

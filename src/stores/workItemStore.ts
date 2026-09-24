@@ -3,7 +3,7 @@ import type {
   WorkItem,
   WorkItemFull,
   WorkItemStatus,
-  CreateWorkItem,
+  ReceiveOrder,
   UpdateWorkItem,
 } from "@/types";
 import { workItemApi } from "@/bindings";
@@ -21,7 +21,7 @@ interface WorkItemActions {
   setFilter: (filter: { customerId?: number | null; status?: WorkItemStatus | null }) => Promise<void>;
   select: (id: number) => Promise<void>;
   clearSelection: () => void;
-  create: (data: CreateWorkItem) => Promise<WorkItem>;
+  receive: (order: ReceiveOrder) => Promise<WorkItemFull>;
   update: (id: number, data: UpdateWorkItem) => Promise<WorkItem>;
   updateStatus: (id: number, status: WorkItemStatus) => Promise<WorkItem>;
   delete: (id: number) => Promise<void>;
@@ -62,10 +62,12 @@ export const useWorkItemStore = create<WorkItemStore>((set, get) => ({
 
   clearSelection: () => set({ selectedItem: null }),
 
-  create: async (data) => {
-    const item = await workItemApi.create(data);
-    set((s) => ({ workItems: [item, ...s.workItems] }));
-    return item;
+  receive: async (order) => {
+    const receipt = await workItemApi.receive(order);
+    const { details: _details, payments: _payments, ...item } = receipt;
+    // 같은 요청을 다시 보내 이미 있는 접수가 돌아와도 목록에 두 번 넣지 않음
+    set((s) => ({ workItems: [item, ...s.workItems.filter((w) => w.id !== item.id)] }));
+    return receipt;
   },
 
   update: async (id, data) => {

@@ -40,7 +40,7 @@ pub async fn get_customer(
 ) -> CmdResult<customer::Model> {
     services::customers::get_by_id(db.inner(), id)
         .await?
-        .ok_or_else(|| AppError::NotFound(format!("customer {id}")))
+        .ok_or_else(|| AppError::NotFound("고객"))
 }
 
 #[tauri::command]
@@ -62,7 +62,7 @@ pub async fn update_customer(
     let existing = customer::Entity::find_by_id(id)
         .one(db.inner())
         .await?
-        .ok_or_else(|| AppError::NotFound(format!("customer {id}")))?;
+        .ok_or_else(|| AppError::NotFound("고객"))?;
 
     Ok(services::customers::update(
         db.inner(),
@@ -78,7 +78,7 @@ pub async fn update_customer(
 pub async fn delete_customer(db: State<'_, DatabaseConnection>, id: i32) -> CmdResult<()> {
     let rows = services::customers::delete(db.inner(), id).await?;
     if rows == 0 {
-        return Err(AppError::NotFound(format!("customer {id}")));
+        return Err(AppError::NotFound("고객"));
     }
     Ok(())
 }

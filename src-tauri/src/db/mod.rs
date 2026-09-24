@@ -332,7 +332,7 @@ mod tests {
 
         assert_eq!(
             scalar(&db, "SELECT COUNT(*) FROM seaql_migrations").await,
-            3
+            Migrator::migrations().len() as i64
         );
         assert_eq!(
             text(&db, "SELECT created_at FROM customers").await,

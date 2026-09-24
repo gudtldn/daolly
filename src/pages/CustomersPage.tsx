@@ -18,7 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
-import type { Customer, WorkItemFull, WorkItemDetail, WorkItemStatus, CreateWorkItem, UpdateWorkItem, DetailInput, CreateCustomer, UpdateCustomer } from "@/types";
+import type { Customer, WorkItemFull, WorkItemDetail, WorkItemStatus, ReceiveOrder, UpdateWorkItem, DetailInput, CreateCustomer, UpdateCustomer } from "@/types";
 import { useCustomerStore } from "@/stores/customerStore";
 import { useWorkItemStore } from "@/stores/workItemStore";
 import { useDialogStore } from "@/stores/dialogStore";
@@ -788,11 +788,10 @@ export function CustomersPage() {
     setWiCardOpen(true);
   };
 
-  const handleWiCardSave = async (data: CreateWorkItem | UpdateWorkItem, details?: DetailInput[], status?: WorkItemStatus, pickedUpAtOverride?: string) => {
+  const handleWiCardSave = async (data: ReceiveOrder | UpdateWorkItem, details?: DetailInput[], status?: WorkItemStatus) => {
     if (wiCardMode === "create") {
-      const created = await useWorkItemStore.getState().create(data as CreateWorkItem);
-      if (status) await useWorkItemStore.getState().updateStatus(created.id, status);
-      if (pickedUpAtOverride) await useWorkItemStore.getState().update(created.id, { pickedUpAt: pickedUpAtOverride });
+      // 상태·수령 일시까지 한 번에 저장
+      await useWorkItemStore.getState().receive(data as ReceiveOrder);
     } else if (editingWorkItem) {
       if (status) await useWorkItemStore.getState().updateStatus(editingWorkItem.id, status);
       await useWorkItemStore.getState().update(editingWorkItem.id, data as UpdateWorkItem);

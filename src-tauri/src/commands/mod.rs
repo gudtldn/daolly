@@ -5,6 +5,7 @@
 pub mod categories;
 pub mod customers;
 pub mod database;
+pub mod orders;
 pub mod payments;
 pub mod price_items;
 pub mod price_settings;
@@ -12,30 +13,7 @@ pub mod sales;
 pub mod updates;
 pub mod work_items;
 
-use serde::Serialize;
-
-/// Tauri 커맨드 공통 에러 타입
-/// 프론트엔드에는 문자열로 전달합니다.
-#[derive(Debug, thiserror::Error)]
-pub enum AppError {
-    /// DB 에러
-    #[error("{0}")]
-    Db(#[from] sea_orm::DbErr),
-
-    /// 리소스 없음
-    #[error("not found: {0}")]
-    NotFound(String),
-
-    /// 입력 검증 실패
-    #[error("validation: {0}")]
-    Validation(String),
-}
-
-impl Serialize for AppError {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.to_string())
-    }
-}
+pub use crate::error::AppError;
 
 pub type CmdResult<T> = Result<T, AppError>;
 

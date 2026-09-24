@@ -6,15 +6,12 @@ import { toast } from "sonner";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { databaseApi } from "@/bindings";
 import type { BackupInfo, BackupKind, BackupSettings } from "@/types";
+import { errorMessage } from "@/utils/errors";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function errorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
 }
 
 const KIND_BADGES: Record<BackupKind, { label: string; cls: string }> = {

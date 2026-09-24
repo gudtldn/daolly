@@ -22,28 +22,38 @@ pub async fn create(
     method: Option<String>,
     paid_at: Option<String>,
 ) -> Result<payment::Model, DbErr> {
+    let tx = db.begin().await?;
+    let inserted = insert(&tx, work_item_id, amount, method, paid_at).await?;
+    tx.commit().await?;
+    Ok(inserted)
+}
+
+/// 결제 행을 추가하고 paid_amount를 맞춥니다. 트랜잭션은 호출하는 쪽에서 관리합니다.
+pub(crate) async fn insert<C: ConnectionTrait>(
+    conn: &C,
+    work_item_id: i32,
+    amount: i64,
+    method: Option<String>,
+    paid_at: Option<String>,
+) -> Result<payment::Model, DbErr> {
     let method = method
         .map(|s| s.trim().to_owned())
         .filter(|s| !s.is_empty());
 
     let now = timestamp::now();
-    let paid_at_val = paid_at.unwrap_or_else(|| now.clone());
-    let tx = db.begin().await?;
-
     let model = payment::ActiveModel {
         work_item_id: Set(work_item_id),
         amount: Set(amount),
         method: Set(method),
-        paid_at: Set(paid_at_val),
+        paid_at: Set(paid_at.unwrap_or_else(|| now.clone())),
         created_at: Set(now),
         ..Default::default()
     };
     let inserted = payment::Entity::insert(model)
-        .exec_with_returning(&tx)
+        .exec_with_returning(conn)
         .await?;
 
-    sync_paid_amount(&tx, work_item_id).await?;
-    tx.commit().await?;
+    sync_paid_amount(conn, work_item_id).await?;
     Ok(inserted)
 }
 
@@ -64,7 +74,7 @@ pub async fn update(
     let p = payment::Entity::find_by_id(id)
         .one(&tx)
         .await?
-        .ok_or_else(|| DbErr::Custom(format!("payment {id} not found")))?;
+        .ok_or_else(|| DbErr::RecordNotFound(format!("payment {id}")))?;
     let wi_id = p.work_item_id;
 
     let mut active: payment::ActiveModel = p.into();
@@ -87,7 +97,7 @@ pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<(), DbErr> {
     let p = payment::Entity::find_by_id(id)
         .one(&tx)
         .await?
-        .ok_or_else(|| DbErr::Custom(format!("payment {id} not found")))?;
+        .ok_or_else(|| DbErr::RecordNotFound(format!("payment {id}")))?;
     let wi_id = p.work_item_id;
 
     payment::Entity::delete_by_id(id).exec(&tx).await?;
@@ -98,7 +108,10 @@ pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<(), DbErr> {
 }
 
 /// payments 합계를 계산하여 work_item.paid_amount를 갱신합니다.
-async fn sync_paid_amount(tx: &DatabaseTransaction, work_item_id: i32) -> Result<(), DbErr> {
+pub(crate) async fn sync_paid_amount<C: ConnectionTrait>(
+    tx: &C,
+    work_item_id: i32,
+) -> Result<(), DbErr> {
     let sum: Option<i64> = payment::Entity::find()
         .filter(payment::Column::WorkItemId.eq(work_item_id))
         .select_only()
@@ -113,7 +126,7 @@ async fn sync_paid_amount(tx: &DatabaseTransaction, work_item_id: i32) -> Result
     let wi = work_item::Entity::find_by_id(work_item_id)
         .one(tx)
         .await?
-        .ok_or_else(|| DbErr::Custom(format!("work_item {work_item_id} not found")))?;
+        .ok_or_else(|| DbErr::RecordNotFound(format!("work_item {work_item_id}")))?;
 
     let mut active: work_item::ActiveModel = wi.into();
     active.paid_amount = Set(total);

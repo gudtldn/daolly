@@ -4,7 +4,8 @@ import type {
   WorkItemFull,
   WorkItemDetail,
   WorkItemStatus,
-  CreateWorkItem,
+  DetailInput,
+  ReceiveOrder,
   UpdateWorkItem,
 } from "@/types";
 
@@ -20,8 +21,9 @@ export const workItemApi = {
     return invoke("get_work_item", { id });
   },
 
-  create(data: CreateWorkItem): Promise<WorkItem> {
-    return invoke("create_work_item", { data });
+  /** 접수 (품목, 선결제 포함)를 한 번에 저장 */
+  receive(order: ReceiveOrder): Promise<WorkItemFull> {
+    return invoke("receive_order", { order });
   },
 
   update(id: number, data: UpdateWorkItem): Promise<WorkItem> {
@@ -34,7 +36,7 @@ export const workItemApi = {
 
   replaceDetails(
     workItemId: number,
-    details: CreateWorkItem["details"],
+    details: DetailInput[],
   ): Promise<WorkItemDetail[]> {
     return invoke("replace_work_item_details", { workItemId, details });
   },

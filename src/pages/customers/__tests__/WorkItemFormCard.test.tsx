@@ -2,7 +2,10 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { WorkItemFormCard } from "../WorkItemFormCard";
-import type { WorkItemFull } from "@/types";
+import type { ComponentProps } from "react";
+import type { ReceiveOrder, WorkItemFull } from "@/types";
+
+type OnSave = ComponentProps<typeof WorkItemFormCard>["onSave"];
 
 vi.mock("@/bindings", () => ({
   paymentApi: { create: vi.fn(), list: vi.fn(), update: vi.fn(), delete: vi.fn() },
@@ -70,5 +73,50 @@ describe("WorkItemFormCard 날짜 전송", () => {
     await user.click(screen.getByRole("button", { name: "저장" }));
 
     expect(onSave.mock.calls[0][0].receivedAt).toBeNull();
+  });
+});
+
+describe("WorkItemFormCard 새 접수", () => {
+  async function fillAndSubmit(onSave: OnSave) {
+    const user = userEvent.setup();
+    render(<WorkItemFormCard open mode="create" customerId={1} onSave={onSave} onClose={vi.fn()} />);
+    await user.type(screen.getByPlaceholderText("작업 내용 요약"), "와이셔츠");
+    await user.type(screen.getByPlaceholderText("품목명"), "와이셔츠");
+    await user.click(screen.getByRole("button", { name: "접수" }));
+    return user;
+  }
+
+  it("품목과 요청 ID를 한 번에 보내고, 가격은 서버가 품목으로 계산하게 둔다", async () => {
+    const onSave = vi.fn<OnSave>().mockResolvedValue(undefined);
+    await fillAndSubmit(onSave);
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    const order = onSave.mock.calls[0][0] as ReceiveOrder;
+    expect(order).toMatchObject({
+      customerId: 1,
+      description: "와이셔츠",
+      lines: [{ itemName: "와이셔츠", unitPrice: 0, quantity: 1 }],
+      priceOverride: null,
+      status: "Received",
+      receivedAt: null,
+      pickedUpAt: null,
+    });
+    expect(order.requestId).toEqual(expect.any(String));
+    expect(order).not.toHaveProperty("price");
+  });
+
+  it("실패하면 오류 문장을 보여주고, 다시 눌러도 같은 요청 ID로 보낸다", async () => {
+    const onSave = vi
+      .fn<OnSave>()
+      .mockRejectedValueOnce({ code: "BUSY", message: "다른 작업이 진행 중입니다. 잠시 후 다시 시도해 주세요." })
+      .mockResolvedValue(undefined);
+    const user = await fillAndSubmit(onSave);
+
+    expect(await screen.findByText("다른 작업이 진행 중입니다. 잠시 후 다시 시도해 주세요.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "접수" }));
+
+    expect(onSave).toHaveBeenCalledTimes(2);
+    const [first, retry] = onSave.mock.calls.map((c) => (c[0] as ReceiveOrder).requestId);
+    expect(retry).toBe(first);
   });
 });

@@ -3,6 +3,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { Info, RefreshCw, Download, CheckCircle, AlertCircle } from "lucide-react";
 import { updateApi, isUpdateStatus } from "@/bindings/updates";
 import type { UpdateStatus } from "@/types";
+import { errorMessage } from "@/utils/errors";
 
 export function AppInfoSettings() {
   const [version, setVersion] = useState("...");
@@ -31,7 +32,7 @@ export function AppInfoSettings() {
     try {
       setStatus(await updateApi.check());
     } catch (e: unknown) {
-      setStatus({ state: "failed", message: e instanceof Error ? e.message : String(e) });
+      setStatus({ state: "failed", message: errorMessage(e) });
     }
   };
 
@@ -42,7 +43,7 @@ export function AppInfoSettings() {
       // 설치 프로그램이 실행되며 앱이 종료되고, 설치가 끝나면 다시 열립니다.
       await updateApi.installNow();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = errorMessage(e);
       if (!msg.includes("Could not connect") && !msg.includes("Disconnected")) {
         setInstallError(msg);
       }

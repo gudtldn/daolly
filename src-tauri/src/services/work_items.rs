@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use crate::db::entities::{payment, work_item, work_item::WorkItemStatus, work_item_detail};
 use crate::timestamp;
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DetailInput {
     /// 통계용 품목 FK (None = 직접 입력)
@@ -39,8 +39,8 @@ pub async fn list(
 }
 
 /// 접수 + 세부항목 + 결제 내역을 함께 조회합니다.
-pub async fn get_full(
-    db: &DatabaseConnection,
+pub async fn get_full<C: ConnectionTrait>(
+    db: &C,
     id: i32,
 ) -> Result<
     Option<(
@@ -70,7 +70,7 @@ pub async fn get_full(
 }
 
 /// details 목록에서 description 자동 생성
-fn build_description(details: &[DetailInput]) -> String {
+pub(crate) fn build_description(details: &[DetailInput]) -> String {
     if details.is_empty() {
         return "직접 입력".to_owned();
     }
@@ -93,7 +93,9 @@ fn build_description(details: &[DetailInput]) -> String {
     }
 }
 
-/// 접수와 세부항목을 트랜잭션으로 함께 생성합니다.
+/// 테스트용: 검증 없이 접수와 세부항목만 만듭니다.
+/// (화면의 접수는 결제까지 한 번에 저장하는 `orders::receive`를 사용)
+#[cfg(test)]
 pub async fn create(
     db: &DatabaseConnection,
     customer_id: i32,
@@ -129,27 +131,40 @@ pub async fn create(
         .exec_with_returning(&tx)
         .await?;
 
-    if !details.is_empty() {
-        let detail_models: Vec<work_item_detail::ActiveModel> = details
-            .into_iter()
-            .map(|d| work_item_detail::ActiveModel {
-                work_item_id: Set(inserted.id),
-                price_item_id: Set(d.price_item_id),
-                item_name: Set(d.item_name.trim().to_owned()),
-                unit_price: Set(d.unit_price),
-                quantity: Set(d.quantity),
-                options_memo: Set(d.options_memo.map(|s| s.trim().to_owned())),
-                ..Default::default()
-            })
-            .collect();
-
-        work_item_detail::Entity::insert_many(detail_models)
-            .exec(&tx)
-            .await?;
-    }
+    insert_details(&tx, inserted.id, details).await?;
 
     tx.commit().await?;
     Ok(inserted)
+}
+
+/// 세부항목을 추가합니다. 트랜잭션은 호출하는 쪽에서 관리합니다.
+pub(crate) async fn insert_details<C: ConnectionTrait>(
+    conn: &C,
+    work_item_id: i32,
+    details: Vec<DetailInput>,
+) -> Result<(), DbErr> {
+    if details.is_empty() {
+        return Ok(());
+    }
+    let models: Vec<work_item_detail::ActiveModel> = details
+        .into_iter()
+        .map(|d| work_item_detail::ActiveModel {
+            work_item_id: Set(work_item_id),
+            price_item_id: Set(d.price_item_id),
+            item_name: Set(d.item_name.trim().to_owned()),
+            unit_price: Set(d.unit_price),
+            quantity: Set(d.quantity),
+            options_memo: Set(d
+                .options_memo
+                .map(|s| s.trim().to_owned())
+                .filter(|s| !s.is_empty())),
+            ..Default::default()
+        })
+        .collect();
+    work_item_detail::Entity::insert_many(models)
+        .exec(conn)
+        .await?;
+    Ok(())
 }
 
 pub async fn update(
@@ -229,24 +244,7 @@ pub async fn replace_details(
         .exec(&tx)
         .await?;
 
-    if !details.is_empty() {
-        let models: Vec<work_item_detail::ActiveModel> = details
-            .into_iter()
-            .map(|d| work_item_detail::ActiveModel {
-                work_item_id: Set(work_item_id),
-                price_item_id: Set(d.price_item_id),
-                item_name: Set(d.item_name.trim().to_owned()),
-                unit_price: Set(d.unit_price),
-                quantity: Set(d.quantity),
-                options_memo: Set(d.options_memo.map(|s| s.trim().to_owned())),
-                ..Default::default()
-            })
-            .collect();
-
-        work_item_detail::Entity::insert_many(models)
-            .exec(&tx)
-            .await?;
-    }
+    insert_details(&tx, work_item_id, details).await?;
 
     let result = work_item_detail::Entity::find()
         .filter(work_item_detail::Column::WorkItemId.eq(work_item_id))
