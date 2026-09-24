@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { WorkItemFormCard } from "../WorkItemFormCard";
 import type { ComponentProps } from "react";
@@ -10,6 +10,9 @@ type OnSave = ComponentProps<typeof WorkItemFormCard>["onSave"];
 vi.mock("@/bindings", () => ({
   paymentApi: { create: vi.fn(), list: vi.fn(), update: vi.fn(), delete: vi.fn() },
 }));
+
+import { paymentApi } from "@/bindings";
+import { useDialogStore } from "@/stores/dialogStore";
 
 const workItem: WorkItemFull = {
   id: 7,
@@ -102,6 +105,29 @@ describe("WorkItemFormCard 수정", () => {
 
     const amendment = onSave.mock.calls[0][0] as AmendOrder;
     expect(amendment.lines?.[0]).toMatchObject({ priceItemId: null, itemName: "블라우스" });
+  });
+
+  it("결제 취소는 확인을 받은 뒤에만 한다", async () => {
+    const user = userEvent.setup();
+    vi.mocked(paymentApi.list).mockResolvedValue([]);
+    const withPayment: WorkItemFull = {
+      ...workItem,
+      paidAmount: 1000,
+      payments: [{ id: 9, workItemId: 7, amount: 1000, method: "cash", paidAt: "2026-09-24T01:20:00.000Z", createdAt: "2026-09-24T01:20:00.000Z" }],
+    };
+    render(
+      <WorkItemFormCard open mode="edit" customerId={1} workItem={withPayment} initialTab="payment" onSave={vi.fn()} onClose={vi.fn()} />,
+    );
+
+    await user.click(screen.getByTitle("결제 취소"));
+    await waitFor(() => expect(useDialogStore.getState().isOpen).toBe(true));
+    act(() => useDialogStore.getState().close(false));
+    expect(paymentApi.delete).not.toHaveBeenCalled();
+
+    await user.click(screen.getByTitle("결제 취소"));
+    await waitFor(() => expect(useDialogStore.getState().isOpen).toBe(true));
+    act(() => useDialogStore.getState().close(true));
+    await waitFor(() => expect(paymentApi.delete).toHaveBeenCalledWith(9));
   });
 
   it("결제 수단에 외상이 없다 (외상은 결제를 기록하지 않음)", () => {

@@ -2,6 +2,7 @@
 //! Commands(Tauri 진입점) -> Services(여기) -> Entities(DB) 순으로 호출합니다.
 //! 입력 검증, 트랜잭션 관리, 집계 로직을 담당합니다.
 
+pub(crate) mod audit;
 pub mod categories;
 pub mod customers;
 pub mod migration;

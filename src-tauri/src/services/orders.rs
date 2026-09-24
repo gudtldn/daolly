@@ -11,6 +11,7 @@ use crate::db::entities::{
     customer, payment, work_item, work_item::WorkItemStatus, work_item_detail,
 };
 use crate::error::AppError;
+use crate::services::audit::{self, Entry};
 use crate::services::payments::{self, won};
 use crate::services::work_items::{self, DetailInput};
 use crate::timestamp;
@@ -106,6 +107,7 @@ where
         None => None,
     };
     if customer::Entity::find_by_id(order.customer_id)
+        .filter(customer::Column::DeletedAt.is_null())
         .one(&txn)
         .await?
         .is_none()
@@ -182,10 +184,7 @@ where
     C: ConnectionTrait + TransactionTrait,
 {
     let txn = db.begin().await?;
-    let current = work_item::Entity::find_by_id(id)
-        .one(&txn)
-        .await?
-        .ok_or(AppError::NotFound("접수"))?;
+    let current = find_order(&txn, id).await?;
 
     let price = match (&amendment.lines, amendment.price_override) {
         (lines, Some(price)) => {
@@ -228,6 +227,16 @@ where
     }
     let status = amendment.status.unwrap_or_else(|| current.status.clone());
     apply_status(&mut active, &current, status, amendment.picked_up_at, &now)?;
+    if price != current.price {
+        audit::record(
+            &txn,
+            Entry::OrderRepriced {
+                order: &current,
+                new_price: price,
+            },
+        )
+        .await?;
+    }
     active.price = Set(price);
     active.last_modified_at = Set(now);
     active.update(&txn).await?;
@@ -251,10 +260,7 @@ pub async fn change_status<C: ConnectionTrait>(
     id: i32,
     status: WorkItemStatus,
 ) -> Result<work_item::Model, AppError> {
-    let current = work_item::Entity::find_by_id(id)
-        .one(db)
-        .await?
-        .ok_or(AppError::NotFound("접수"))?;
+    let current = find_order(db, id).await?;
     if current.status == status {
         return Ok(current);
     }
@@ -263,6 +269,50 @@ pub async fn change_status<C: ConnectionTrait>(
     apply_status(&mut active, &current, status, None, &now)?;
     active.last_modified_at = Set(now);
     Ok(active.update(db).await?)
+}
+
+/// 접수를 취소합니다. 받은 결제도 함께 취소되어 매출에서 빠지고, 기록은 남습니다.
+/// (예전에는 행을 지워 결제 기록까지 사라졌음)
+pub async fn cancel<C>(db: &C, id: i32) -> Result<(), AppError>
+where
+    C: ConnectionTrait + TransactionTrait,
+{
+    let txn = db.begin().await?;
+    let order = find_order(&txn, id).await?;
+    let voided = payment::Entity::find()
+        .filter(payment::Column::WorkItemId.eq(id))
+        .filter(payment::Column::VoidedAt.is_null())
+        .all(&txn)
+        .await?;
+    for p in &voided {
+        payments::void(&txn, p).await?;
+    }
+    payments::sync_paid_amount(&txn, id).await?;
+
+    let now = timestamp::now();
+    let mut active: work_item::ActiveModel = order.clone().into();
+    active.deleted_at = Set(Some(now.clone()));
+    active.last_modified_at = Set(now);
+    active.update(&txn).await?;
+    audit::record(
+        &txn,
+        Entry::OrderCancelled {
+            order: &order,
+            voided: &voided,
+        },
+    )
+    .await?;
+    txn.commit().await?;
+    Ok(())
+}
+
+/// 취소하지 않은 접수
+async fn find_order<C: ConnectionTrait>(conn: &C, id: i32) -> Result<work_item::Model, AppError> {
+    work_item::Entity::find_by_id(id)
+        .filter(work_item::Column::DeletedAt.is_null())
+        .one(conn)
+        .await?
+        .ok_or(AppError::NotFound("접수"))
 }
 
 /// 상태를 바꾸고 완료·수령 일시를 상태에 맞춥니다.
@@ -624,6 +674,37 @@ mod tests {
         assert!(updated.completed_at.is_some());
         assert_eq!(details.len(), 1);
         assert_eq!(details[0].price_item_id, Some(1));
+        assert_eq!(audit::actions(&db).await, vec!["order.reprice"]);
+    }
+
+    /// 접수 취소: 목록·상세에서 빠지고 받은 결제도 함께 취소되며, 기록은 남음
+    #[tokio::test]
+    async fn cancel_keeps_record() {
+        let (db, cid) = setup().await;
+        let wi = received(&db, cid, true).await;
+
+        cancel(&db, wi.id).await.unwrap();
+
+        assert!(work_items::get_full(&db, wi.id).await.unwrap().is_none());
+        assert!(
+            work_items::list(&db, Some(cid), None)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(count(&db, "work_items").await, 1);
+        assert_eq!(count(&db, "payments WHERE voided_at IS NOT NULL").await, 1);
+        assert_eq!(audit::actions(&db).await, vec!["order.cancel"]);
+
+        // 취소한 접수는 고치거나 다시 취소할 수 없음
+        assert_eq!(
+            cancel(&db, wi.id).await.unwrap_err().code(),
+            ErrorCode::NotFound
+        );
+        assert_eq!(
+            amend(&db, wi.id, amendment()).await.unwrap_err().code(),
+            ErrorCode::NotFound
+        );
     }
 
     /// V6: 이미 받은 금액보다 낮은 가격으로는 고칠 수 없음 (아무것도 바뀌지 않음)

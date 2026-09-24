@@ -3,6 +3,7 @@ import { X, Plus, Trash2, Pencil, Check } from "lucide-react";
 import type { WorkItemFull, WorkItemStatus, ReceiveOrder, AmendOrder, DetailInput, Payment } from "@/types";
 import { paymentApi } from "@/bindings";
 import { errorMessage } from "@/utils/errors";
+import { useDialogStore } from "@/stores/dialogStore";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { NumberInput } from "@/components/NumberInput";
 
@@ -249,12 +250,19 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
     }
   }, [activeTab]);
 
-  // 결제 삭제
-  const handleDeletePayment = async (paymentId: number) => {
+  // 결제 취소 (기록은 남고 받은 금액과 매출에서 빠짐)
+  const handleDeletePayment = async (payment: Payment) => {
     if (!workItem) return;
+    const confirmed = await useDialogStore.getState().showConfirm({
+      title: "결제 취소",
+      message: `${payment.amount.toLocaleString()}원 결제를 취소하시겠습니까? 받은 금액과 매출에서 빠집니다.`,
+      confirmText: "결제 취소",
+      isDestructive: true,
+    });
+    if (!confirmed) return;
     setPayLoading(true);
     try {
-      await paymentApi.delete(paymentId);
+      await paymentApi.delete(payment.id);
       const updated = await paymentApi.list(workItem.id);
       setPayments(updated);
       const newPaid = updated.reduce((s, p) => s + p.amount, 0);
@@ -713,7 +721,8 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                                       <Pencil className="w-3.5 h-3.5" />
                                     </button>
                                     <button
-                                      onClick={() => handleDeletePayment(p.id)}
+                                      onClick={() => handleDeletePayment(p)}
+                                      title="결제 취소"
                                       disabled={payLoading}
                                       className="p-1.5 text-on-surface-muted hover:text-danger-500 transition-colors cursor-pointer disabled:opacity-30"
                                     >

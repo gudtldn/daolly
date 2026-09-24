@@ -4,6 +4,7 @@ mod m20260423_000001_init;
 mod m20260516_000002_drop_price_options;
 mod m20260924_000003_normalize_timestamps;
 mod m20260924_000004_work_item_request_id;
+mod m20260924_000005_keep_ledger;
 
 pub struct Migrator;
 
@@ -15,6 +16,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260516_000002_drop_price_options::Migration),
             Box::new(m20260924_000003_normalize_timestamps::Migration),
             Box::new(m20260924_000004_work_item_request_id::Migration),
+            Box::new(m20260924_000005_keep_ledger::Migration),
         ]
     }
 }

@@ -22,7 +22,8 @@ pub async fn list(
     customer_id: Option<i32>,
     status: Option<WorkItemStatus>,
 ) -> Result<Vec<work_item::Model>, DbErr> {
-    let mut query = work_item::Entity::find();
+    // 취소한 접수는 빼고
+    let mut query = work_item::Entity::find().filter(work_item::Column::DeletedAt.is_null());
 
     if let Some(cid) = customer_id {
         query = query.filter(work_item::Column::CustomerId.eq(cid));
@@ -37,7 +38,7 @@ pub async fn list(
         .await
 }
 
-/// 접수 + 세부항목 + 결제 내역을 함께 조회합니다.
+/// 접수 + 세부항목 + 결제 내역을 함께 조회합니다. (취소한 접수·결제는 빼고)
 pub async fn get_full<C: ConnectionTrait>(
     db: &C,
     id: i32,
@@ -49,7 +50,11 @@ pub async fn get_full<C: ConnectionTrait>(
     )>,
     DbErr,
 > {
-    let item = match work_item::Entity::find_by_id(id).one(db).await? {
+    let item = match work_item::Entity::find_by_id(id)
+        .filter(work_item::Column::DeletedAt.is_null())
+        .one(db)
+        .await?
+    {
         Some(m) => m,
         None => return Ok(None),
     };
@@ -61,6 +66,7 @@ pub async fn get_full<C: ConnectionTrait>(
 
     let payments = payment::Entity::find()
         .filter(payment::Column::WorkItemId.eq(id))
+        .filter(payment::Column::VoidedAt.is_null())
         .order_by_asc(payment::Column::PaidAt)
         .all(db)
         .await?;
@@ -166,19 +172,16 @@ pub(crate) async fn insert_details<C: ConnectionTrait>(
     Ok(())
 }
 
-pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<u64, DbErr> {
-    let res = work_item::Entity::delete_by_id(id).exec(db).await?;
-    Ok(res.rows_affected)
-}
-
-/// 고객별 미수금 합계를 반환합니다.
+/// 고객별 미수금 합계를 반환합니다. (취소한 접수와 삭제한 고객은 빼고)
 /// 잔액이 남은 접수만 더합니다. (더 받은 접수의 음수 잔액이 다른 접수의 미수금을 가리지 않도록)
 pub async fn get_all_unpaid_amounts(db: &DatabaseConnection) -> Result<HashMap<i32, i64>, DbErr> {
     let rows = db
         .query_all(Statement::from_string(
             DbBackend::Sqlite,
-            "SELECT customer_id, SUM(price - paid_amount) FROM work_items
-             WHERE paid_amount < price GROUP BY customer_id",
+            "SELECT w.customer_id, SUM(w.price - w.paid_amount)
+             FROM work_items w JOIN customers c ON c.id = w.customer_id
+             WHERE w.paid_amount < w.price AND w.deleted_at IS NULL AND c.deleted_at IS NULL
+             GROUP BY w.customer_id",
         ))
         .await?;
     rows.into_iter()

@@ -11,6 +11,7 @@ pub async fn clear_database(db: &DatabaseConnection) -> Result<(), DbErr> {
     db.transaction::<_, (), DbErr>(|txn| {
         Box::pin(async move {
             // 하위 테이블부터 삭제 (외래 키 제약 조건 고려)
+            txn.execute_unprepared("DELETE FROM audit_log").await?;
             work_item_detail::Entity::delete_many().exec(txn).await?;
             payment::Entity::delete_many().exec(txn).await?;
             work_item::Entity::delete_many().exec(txn).await?;
@@ -96,6 +97,7 @@ async fn import_legacy(
             note: Set(note),
             created_at: Set(now.clone()),
             last_modified_at: Set(now.clone()),
+            deleted_at: Set(None),
         });
         imported_customer_ids.insert(old_id);
     }
@@ -119,6 +121,7 @@ async fn import_legacy(
         )),
         created_at: Set(now.clone()),
         last_modified_at: Set(now.clone()),
+        deleted_at: Set(None),
     };
     customer::Entity::insert(orphan_model).exec(&tx).await?;
 
@@ -192,6 +195,7 @@ async fn import_legacy(
             created_at: Set(now.clone()),
             last_modified_at: Set(now.clone()),
             request_id: Set(None),
+            deleted_at: Set(None),
         };
         work_item::Entity::insert(model).exec(&tx).await?;
 
@@ -330,16 +334,58 @@ mod tests {
             .collect();
         assert_eq!(names, vec!["기존 고객"]);
 
-        // 외래 키가 켜져 있어 고객 삭제 시 접수도 함께 삭제됨
-        crate::services::customers::delete(&db, existing.id)
-            .await
-            .unwrap();
+        // 외래 키가 켜져 있음: 접수가 있는 고객 행은 지울 수 없음 (RESTRICT)
+        assert!(
+            db.execute_unprepared(&format!("DELETE FROM customers WHERE id = {}", existing.id))
+                .await
+                .is_err()
+        );
         assert!(
             work_item::Entity::find_by_id(wi.id)
                 .one(&db)
                 .await
                 .unwrap()
-                .is_none()
+                .is_some()
         );
+    }
+
+    /// '모든 데이터 삭제'는 외래 키가 RESTRICT여도 하위 테이블부터 지워 모두 비움
+    #[tokio::test]
+    async fn clear_database_removes_everything() {
+        let db = setup_test_db().await.unwrap();
+        let c = crate::services::customers::create(&db, "고객".into(), None, None)
+            .await
+            .unwrap();
+        let wi = crate::services::work_items::create(
+            &db,
+            c.id,
+            Some("접수".into()),
+            1000,
+            None,
+            None,
+            vec![],
+        )
+        .await
+        .unwrap();
+        crate::services::payments::create(&db, wi.id, 1000, Some("cash".into()), None)
+            .await
+            .unwrap();
+        crate::services::orders::cancel(&db, wi.id).await.unwrap();
+
+        clear_database(&db).await.unwrap();
+
+        for table in ["customers", "work_items", "payments", "audit_log"] {
+            let count: i64 = db
+                .query_one(sea_orm::Statement::from_string(
+                    sea_orm::DbBackend::Sqlite,
+                    format!("SELECT COUNT(*) FROM {table}"),
+                ))
+                .await
+                .unwrap()
+                .unwrap()
+                .try_get_by_index(0)
+                .unwrap();
+            assert_eq!(count, 0, "{table}");
+        }
     }
 }

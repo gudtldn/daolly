@@ -720,9 +720,13 @@ export function CustomersPage() {
 
   const handleDelete = async () => {
     if (!selectedCustomer) return;
+    // 고객은 목록에서만 빠지고 지난 접수·결제는 매출 기록으로 남음
+    const unpaid = useCustomerStore.getState().unpaidMap[selectedCustomer.id] ?? 0;
     const confirmed = await showConfirm({
       title: "고객 삭제",
-      message: `"${selectedCustomer.name}" 고객을 삭제하시겠습니까? 관련 접수 내역도 모두 삭제됩니다.`,
+      message: `"${selectedCustomer.name}" 고객을 목록에서 삭제하시겠습니까? 지난 접수·결제 기록은 매출에 그대로 남습니다.${
+        unpaid > 0 ? ` 남은 미수금 ${unpaid.toLocaleString()}원은 미수금 목록에서 빠집니다.` : ""
+      }`,
       confirmText: "삭제",
       isDestructive: true,
     });
@@ -758,7 +762,9 @@ export function CustomersPage() {
   const handleWiDelete = async (id: number) => {
     const item = useWorkItemStore.getState().workItems.find((w) => w.id === id);
     if (!item) return;
-    const confirmed = await showConfirm({ title: "작업 삭제", message: `"${item.description}" 작업을 삭제하시겠습니까?`, confirmText: "삭제", isDestructive: true });
+    // 접수는 취소 표시만 하고 기록은 남음. 받은 결제도 함께 취소되어 매출에서 빠짐
+    const paidNote = item.paidAmount > 0 ? ` 받은 결제 ${item.paidAmount.toLocaleString()}원도 함께 취소되어 매출에서 빠집니다.` : "";
+    const confirmed = await showConfirm({ title: "작업 삭제", message: `"${item.description}" 작업을 삭제하시겠습니까?${paidNote}`, confirmText: "삭제", isDestructive: true });
     if (!confirmed) return;
     await useWorkItemStore.getState().delete(id);
     loadUnpaid();

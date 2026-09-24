@@ -3,6 +3,7 @@ use serde::Serialize;
 
 use crate::db::entities::{customer, payment, work_item};
 use crate::error::AppError;
+use crate::services::audit::{self, Entry};
 use crate::timestamp;
 
 pub async fn list(
@@ -11,6 +12,7 @@ pub async fn list(
 ) -> Result<Vec<payment::Model>, DbErr> {
     payment::Entity::find()
         .filter(payment::Column::WorkItemId.eq(work_item_id))
+        .filter(payment::Column::VoidedAt.is_null())
         .order_by_asc(payment::Column::PaidAt)
         .all(db)
         .await
@@ -86,7 +88,8 @@ pub(crate) async fn insert<C: ConnectionTrait>(
     Ok(inserted)
 }
 
-/// 결제 내역(금액, 수단, 일시)을 수정하고 work_item.paid_amount를 자동 갱신합니다.
+/// 결제를 정정합니다. 기존 결제는 취소 기록으로 남기고 고친 내용으로 새로 기록합니다.
+/// `paid_at`이 None이면 원래 결제 일시를 유지합니다.
 pub async fn update(
     db: &DatabaseConnection,
     id: i32,
@@ -97,40 +100,45 @@ pub async fn update(
     let method = normalize_method(method.as_deref())?;
     let tx = db.begin().await?;
 
-    let p = payment::Entity::find_by_id(id)
-        .one(&tx)
-        .await?
-        .ok_or(AppError::NotFound("결제"))?;
-    let wi = find_work_item(&tx, p.work_item_id).await?;
-    check_not_overpaid(wi.price, wi.paid_amount - p.amount + amount)?;
+    let before = find_active(&tx, id).await?;
+    let wi = find_work_item(&tx, before.work_item_id).await?;
+    check_not_overpaid(wi.price, wi.paid_amount - before.amount + amount)?;
 
-    let mut active: payment::ActiveModel = p.into();
-    active.amount = Set(amount);
-    active.method = Set(Some(method.to_owned()));
-    if let Some(at) = paid_at {
-        active.paid_at = Set(at);
-    }
-    let updated = active.update(&tx).await?;
+    void(&tx, &before).await?;
+    let paid_at = paid_at.unwrap_or_else(|| before.paid_at.clone());
+    let after = insert(&tx, wi.id, amount, method, Some(paid_at)).await?;
+    audit::record(
+        &tx,
+        Entry::PaymentCorrected {
+            before: &before,
+            after: &after,
+        },
+    )
+    .await?;
 
-    sync_paid_amount(&tx, wi.id).await?;
     tx.commit().await?;
-    Ok(updated)
+    Ok(after)
 }
 
-/// 결제를 삭제하고 work_item.paid_amount를 자동 갱신합니다.
+/// 결제를 취소합니다. 받은 금액과 매출에서 빠지고 기록은 남습니다.
 pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<(), AppError> {
     let tx = db.begin().await?;
-
-    let p = payment::Entity::find_by_id(id)
-        .one(&tx)
-        .await?
-        .ok_or(AppError::NotFound("결제"))?;
-    let wi_id = p.work_item_id;
-
-    payment::Entity::delete_by_id(id).exec(&tx).await?;
-    sync_paid_amount(&tx, wi_id).await?;
-
+    let payment = find_active(&tx, id).await?;
+    void(&tx, &payment).await?;
+    sync_paid_amount(&tx, payment.work_item_id).await?;
+    audit::record(&tx, Entry::PaymentVoided { payment: &payment }).await?;
     tx.commit().await?;
+    Ok(())
+}
+
+/// 결제에 취소 표시를 합니다. paid_amount는 호출하는 쪽에서 맞춥니다.
+pub(crate) async fn void<C: ConnectionTrait>(
+    conn: &C,
+    payment: &payment::Model,
+) -> Result<(), DbErr> {
+    let mut active: payment::ActiveModel = payment.clone().into();
+    active.voided_at = Set(Some(timestamp::now()));
+    active.update(conn).await?;
     Ok(())
 }
 
@@ -151,6 +159,7 @@ pub struct CreditPayment {
 pub async fn list_credit(db: &DatabaseConnection) -> Result<Vec<CreditPayment>, DbErr> {
     let rows: Vec<(payment::Model, Option<work_item::Model>)> = payment::Entity::find()
         .filter(payment::Column::Method.is_in(["credit", "외상"]))
+        .filter(payment::Column::VoidedAt.is_null())
         .find_also_related(work_item::Entity)
         .order_by_asc(payment::Column::PaidAt)
         .all(db)
@@ -158,7 +167,9 @@ pub async fn list_credit(db: &DatabaseConnection) -> Result<Vec<CreditPayment>, 
 
     let mut result = Vec::with_capacity(rows.len());
     for (p, wi) in rows {
-        let Some(wi) = wi else { continue };
+        let Some(wi) = wi.filter(|wi| wi.deleted_at.is_none()) else {
+            continue;
+        };
         let customer_name = customer::Entity::find_by_id(wi.customer_id)
             .one(db)
             .await?
@@ -177,23 +188,35 @@ pub async fn list_credit(db: &DatabaseConnection) -> Result<Vec<CreditPayment>, 
     Ok(result)
 }
 
+/// 취소하지 않은 접수
 async fn find_work_item<C: ConnectionTrait>(
     conn: &C,
     id: i32,
 ) -> Result<work_item::Model, AppError> {
     work_item::Entity::find_by_id(id)
+        .filter(work_item::Column::DeletedAt.is_null())
         .one(conn)
         .await?
         .ok_or(AppError::NotFound("접수"))
 }
 
-/// payments 합계를 계산하여 work_item.paid_amount를 갱신합니다.
+/// 취소하지 않은 결제
+async fn find_active<C: ConnectionTrait>(conn: &C, id: i32) -> Result<payment::Model, AppError> {
+    payment::Entity::find_by_id(id)
+        .filter(payment::Column::VoidedAt.is_null())
+        .one(conn)
+        .await?
+        .ok_or(AppError::NotFound("결제"))
+}
+
+/// 취소하지 않은 결제의 합계로 work_item.paid_amount를 갱신합니다.
 pub(crate) async fn sync_paid_amount<C: ConnectionTrait>(
     tx: &C,
     work_item_id: i32,
 ) -> Result<(), DbErr> {
     let sum: Option<i64> = payment::Entity::find()
         .filter(payment::Column::WorkItemId.eq(work_item_id))
+        .filter(payment::Column::VoidedAt.is_null())
         .select_only()
         .column_as(payment::Column::Amount.sum(), "total")
         .into_tuple::<Option<i64>>()
@@ -407,5 +430,48 @@ mod tests {
         assert_eq!(won(0), "0원");
         assert_eq!(won(3000), "3,000원");
         assert_eq!(won(100_000_000), "100,000,000원");
+    }
+
+    /// 결제 취소·정정은 행을 지우지 않고 취소 표시와 감사 기록을 남김
+    #[tokio::test]
+    async fn void_and_correct_keep_history() {
+        let db = setup_test_db().await.unwrap();
+        let wi_id = setup_work_item(&db).await;
+        let first = create(
+            &db,
+            wi_id,
+            3000,
+            Some("cash".into()),
+            Some("2026-09-20T01:00:00.000Z".into()),
+        )
+        .await
+        .unwrap();
+
+        // 정정: 일시를 보내지 않으면 원래 결제 일시 유지
+        let corrected = update(&db, first.id, 5000, Some("card".into()), None)
+            .await
+            .unwrap();
+        assert_ne!(corrected.id, first.id);
+        assert_eq!(corrected.paid_at, "2026-09-20T01:00:00.000Z");
+
+        delete(&db, corrected.id).await.unwrap();
+        assert!(list(&db, wi_id).await.unwrap().is_empty());
+        let wi = work_item::Entity::find_by_id(wi_id)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(wi.paid_amount, 0);
+
+        // 행은 남아 있고 모두 취소 표시
+        let all = payment::Entity::find().all(&db).await.unwrap();
+        assert_eq!(all.len(), 2);
+        assert!(all.iter().all(|p| p.voided_at.is_some()));
+        assert_eq!(
+            audit::actions(&db).await,
+            vec!["payment.correct", "payment.void"]
+        );
+        // 이미 취소한 결제는 다시 취소·정정할 수 없음
+        assert!(delete(&db, corrected.id).await.is_err());
     }
 }

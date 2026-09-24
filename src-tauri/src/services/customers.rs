@@ -1,13 +1,14 @@
 use sea_orm::*;
 
 use crate::db::entities::customer;
+use crate::services::audit::{self, Entry};
 use crate::timestamp;
 
 pub async fn list(
     db: &DatabaseConnection,
     search: Option<String>,
 ) -> Result<Vec<customer::Model>, DbErr> {
-    let mut query = customer::Entity::find();
+    let mut query = customer::Entity::find().filter(customer::Column::DeletedAt.is_null());
 
     if let Some(keyword) = search {
         query = query.filter(
@@ -22,8 +23,12 @@ pub async fn list(
     query.all(db).await
 }
 
+/// 삭제하지 않은 고객
 pub async fn get_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<customer::Model>, DbErr> {
-    customer::Entity::find_by_id(id).one(db).await
+    customer::Entity::find_by_id(id)
+        .filter(customer::Column::DeletedAt.is_null())
+        .one(db)
+        .await
 }
 
 pub fn format_phone(phone: &str) -> String {
@@ -102,9 +107,32 @@ pub async fn update(
     active.update(db).await
 }
 
-pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<u64, DbErr> {
-    let res = customer::Entity::delete_by_id(id).exec(db).await?;
-    Ok(res.rows_affected)
+/// 고객을 목록에서 삭제합니다. 지난 접수·결제는 매출 기록으로 남습니다.
+/// (예전에는 접수·결제까지 함께 지워져 지난 매출이 사라졌음) 없는 고객이면 false
+pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<bool, DbErr> {
+    let tx = db.begin().await?;
+    let Some(existing) = customer::Entity::find_by_id(id)
+        .filter(customer::Column::DeletedAt.is_null())
+        .one(&tx)
+        .await?
+    else {
+        return Ok(false);
+    };
+    audit::record(
+        &tx,
+        Entry::CustomerDeleted {
+            customer: &existing,
+        },
+    )
+    .await?;
+
+    let now = timestamp::now();
+    let mut active: customer::ActiveModel = existing.into();
+    active.deleted_at = Set(Some(now.clone()));
+    active.last_modified_at = Set(now);
+    active.update(&tx).await?;
+    tx.commit().await?;
+    Ok(true)
 }
 
 #[cfg(test)]
@@ -150,9 +178,15 @@ mod tests {
     async fn delete_customer_success() {
         let db = setup_test_db().await.unwrap();
         let c = create(&db, "삭제대상".into(), None, None).await.unwrap();
-        let rows = delete(&db, c.id).await.unwrap();
-        assert_eq!(rows, 1);
+        assert!(delete(&db, c.id).await.unwrap());
         assert!(get_by_id(&db, c.id).await.unwrap().is_none());
+        assert!(list(&db, None).await.unwrap().is_empty());
+        // 두 번 지울 수 없음
+        assert!(!delete(&db, c.id).await.unwrap());
+        assert_eq!(
+            crate::services::audit::actions(&db).await,
+            vec!["customer.delete"]
+        );
     }
 
     #[tokio::test]

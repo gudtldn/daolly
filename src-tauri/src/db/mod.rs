@@ -195,7 +195,8 @@ mod tests {
                 phone_number TEXT,
                 note TEXT,
                 created_at TEXT NOT NULL,
-                last_modified_at TEXT NOT NULL
+                last_modified_at TEXT NOT NULL,
+                deleted_at TEXT
             )",
             )
             .await?;
@@ -289,9 +290,13 @@ mod tests {
         assert_eq!(scalar(&db, "SELECT COUNT(*) FROM payments").await, 1);
         assert_eq!(scalar(&db, "PRAGMA foreign_keys").await, 1);
 
-        // 재생성한 테이블에도 FK(CASCADE)가 계속 동작
-        customers::delete(&db, 1).await.unwrap();
-        assert_eq!(scalar(&db, "SELECT COUNT(*) FROM work_items").await, 0);
+        // 재생성한 테이블에도 외래 키가 계속 동작 (접수가 있는 고객 행은 지울 수 없음)
+        assert!(
+            db.execute_unprepared("DELETE FROM customers WHERE id = 1")
+                .await
+                .is_err()
+        );
+        assert_eq!(scalar(&db, "SELECT COUNT(*) FROM work_items").await, 1);
     }
 
     async fn text(db: &DatabaseConnection, sql: &str) -> String {

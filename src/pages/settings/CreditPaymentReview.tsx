@@ -8,7 +8,7 @@ import type { CreditPayment } from "@/types";
 /**
  * 예전 버전에서 결제 수단을 '외상'으로 등록한 결제 점검.
  * 이런 결제는 돈을 받지 않았는데 받은 것으로 계산되어 미수금에서 빠졌습니다.
- * 자동으로 지우지 않고, 확인한 뒤 결제에서 빼면 미수금으로 다시 표시됩니다.
+ * 자동으로 정리하지 않고, 확인한 뒤 결제에서 빼면(결제 취소) 미수금으로 다시 표시됩니다.
  * 정리할 결제가 없으면 아무것도 보이지 않습니다.
  */
 export function CreditPaymentReview() {
@@ -34,7 +34,7 @@ export function CreditPaymentReview() {
   const handleRemove = async (p: CreditPayment) => {
     const ok = await showConfirm({
       title: "외상 결제 정리",
-      message: `${p.customerName}님 '${p.description ?? "접수"}'의 ${p.amount.toLocaleString()}원 결제를 지웁니다. 이 금액은 미수금으로 다시 표시됩니다.`,
+      message: `${p.customerName}님 '${p.description ?? "접수"}'의 ${p.amount.toLocaleString()}원 결제를 결제 내역에서 뺍니다. 이 금액은 미수금으로 다시 표시됩니다.`,
       confirmText: "결제에서 빼기",
       isDestructive: true,
     });

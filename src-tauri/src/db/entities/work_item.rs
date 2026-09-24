@@ -41,6 +41,9 @@ pub struct Model {
     /// 접수 요청 ID (같은 요청이 두 번 와도 한 번만 접수하기 위함). 화면에는 보내지 않음
     #[serde(skip)]
     pub request_id: Option<String>,
+    /// 접수를 취소(삭제)한 시각. 목록과 매출에서 빠지지만 기록은 남음
+    #[serde(skip)]
+    pub deleted_at: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

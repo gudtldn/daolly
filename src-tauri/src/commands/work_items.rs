@@ -53,11 +53,8 @@ pub async fn update_work_item_status(
 
 #[tauri::command]
 pub async fn delete_work_item(db: State<'_, DatabaseConnection>, id: i32) -> CmdResult<()> {
-    let rows = services::work_items::delete(db.inner(), id).await?;
-    if rows == 0 {
-        return Err(AppError::NotFound("접수"));
-    }
-    Ok(())
+    // 지우지 않고 취소 표시 (받은 결제도 함께 취소, 기록은 남음)
+    services::orders::cancel(db.inner(), id).await
 }
 
 #[tauri::command]

@@ -3,6 +3,8 @@
 //! 기간은 가게 날짜(`NaiveDate`, 양끝 포함)로 받아 `timestamp::day_bounds`로 저장 형식의
 //! UTC 경계 `[start, end)`로 바꾼 뒤 비교합니다. 시각은 고정 형식 UTC로 저장되므로
 //! 문자열 비교가 곧 시간 비교입니다.
+//!
+//! 취소한 접수와 결제는 매출에서 빼고, 삭제한 고객의 지난 접수·결제는 매출에 남깁니다.
 
 use chrono::{Datelike, Duration, NaiveDate, TimeZone};
 use sea_orm::prelude::Expr;
@@ -117,6 +119,7 @@ pub async fn list_sales_records<Tz: TimeZone>(
 ) -> Result<Vec<SalesRecord>, DbErr> {
     let bounds = Bounds::new(from, to, tz);
     let query = work_item::Entity::find()
+        .filter(work_item::Column::DeletedAt.is_null())
         .join(JoinType::LeftJoin, work_item::Relation::Customer.def())
         .select_also(customer::Entity);
     let results: Vec<(work_item::Model, Option<customer::Model>)> = bounds
@@ -143,6 +146,7 @@ pub async fn list_sales_records<Tz: TimeZone>(
     }
     let payments = payment::Entity::find()
         .filter(payment::Column::WorkItemId.in_subquery(in_range.to_owned()))
+        .filter(payment::Column::VoidedAt.is_null())
         .order_by_asc(payment::Column::PaidAt)
         .all(db)
         .await?;
@@ -184,7 +188,9 @@ pub async fn list_sales_records<Tz: TimeZone>(
 pub async fn list_unpaid_records(db: &DatabaseConnection) -> Result<Vec<UnpaidRecord>, DbErr> {
     let results: Vec<(work_item::Model, Option<customer::Model>)> = work_item::Entity::find()
         .filter(Expr::col(work_item::Column::PaidAmount).lt(Expr::col(work_item::Column::Price)))
+        .filter(work_item::Column::DeletedAt.is_null())
         .join(JoinType::LeftJoin, work_item::Relation::Customer.def())
+        .filter(customer::Column::DeletedAt.is_null())
         .select_also(customer::Entity)
         .order_by_desc(work_item::Column::ReceivedAt)
         .all(db)
@@ -232,7 +238,10 @@ pub async fn list_weekly_chart<Tz: TimeZone>(
     let first = today - Duration::days(6);
     let bounds = Bounds::new(Some(first), Some(today), tz);
     let items = bounds
-        .apply(work_item::Entity::find(), work_item::Column::ReceivedAt)
+        .apply(
+            work_item::Entity::find().filter(work_item::Column::DeletedAt.is_null()),
+            work_item::Column::ReceivedAt,
+        )
         .all(db)
         .await?;
 
@@ -295,6 +304,7 @@ pub async fn list_top_items<Tz: TimeZone>(
                 .to(work_item_detail::Column::WorkItemId)
                 .into(),
         )
+        .filter(work_item::Column::DeletedAt.is_null())
         .group_by(work_item_detail::Column::ItemName)
         .order_by_desc(Expr::cust("total_quantity"))
         .limit(limit as u64);
@@ -335,7 +345,8 @@ pub async fn get_revenue_summary<Tz: TimeZone>(
         .query_one(Statement::from_sql_and_values(
             DbBackend::Sqlite,
             "SELECT COALESCE(SUM(price), 0) FROM work_items
-             WHERE (?1 IS NULL OR received_at >= ?1) AND (?2 IS NULL OR received_at < ?2)",
+             WHERE deleted_at IS NULL
+               AND (?1 IS NULL OR received_at >= ?1) AND (?2 IS NULL OR received_at < ?2)",
             bounds.values(),
         ))
         .await?;
@@ -355,7 +366,8 @@ pub async fn get_revenue_summary<Tz: TimeZone>(
                 COALESCE(SUM(CASE WHEN p.method IN ('transfer', '계좌이체', '이체') THEN p.amount END), 0),
                 COALESCE(SUM(CASE WHEN w.received_at < ?1 THEN p.amount END), 0)
              FROM payments p JOIN work_items w ON w.id = p.work_item_id
-             WHERE (?1 IS NULL OR p.paid_at >= ?1) AND (?2 IS NULL OR p.paid_at < ?2)",
+             WHERE p.voided_at IS NULL AND w.deleted_at IS NULL
+               AND (?1 IS NULL OR p.paid_at >= ?1) AND (?2 IS NULL OR p.paid_at < ?2)",
             bounds.values(),
         ))
         .await?;
@@ -385,7 +397,9 @@ pub async fn list_payment_records<Tz: TimeZone>(
 ) -> Result<Vec<PaymentRecord>, DbErr> {
     let bounds = Bounds::new(from, to, tz);
     let query = payment::Entity::find()
+        .filter(payment::Column::VoidedAt.is_null())
         .join(JoinType::InnerJoin, payment::Relation::WorkItem.def())
+        .filter(work_item::Column::DeletedAt.is_null())
         .join(JoinType::InnerJoin, work_item::Relation::Customer.def())
         .select_also(work_item::Entity)
         .select_also(customer::Entity);
@@ -597,5 +611,82 @@ mod tests {
             days[6].date,
             timestamp::today(&kst()).format("%Y-%m-%d").to_string()
         );
+    }
+
+    /// V8: 고객을 삭제해도 그 고객의 지난 매출·입금은 남고, 미수금 목록에서만 빠짐
+    #[tokio::test]
+    async fn deleting_customer_keeps_revenue() {
+        let db = setup_test_db().await.unwrap();
+        let cid = customers::create(&db, "고객".into(), None, None)
+            .await
+            .unwrap()
+            .id;
+        let paid = item(&db, cid, 10000, kst_at(24, 10, 0)).await;
+        payments::create(
+            &db,
+            paid,
+            10000,
+            Some("cash".into()),
+            Some(kst_at(24, 10, 5)),
+        )
+        .await
+        .unwrap();
+        item(&db, cid, 3000, kst_at(24, 11, 0)).await; // 미수
+
+        assert!(customers::delete(&db, cid).await.unwrap());
+
+        let s24 = get_revenue_summary(&db, day(24), day(24), &kst())
+            .await
+            .unwrap();
+        assert_eq!(s24.total_sales, 13000);
+        assert_eq!(s24.actual_income, 10000);
+        let records = list_payment_records(&db, day(24), day(24), &kst())
+            .await
+            .unwrap();
+        assert_eq!(records[0].customer_name, "고객");
+        assert!(list_unpaid_records(&db).await.unwrap().is_empty());
+    }
+
+    /// 취소한 접수와 결제는 매출·입금에서 빠짐
+    #[tokio::test]
+    async fn cancelled_order_is_excluded() {
+        let db = setup_test_db().await.unwrap();
+        let cid = customers::create(&db, "고객".into(), None, None)
+            .await
+            .unwrap()
+            .id;
+        let keep = item(&db, cid, 4000, kst_at(24, 9, 0)).await;
+        let wrong = item(&db, cid, 7000, kst_at(24, 9, 30)).await;
+        payments::create(
+            &db,
+            wrong,
+            7000,
+            Some("card".into()),
+            Some(kst_at(24, 9, 31)),
+        )
+        .await
+        .unwrap();
+
+        crate::services::orders::cancel(&db, wrong).await.unwrap();
+
+        let s24 = get_revenue_summary(&db, day(24), day(24), &kst())
+            .await
+            .unwrap();
+        assert_eq!(s24.total_sales, 4000);
+        assert_eq!(s24.actual_income, 0);
+        let sales = list_sales_records(&db, day(24), day(24), &kst())
+            .await
+            .unwrap();
+        assert_eq!(
+            sales.iter().map(|r| r.work_item_id).collect::<Vec<_>>(),
+            vec![keep]
+        );
+        assert!(
+            list_payment_records(&db, day(24), day(24), &kst())
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(list_weekly_chart(&db, &kst()).await.unwrap().len(), 7);
     }
 }
