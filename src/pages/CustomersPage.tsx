@@ -18,7 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
-import type { Customer, WorkItemFull, WorkItemDetail, WorkItemStatus, ReceiveOrder, UpdateWorkItem, DetailInput, CreateCustomer, UpdateCustomer } from "@/types";
+import type { Customer, WorkItemFull, WorkItemDetail, WorkItemStatus, ReceiveOrder, AmendOrder, CreateCustomer, UpdateCustomer } from "@/types";
 import { useCustomerStore } from "@/stores/customerStore";
 import { useWorkItemStore } from "@/stores/workItemStore";
 import { useDialogStore } from "@/stores/dialogStore";
@@ -788,14 +788,12 @@ export function CustomersPage() {
     setWiCardOpen(true);
   };
 
-  const handleWiCardSave = async (data: ReceiveOrder | UpdateWorkItem, details?: DetailInput[], status?: WorkItemStatus) => {
+  const handleWiCardSave = async (data: ReceiveOrder | AmendOrder) => {
+    // 새 접수와 수정 모두 한 번에 저장 (중간에 실패해도 반쯤 저장되지 않음)
     if (wiCardMode === "create") {
-      // 상태·수령 일시까지 한 번에 저장
       await useWorkItemStore.getState().receive(data as ReceiveOrder);
     } else if (editingWorkItem) {
-      if (status) await useWorkItemStore.getState().updateStatus(editingWorkItem.id, status);
-      await useWorkItemStore.getState().update(editingWorkItem.id, data as UpdateWorkItem);
-      if (details) await workItemApi.replaceDetails(editingWorkItem.id, details);
+      await useWorkItemStore.getState().amend(editingWorkItem.id, data as AmendOrder);
       setDetailsRefreshId({ id: editingWorkItem.id, nonce: Date.now() });
     }
     loadUnpaid();

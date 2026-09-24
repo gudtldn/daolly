@@ -2,11 +2,9 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   WorkItem,
   WorkItemFull,
-  WorkItemDetail,
   WorkItemStatus,
-  DetailInput,
   ReceiveOrder,
-  UpdateWorkItem,
+  AmendOrder,
 } from "@/types";
 
 export const workItemApi = {
@@ -26,19 +24,13 @@ export const workItemApi = {
     return invoke("receive_order", { order });
   },
 
-  update(id: number, data: UpdateWorkItem): Promise<WorkItem> {
-    return invoke("update_work_item", { id, data });
+  /** 상태·내용·품목을 한 번에 수정 */
+  amend(id: number, amendment: AmendOrder): Promise<WorkItemFull> {
+    return invoke("amend_order", { id, amendment });
   },
 
   updateStatus(id: number, status: WorkItemStatus): Promise<WorkItem> {
     return invoke("update_work_item_status", { id, status });
-  },
-
-  replaceDetails(
-    workItemId: number,
-    details: DetailInput[],
-  ): Promise<WorkItemDetail[]> {
-    return invoke("replace_work_item_details", { workItemId, details });
   },
 
   delete(id: number): Promise<void> {

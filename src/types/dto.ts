@@ -73,12 +73,19 @@ export interface ReceiveOrder {
   pickedUpAt?: string | null;
 }
 
-export interface UpdateWorkItem {
+/** 접수 수정: 상태·내용·품목을 한 번에 저장. 보내지 않은 값은 바꾸지 않음 */
+export interface AmendOrder {
   description?: string | null;
-  price?: number | null;
+  /** "" = 메모 지우기 */
   note?: string | null;
   receivedAt?: string | null;
+  /** 상태가 수령일 때의 수령 일시 */
   pickedUpAt?: string | null;
+  /** 품목 전체 (보내면 모두 바꿈) */
+  lines?: DetailInput[] | null;
+  /** 가격을 직접 정한 경우. 없으면 품목 합계 */
+  priceOverride?: number | null;
+  status?: WorkItemStatus | null;
 }
 
 export interface CreatePayment {

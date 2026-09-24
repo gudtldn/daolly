@@ -11,15 +11,12 @@ use crate::db::entities::{
     customer, payment, work_item, work_item::WorkItemStatus, work_item_detail,
 };
 use crate::error::AppError;
-use crate::services::payments;
+use crate::services::payments::{self, won};
 use crate::services::work_items::{self, DetailInput};
 use crate::timestamp;
 
 /// 한 접수의 최대 금액 (자릿수를 잘못 입력한 경우 방지)
 pub const MAX_AMOUNT: i64 = 100_000_000;
-
-/// 접수와 함께 받을 수 있는 결제 수단 (외상은 결제를 기록하지 않음)
-const PAYMENT_METHODS: [&str; 3] = ["card", "cash", "transfer"];
 
 /// 접수 요청
 #[derive(Clone, Deserialize)]
@@ -105,7 +102,7 @@ where
         return Err(invalid("수령 일시는 '수령' 상태일 때만 정할 수 있습니다."));
     }
     let payment = match &order.payment {
-        Some(p) => prepayment_amount(p, price)?.map(|amount| (p.method.clone(), amount)),
+        Some(p) => prepayment(p, price)?,
         None => None,
     };
     if customer::Entity::find_by_id(order.customer_id)
@@ -152,12 +149,159 @@ where
 
     work_items::insert_details(&txn, inserted.id, order.lines).await?;
     if let Some((method, amount)) = payment {
-        payments::insert(&txn, inserted.id, amount, Some(method), None).await?;
+        payments::insert(&txn, inserted.id, amount, method, None).await?;
     }
 
     let receipt = load_receipt(&txn, inserted.id).await?;
     txn.commit().await?;
     Ok(receipt)
+}
+
+/// 접수 수정 요청 (고객관리의 수정 화면). None인 값은 바꾸지 않습니다.
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AmendOrder {
+    pub description: Option<String>,
+    /// 빈 문자열이면 메모 지우기
+    pub note: Option<String>,
+    /// 접수 일시 (저장 형식)
+    pub received_at: Option<String>,
+    /// 수령 일시 (저장 형식). 상태가 수령일 때만 씀
+    pub picked_up_at: Option<String>,
+    /// 품목 전체. 보내면 기존 품목을 모두 바꿈
+    pub lines: Option<Vec<DetailInput>>,
+    /// 가격을 직접 정한 경우. None이면 품목 합계 (품목도 보내지 않으면 그대로)
+    pub price_override: Option<i64>,
+    pub status: Option<WorkItemStatus>,
+}
+
+/// 접수의 상태·내용·품목을 한 번에 고칩니다. (예전에는 세 번 나눠 저장해 중간에 실패하면
+/// 가격과 품목이 어긋났음) 이미 받은 금액보다 낮은 가격으로는 고칠 수 없습니다.
+pub async fn amend<C>(db: &C, id: i32, amendment: AmendOrder) -> Result<Receipt, AppError>
+where
+    C: ConnectionTrait + TransactionTrait,
+{
+    let txn = db.begin().await?;
+    let current = work_item::Entity::find_by_id(id)
+        .one(&txn)
+        .await?
+        .ok_or(AppError::NotFound("접수"))?;
+
+    let price = match (&amendment.lines, amendment.price_override) {
+        (lines, Some(price)) => {
+            if let Some(lines) = lines {
+                lines_total(lines)?;
+            }
+            check_amount(price)?;
+            price
+        }
+        (Some(lines), None) if lines.is_empty() => {
+            return Err(invalid(
+                "품목을 하나 이상 넣거나 가격을 직접 입력해 주세요.",
+            ));
+        }
+        (Some(lines), None) => lines_total(lines)?,
+        (None, None) => current.price,
+    };
+    if price < current.paid_amount {
+        return Err(invalid(format!(
+            "이미 받은 금액({})보다 낮게 고칠 수 없습니다. 결제 관리에서 결제를 먼저 고쳐 주세요.",
+            won(current.paid_amount)
+        )));
+    }
+
+    let now = timestamp::now();
+    let mut active: work_item::ActiveModel = current.clone().into();
+    if let Some(description) = amendment.description {
+        let description = description.trim();
+        if description.is_empty() {
+            return Err(invalid("작업 내용을 입력해 주세요."));
+        }
+        active.description = Set(Some(description.to_owned()));
+    }
+    if let Some(note) = amendment.note {
+        let note = note.trim();
+        active.note = Set((!note.is_empty()).then(|| note.to_owned()));
+    }
+    if let Some(received_at) = amendment.received_at {
+        active.received_at = Set(received_at);
+    }
+    let status = amendment.status.unwrap_or_else(|| current.status.clone());
+    apply_status(&mut active, &current, status, amendment.picked_up_at, &now)?;
+    active.price = Set(price);
+    active.last_modified_at = Set(now);
+    active.update(&txn).await?;
+
+    if let Some(lines) = amendment.lines {
+        work_item_detail::Entity::delete_many()
+            .filter(work_item_detail::Column::WorkItemId.eq(id))
+            .exec(&txn)
+            .await?;
+        work_items::insert_details(&txn, id, lines).await?;
+    }
+
+    let receipt = load_receipt(&txn, id).await?;
+    txn.commit().await?;
+    Ok(receipt)
+}
+
+/// 상태만 바꿉니다. (목록에서 바로 완료·수령 처리)
+pub async fn change_status<C: ConnectionTrait>(
+    db: &C,
+    id: i32,
+    status: WorkItemStatus,
+) -> Result<work_item::Model, AppError> {
+    let current = work_item::Entity::find_by_id(id)
+        .one(db)
+        .await?
+        .ok_or(AppError::NotFound("접수"))?;
+    if current.status == status {
+        return Ok(current);
+    }
+    let now = timestamp::now();
+    let mut active: work_item::ActiveModel = current.clone().into();
+    apply_status(&mut active, &current, status, None, &now)?;
+    active.last_modified_at = Set(now);
+    Ok(active.update(db).await?)
+}
+
+/// 상태를 바꾸고 완료·수령 일시를 상태에 맞춥니다.
+/// - 접수: 완료·수령 일시 없음
+/// - 완료: 완료 일시 (이미 있으면 유지), 수령 일시 없음
+/// - 수령: 수령 일시 (지정한 값 → 기존 값 → 지금 순)
+fn apply_status(
+    active: &mut work_item::ActiveModel,
+    current: &work_item::Model,
+    status: WorkItemStatus,
+    picked_up_at: Option<String>,
+    now: &str,
+) -> Result<(), AppError> {
+    let picked_up_at = picked_up_at.filter(|s| !s.is_empty());
+    if picked_up_at.is_some() && status != WorkItemStatus::PickedUp {
+        return Err(invalid("수령 일시는 '수령' 상태일 때만 정할 수 있습니다."));
+    }
+    match status {
+        WorkItemStatus::Received => {
+            active.completed_at = Set(None);
+            active.picked_up_at = Set(None);
+        }
+        WorkItemStatus::Completed => {
+            let completed_at = current
+                .completed_at
+                .clone()
+                .unwrap_or_else(|| now.to_owned());
+            active.completed_at = Set(Some(completed_at));
+            active.picked_up_at = Set(None);
+        }
+        WorkItemStatus::PickedUp => {
+            let at = picked_up_at
+                .or_else(|| current.picked_up_at.clone())
+                .unwrap_or_else(|| now.to_owned());
+            active.picked_up_at = Set(Some(at));
+        }
+    }
+    active.status = Set(status);
+    Ok(())
 }
 
 /// 품목을 검증하고 합계를 계산합니다.
@@ -187,22 +331,19 @@ pub fn lines_total(lines: &[DetailInput]) -> Result<i64, AppError> {
     Ok(total)
 }
 
-/// 받을 금액. 전액을 받는데 청구 금액이 0원이면 기록할 결제가 없으므로 None
-fn prepayment_amount(payment: &Prepayment, price: i64) -> Result<Option<i64>, AppError> {
-    if !PAYMENT_METHODS.contains(&payment.method.as_str()) {
-        return Err(invalid("결제 수단을 다시 선택해 주세요."));
-    }
-    match payment.amount {
-        None if price == 0 => Ok(None),
-        None => Ok(Some(price)),
-        Some(amount) if amount <= 0 => Err(invalid("받은 금액은 0원보다 커야 합니다.")),
-        Some(amount) if amount > price => Err(invalid(format!(
-            "받은 금액({})이 청구 금액({})보다 많습니다.",
-            won(amount),
-            won(price)
-        ))),
-        Some(amount) => Ok(Some(amount)),
-    }
+/// 선결제의 수단과 금액. 전액을 받는데 청구 금액이 0원이면 기록할 결제가 없으므로 None
+fn prepayment(payment: &Prepayment, price: i64) -> Result<Option<(&'static str, i64)>, AppError> {
+    let method = payments::normalize_method(Some(&payment.method))?;
+    let amount = match payment.amount {
+        None if price == 0 => return Ok(None),
+        None => price,
+        Some(amount) if amount <= 0 => {
+            return Err(invalid("받은 금액은 0원보다 커야 합니다."));
+        }
+        Some(amount) => amount,
+    };
+    payments::check_not_overpaid(price, amount)?;
+    Ok(Some((method, amount)))
 }
 
 async fn load_receipt<C: ConnectionTrait>(conn: &C, id: i32) -> Result<Receipt, AppError> {
@@ -230,20 +371,6 @@ fn too_large() -> AppError {
 
 fn invalid(message: impl Into<String>) -> AppError {
     AppError::Validation(message.into())
-}
-
-/// 12000 → "12,000원"
-fn won(amount: i64) -> String {
-    let digits = amount.unsigned_abs().to_string();
-    let mut out = String::new();
-    for (i, c) in digits.chars().enumerate() {
-        if i > 0 && (digits.len() - i).is_multiple_of(3) {
-            out.push(',');
-        }
-        out.push(c);
-    }
-    let sign = if amount < 0 { "-" } else { "" };
-    format!("{sign}{out}원")
 }
 
 #[cfg(test)]
@@ -388,7 +515,7 @@ mod tests {
         let err = receive(&db, over).await.unwrap_err();
         assert_eq!(
             err.to_string(),
-            "받은 금액(30,000원)이 청구 금액(3,000원)보다 많습니다."
+            "받은 금액이 청구 금액보다 많아집니다. (청구 3,000원, 받은 금액 30,000원)"
         );
 
         let mut credit = order(cid, lines.clone());
@@ -456,10 +583,138 @@ mod tests {
         assert_eq!(order.status, Some(WorkItemStatus::PickedUp));
     }
 
-    #[test]
-    fn formats_won() {
-        assert_eq!(won(0), "0원");
-        assert_eq!(won(3000), "3,000원");
-        assert_eq!(won(100_000_000), "100,000,000원");
+    async fn received(db: &DatabaseConnection, cid: i32, paid: bool) -> work_item::Model {
+        let mut o = order(cid, vec![line("와이셔츠", 3000, 2), line("바지", 4000, 1)]);
+        o.lines[0].price_item_id = Some(1);
+        if paid {
+            o.payment = paid_by("cash");
+        }
+        receive(db, o).await.unwrap().0
+    }
+
+    fn amendment() -> AmendOrder {
+        AmendOrder {
+            description: None,
+            note: None,
+            received_at: None,
+            picked_up_at: None,
+            lines: None,
+            price_override: None,
+            status: None,
+        }
+    }
+
+    /// 상태·내용·품목을 한 번에 저장하고, 품목의 단가표 연결(price_item_id)을 유지
+    #[tokio::test]
+    async fn amend_saves_all_at_once() {
+        let (db, cid) = setup().await;
+        let wi = received(&db, cid, false).await;
+
+        let mut a = amendment();
+        a.note = Some("얼룩 주의".into());
+        a.status = Some(WorkItemStatus::Completed);
+        let mut shirt = line("와이셔츠", 3000, 3);
+        shirt.price_item_id = Some(1);
+        a.lines = Some(vec![shirt]);
+
+        let (updated, details, _) = amend(&db, wi.id, a).await.unwrap();
+        assert_eq!(updated.price, 9000);
+        assert_eq!(updated.note.as_deref(), Some("얼룩 주의"));
+        assert_eq!(updated.status, WorkItemStatus::Completed);
+        assert!(updated.completed_at.is_some());
+        assert_eq!(details.len(), 1);
+        assert_eq!(details[0].price_item_id, Some(1));
+    }
+
+    /// V6: 이미 받은 금액보다 낮은 가격으로는 고칠 수 없음 (아무것도 바뀌지 않음)
+    #[tokio::test]
+    async fn amend_rejects_price_below_paid() {
+        let (db, cid) = setup().await;
+        let wi = received(&db, cid, true).await; // 10,000원 전액 결제
+
+        let mut a = amendment();
+        a.lines = Some(vec![line("와이셔츠", 3000, 1)]);
+        a.note = Some("바뀌면 안 됨".into());
+        let err = amend(&db, wi.id, a).await.unwrap_err();
+        assert!(
+            err.to_string()
+                .starts_with("이미 받은 금액(10,000원)보다 낮게")
+        );
+
+        let mut override_price = amendment();
+        override_price.price_override = Some(9000);
+        assert!(amend(&db, wi.id, override_price).await.is_err());
+
+        let (same, details, _) = work_items::get_full(&db, wi.id).await.unwrap().unwrap();
+        assert_eq!(same.price, 10000);
+        assert_eq!(same.note, None);
+        assert_eq!(details.len(), 2);
+    }
+
+    /// 품목 저장이 실패하면 가격·메모도 바뀌지 않음 (예전에는 따로 저장해 가격과 품목이 어긋남)
+    #[tokio::test]
+    async fn failed_amend_changes_nothing() {
+        let (db, cid) = setup().await;
+        let wi = received(&db, cid, false).await;
+        db.execute_unprepared(
+            "CREATE TRIGGER fail_detail BEFORE INSERT ON work_item_details
+             BEGIN SELECT RAISE(ABORT, 'disk full'); END",
+        )
+        .await
+        .unwrap();
+
+        let mut a = amendment();
+        a.lines = Some(vec![line("코트", 15000, 1)]);
+        a.note = Some("메모".into());
+        assert!(amend(&db, wi.id, a).await.is_err());
+
+        let (same, details, _) = work_items::get_full(&db, wi.id).await.unwrap().unwrap();
+        assert_eq!(same.price, 10000);
+        assert_eq!(same.note, None);
+        assert_eq!(details.len(), 2);
+    }
+
+    /// 수령 일시는 '수령' 상태일 때만 있고, 상태를 되돌리면 지워짐
+    #[tokio::test]
+    async fn status_rules() {
+        let (db, cid) = setup().await;
+        let wi = received(&db, cid, false).await;
+
+        let mut a = amendment();
+        a.status = Some(WorkItemStatus::PickedUp);
+        a.picked_up_at = Some("2026-09-24T09:00:00.000Z".into());
+        let (picked, _, _) = amend(&db, wi.id, a).await.unwrap();
+        assert_eq!(
+            picked.picked_up_at.as_deref(),
+            Some("2026-09-24T09:00:00.000Z")
+        );
+
+        // 다른 내용만 고치면 수령 일시 유지
+        let mut note_only = amendment();
+        note_only.note = Some("메모".into());
+        let (kept, _, _) = amend(&db, wi.id, note_only).await.unwrap();
+        assert_eq!(kept.picked_up_at, picked.picked_up_at);
+
+        let back = change_status(&db, wi.id, WorkItemStatus::Received)
+            .await
+            .unwrap();
+        assert_eq!(back.completed_at, None);
+        assert_eq!(back.picked_up_at, None);
+
+        let mut wrong = amendment();
+        wrong.status = Some(WorkItemStatus::Completed);
+        wrong.picked_up_at = Some("2026-09-24T09:00:00.000Z".into());
+        assert_eq!(
+            amend(&db, wi.id, wrong).await.unwrap_err().code(),
+            ErrorCode::Validation
+        );
+
+        let done = change_status(&db, wi.id, WorkItemStatus::Completed)
+            .await
+            .unwrap();
+        let again = change_status(&db, wi.id, WorkItemStatus::Completed)
+            .await
+            .unwrap();
+        assert_eq!(again.completed_at, done.completed_at);
     }
 }

@@ -150,13 +150,12 @@ pub fn run() {
             // work_items
             commands::work_items::list_work_items,
             commands::work_items::get_work_item,
-            commands::work_items::update_work_item,
             commands::work_items::update_work_item_status,
-            commands::work_items::replace_work_item_details,
             commands::work_items::delete_work_item,
             commands::work_items::get_all_unpaid_amounts,
             // orders
             commands::orders::receive_order,
+            commands::orders::amend_order,
             // price_settings
             commands::price_settings::export_price_settings_to_file,
             commands::price_settings::import_price_settings_from_file,
@@ -165,6 +164,7 @@ pub fn run() {
             commands::payments::create_payment,
             commands::payments::update_payment,
             commands::payments::delete_payment,
+            commands::payments::list_credit_payments,
             // database
             commands::database::open_db_folder,
             commands::database::get_db_path,

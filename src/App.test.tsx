@@ -33,10 +33,9 @@ vi.mock("@/bindings", () => ({
   workItemApi: {
     list: vi.fn().mockResolvedValue([]),
     get: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
+    receive: vi.fn(),
+    amend: vi.fn(),
     updateStatus: vi.fn(),
-    replaceDetails: vi.fn(),
     delete: vi.fn(),
     getAllUnpaidAmounts: vi.fn().mockResolvedValue({}),
   },

@@ -123,6 +123,17 @@ export interface RevenueSummary {
   backPaymentIncome: number;
 }
 
+/** 예전 버전에서 결제 수단을 '외상'으로 등록한 결제 (데이터 점검용) */
+export interface CreditPayment {
+  paymentId: number;
+  workItemId: number;
+  customerId: number;
+  customerName: string;
+  description: string | null;
+  amount: number;
+  paidAt: string;
+}
+
 export interface PaymentRecord {
   paymentId: number;
   workItemId: number;

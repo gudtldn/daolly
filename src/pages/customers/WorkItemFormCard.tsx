@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { X, Plus, Trash2, Pencil, Check } from "lucide-react";
-import type { WorkItemFull, WorkItemStatus, ReceiveOrder, UpdateWorkItem, DetailInput, Payment } from "@/types";
+import type { WorkItemFull, WorkItemStatus, ReceiveOrder, AmendOrder, DetailInput, Payment } from "@/types";
 import { paymentApi } from "@/bindings";
 import { errorMessage } from "@/utils/errors";
 import { CurrencyInput } from "@/components/CurrencyInput";
@@ -55,8 +55,8 @@ interface Props {
   workItem?: WorkItemFull | null;
   /** edit 모드에서 초기 탭 선택 */
   initialTab?: Tab;
-  /** create: 접수 요청 하나 / edit: 수정 내용, 품목, 바뀐 상태 */
-  onSave: (data: ReceiveOrder | UpdateWorkItem, details?: DetailInput[], status?: WorkItemStatus) => Promise<void>;
+  /** create: 새 접수 / edit: 상태·내용·품목 수정 (각각 한 번에 저장) */
+  onSave: (data: ReceiveOrder | AmendOrder) => Promise<void>;
   onClose: () => void;
   /** 결제 변경 후 외부 상태 갱신 */
   onPaymentChange?: () => void;
@@ -104,7 +104,6 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
 
   // 자동 합산 가격
   const autoPrice = details.reduce((sum, d) => sum + d.unitPrice * d.quantity, 0);
-  const effectivePrice = manualPrice ? priceInput : autoPrice;
 
   // 열릴 때 폼 초기화 및 포커스 저장
   useEffect(() => {
@@ -132,6 +131,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
         workItem.details.length > 0
           ? workItem.details.map((d) => ({
               _key: d.id + Math.random(),
+              priceItemId: d.priceItemId,
               itemName: d.itemName,
               unitPrice: d.unitPrice,
               quantity: d.quantity,
@@ -271,7 +271,11 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
   // 품목 행 변경
   const updateDetail = (key: number, field: keyof DetailInput, value: string | number) => {
     setDetails((prev) =>
-      prev.map((d) => (d._key === key ? { ...d, [field]: value } : d))
+      prev.map((d) => {
+        if (d._key !== key) return d;
+        // 품목명을 바꾸면 더 이상 단가표의 그 품목이 아니므로 연결을 끊음
+        return field === "itemName" ? { ...d, itemName: String(value), priceItemId: null } : { ...d, [field]: value };
+      })
     );
   };
 
@@ -311,6 +315,8 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
     setSaving(true);
     try {
       const detailInputs: DetailInput[] = validDetails.map((d) => ({
+        // 단가표 품목 연결 유지 (예전에는 수정할 때마다 빠졌음)
+        priceItemId: d.priceItemId ?? null,
         itemName: d.itemName.trim(),
         unitPrice: d.unitPrice,
         quantity: d.quantity,
@@ -333,19 +339,19 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
         };
         await onSave(order);
       } else {
-        const statusChanged = workItem && status !== workItem.status ? status : undefined;
-        await onSave(
-          {
-            description: trimmedDesc,
-            price: effectivePrice,
-            note: note.trim(),
-            // null = 변경 없음, "" = 수령 일시 지우기
-            receivedAt: changedDate(receivedAt, initialDates.current.receivedAt) || null,
-            pickedUpAt: changedDate(pickedUpAt, initialDates.current.pickedUpAt),
-          } as UpdateWorkItem,
-          detailInputs,
-          statusChanged,
-        );
+        const amendment: AmendOrder = {
+          description: trimmedDesc,
+          note: note.trim(),
+          // null = 변경 없음
+          receivedAt: changedDate(receivedAt, initialDates.current.receivedAt) || null,
+          // 수령 일시는 '수령' 상태일 때만 있음 (상태를 되돌리면 서버가 지움)
+          pickedUpAt: status === "PickedUp" ? changedDate(pickedUpAt, initialDates.current.pickedUpAt) || null : null,
+          lines: detailInputs,
+          // 직접 입력하지 않으면 서버가 품목 합계로 계산
+          priceOverride: manualPrice ? priceInput : null,
+          status: workItem && status !== workItem.status ? status : null,
+        };
+        await onSave(amendment);
       }
       onClose();
     } catch (e: unknown) {
@@ -669,7 +675,6 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                                     <option value="cash">현금</option>
                                     <option value="card">카드</option>
                                     <option value="transfer">계좌이체</option>
-                                    <option value="credit">외상</option>
                                   </select>
                                 </td>
                                 <td className="px-1 py-1.5">
@@ -759,7 +764,6 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                           <option value="cash">현금</option>
                           <option value="card">카드</option>
                           <option value="transfer">계좌이체</option>
-                          <option value="credit">외상</option>
                         </select>
                       </div>
                       <button

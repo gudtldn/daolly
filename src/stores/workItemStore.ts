@@ -4,7 +4,7 @@ import type {
   WorkItemFull,
   WorkItemStatus,
   ReceiveOrder,
-  UpdateWorkItem,
+  AmendOrder,
 } from "@/types";
 import { workItemApi } from "@/bindings";
 
@@ -22,7 +22,7 @@ interface WorkItemActions {
   select: (id: number) => Promise<void>;
   clearSelection: () => void;
   receive: (order: ReceiveOrder) => Promise<WorkItemFull>;
-  update: (id: number, data: UpdateWorkItem) => Promise<WorkItem>;
+  amend: (id: number, amendment: AmendOrder) => Promise<WorkItemFull>;
   updateStatus: (id: number, status: WorkItemStatus) => Promise<WorkItem>;
   delete: (id: number) => Promise<void>;
 }
@@ -70,15 +70,14 @@ export const useWorkItemStore = create<WorkItemStore>((set, get) => ({
     return receipt;
   },
 
-  update: async (id, data) => {
-    const updated = await workItemApi.update(id, data);
+  amend: async (id, amendment) => {
+    const full = await workItemApi.amend(id, amendment);
+    const { details: _details, payments: _payments, ...updated } = full;
     set((s) => ({
       workItems: s.workItems.map((w) => (w.id === id ? updated : w)),
-      selectedItem: s.selectedItem?.id === id
-        ? { ...s.selectedItem, ...updated }
-        : s.selectedItem,
+      selectedItem: s.selectedItem?.id === id ? full : s.selectedItem,
     }));
-    return updated;
+    return full;
   },
 
   updateStatus: async (id, status) => {

@@ -3,7 +3,6 @@ use serde::Deserialize;
 use std::collections::HashMap;
 
 use crate::db::entities::{payment, work_item, work_item::WorkItemStatus, work_item_detail};
-use crate::timestamp;
 
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -111,7 +110,7 @@ pub async fn create(
         .unwrap_or_else(|| build_description(&details));
     let note = note.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty());
 
-    let now = timestamp::now();
+    let now = crate::timestamp::now();
     let recv = received_at.unwrap_or_else(|| now.clone());
     let tx = db.begin().await?;
 
@@ -167,146 +166,24 @@ pub(crate) async fn insert_details<C: ConnectionTrait>(
     Ok(())
 }
 
-pub async fn update(
-    db: &DatabaseConnection,
-    existing: work_item::Model,
-    description: Option<String>,
-    price: Option<i64>,
-    note: Option<String>,
-    received_at: Option<String>,
-    picked_up_at: Option<String>,
-) -> Result<work_item::Model, DbErr> {
-    let mut active: work_item::ActiveModel = existing.into();
-
-    if let Some(desc) = description {
-        let desc = desc.trim().to_owned();
-        active.description = Set(Some(desc));
-    }
-    if let Some(price) = price {
-        active.price = Set(price);
-    }
-    if let Some(note) = note {
-        let trimmed = note.trim().to_owned();
-        active.note = Set(if trimmed.is_empty() {
-            None
-        } else {
-            Some(trimmed)
-        });
-    }
-    if let Some(recv) = received_at {
-        active.received_at = Set(recv);
-    }
-    if let Some(pick) = picked_up_at {
-        active.picked_up_at = Set(if pick.is_empty() { None } else { Some(pick) });
-    }
-    active.last_modified_at = Set(timestamp::now());
-
-    active.update(db).await
-}
-
-pub async fn update_status(
-    db: &DatabaseConnection,
-    existing: work_item::Model,
-    status: WorkItemStatus,
-) -> Result<work_item::Model, DbErr> {
-    let now = timestamp::now();
-    let mut active: work_item::ActiveModel = existing.into();
-    active.last_modified_at = Set(now.clone());
-
-    match status {
-        WorkItemStatus::Received => {
-            active.completed_at = Set(None);
-            active.picked_up_at = Set(None);
-        }
-        WorkItemStatus::Completed => {
-            active.completed_at = Set(Some(now));
-            active.picked_up_at = Set(None);
-        }
-        WorkItemStatus::PickedUp => {
-            active.picked_up_at = Set(Some(now));
-        }
-    }
-    active.status = Set(status);
-
-    active.update(db).await
-}
-
-/// 기존 세부항목을 삭제하고 새 항목으로 교체합니다. (delete-all + insert 트랜잭션)
-pub async fn replace_details(
-    db: &DatabaseConnection,
-    work_item_id: i32,
-    details: Vec<DetailInput>,
-) -> Result<Vec<work_item_detail::Model>, DbErr> {
-    let tx = db.begin().await?;
-
-    work_item_detail::Entity::delete_many()
-        .filter(work_item_detail::Column::WorkItemId.eq(work_item_id))
-        .exec(&tx)
-        .await?;
-
-    insert_details(&tx, work_item_id, details).await?;
-
-    let result = work_item_detail::Entity::find()
-        .filter(work_item_detail::Column::WorkItemId.eq(work_item_id))
-        .all(&tx)
-        .await?;
-
-    tx.commit().await?;
-    Ok(result)
-}
-
 pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<u64, DbErr> {
     let res = work_item::Entity::delete_by_id(id).exec(db).await?;
     Ok(res.rows_affected)
 }
 
-/// 모든 고객에 대해 미수금(price - paid_amount) 합계를 반환합니다.
+/// 고객별 미수금 합계를 반환합니다.
+/// 잔액이 남은 접수만 더합니다. (더 받은 접수의 음수 잔액이 다른 접수의 미수금을 가리지 않도록)
 pub async fn get_all_unpaid_amounts(db: &DatabaseConnection) -> Result<HashMap<i32, i64>, DbErr> {
-    use sea_orm::{
-        FromQueryResult,
-        prelude::Expr,
-        sea_query::{ExprTrait, Func, SimpleExpr},
-    };
-
-    #[derive(FromQueryResult)]
-    struct UnpaidRow {
-        customer_id: i32,
-        unpaid: Option<i64>,
-    }
-
-    let rows = work_item::Entity::find()
-        .select_only()
-        .column(work_item::Column::CustomerId)
-        .column_as(
-            SimpleExpr::from(Func::sum(
-                Expr::col(work_item::Column::Price).sub(Expr::col(work_item::Column::PaidAmount)),
-            )),
-            "unpaid",
-        )
-        .group_by(work_item::Column::CustomerId)
-        .having(
-            SimpleExpr::from(Func::sum(
-                Expr::col(work_item::Column::Price).sub(Expr::col(work_item::Column::PaidAmount)),
-            ))
-            .gt(0),
-        )
-        .into_model::<UnpaidRow>()
-        .all(db)
+    let rows = db
+        .query_all(Statement::from_string(
+            DbBackend::Sqlite,
+            "SELECT customer_id, SUM(price - paid_amount) FROM work_items
+             WHERE paid_amount < price GROUP BY customer_id",
+        ))
         .await?;
-
-    let map = rows
-        .into_iter()
-        .filter_map(|r| {
-            let unpaid = r.unpaid.unwrap_or(0);
-            if unpaid > 0 {
-                Some((r.customer_id, unpaid))
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    Ok(map)
+    rows.into_iter()
+        .map(|row| Ok((row.try_get_by_index(0)?, row.try_get_by_index(1)?)))
+        .collect()
 }
 
 #[cfg(test)]
@@ -366,74 +243,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn update_status_sets_completed_at() {
-        let db = setup_test_db().await.unwrap();
-        let cid = create_test_customer(&db).await;
-        let wi = create(
-            &db,
-            cid,
-            Some("테스트".to_owned()),
-            1000,
-            None,
-            None,
-            vec![],
-        )
-        .await
-        .unwrap();
-
-        let updated = update_status(&db, wi, WorkItemStatus::Completed)
-            .await
-            .unwrap();
-        assert_eq!(updated.status, WorkItemStatus::Completed);
-        assert!(updated.completed_at.is_some());
-    }
-
-    #[tokio::test]
-    async fn replace_details_replaces_all() {
-        let db = setup_test_db().await.unwrap();
-        let cid = create_test_customer(&db).await;
-        let details = vec![DetailInput {
-            price_item_id: None,
-            item_name: "A".into(),
-            unit_price: 1000,
-            quantity: 1,
-            options_memo: None,
-        }];
-        let wi = create(
-            &db,
-            cid,
-            Some("테스트".to_owned()),
-            1000,
-            None,
-            None,
-            details,
-        )
-        .await
-        .unwrap();
-
-        // 기존 1개 -> 새로 2개로 교체
-        let new_details = vec![
-            DetailInput {
-                price_item_id: None,
-                item_name: "B".into(),
-                unit_price: 2000,
-                quantity: 1,
-                options_memo: None,
-            },
-            DetailInput {
-                price_item_id: None,
-                item_name: "C".into(),
-                unit_price: 3000,
-                quantity: 1,
-                options_memo: None,
-            },
-        ];
-        let replaced = replace_details(&db, wi.id, new_details).await.unwrap();
-        assert_eq!(replaced.len(), 2);
-        assert_eq!(replaced[0].item_name, "B");
-    }
-
-    #[tokio::test]
     async fn list_filters_by_status() {
         let db = setup_test_db().await.unwrap();
         let cid = create_test_customer(&db).await;
@@ -443,9 +252,9 @@ mod tests {
         create(&db, cid, Some("접수2".to_owned()), 2000, None, None, vec![])
             .await
             .unwrap();
-        update_status(&db, wi, WorkItemStatus::Completed)
-            .await
-            .unwrap();
+        let mut done: work_item::ActiveModel = wi.into();
+        done.status = Set(WorkItemStatus::Completed);
+        done.update(&db).await.unwrap();
 
         let received = list(&db, None, Some(WorkItemStatus::Received))
             .await
@@ -483,5 +292,25 @@ mod tests {
         assert_eq!(unpaid.len(), 1);
         assert_eq!(unpaid.get(&cid1), Some(&1000));
         assert_eq!(unpaid.get(&cid2), None);
+    }
+
+    /// V6: 더 받은 접수(음수 잔액)가 있어도 다른 접수의 미수금은 그대로 보임
+    #[tokio::test]
+    async fn overpaid_item_does_not_hide_other_debt() {
+        let db = setup_test_db().await.unwrap();
+        let cid = create_test_customer(&db).await;
+        // 예전 버전에서 가격을 받은 금액보다 낮게 고친 접수 (잔액 -5000)
+        let over = create(&db, cid, Some("과납".to_owned()), 5000, None, None, vec![])
+            .await
+            .unwrap();
+        let mut over: work_item::ActiveModel = over.into();
+        over.paid_amount = Set(10000);
+        over.update(&db).await.unwrap();
+        create(&db, cid, Some("미수".to_owned()), 5000, None, None, vec![])
+            .await
+            .unwrap();
+
+        let unpaid = get_all_unpaid_amounts(&db).await.unwrap();
+        assert_eq!(unpaid.get(&cid), Some(&5000));
     }
 }

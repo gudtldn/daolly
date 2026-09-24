@@ -7,7 +7,7 @@ vi.mock("@/bindings", () => ({
     list: vi.fn(),
     get: vi.fn(),
     receive: vi.fn(),
-    update: vi.fn(),
+    amend: vi.fn(),
     updateStatus: vi.fn(),
     delete: vi.fn(),
   },
@@ -18,7 +18,7 @@ import { workItemApi } from "@/bindings";
 const mockList = vi.mocked(workItemApi.list);
 const mockGet = vi.mocked(workItemApi.get);
 const mockReceive = vi.mocked(workItemApi.receive);
-const mockUpdate = vi.mocked(workItemApi.update);
+const mockAmend = vi.mocked(workItemApi.amend);
 const mockUpdateStatus = vi.mocked(workItemApi.updateStatus);
 const mockDelete = vi.mocked(workItemApi.delete);
 
@@ -111,15 +111,15 @@ describe("workItemStore", () => {
     });
   });
 
-  describe("update", () => {
+  describe("amend", () => {
     it("수정 후 목록 + selectedItem 갱신", async () => {
-      const updated: WorkItem = { ...wi1, description: "와이셔츠 세탁", price: 5000 };
-      mockUpdate.mockResolvedValue(updated);
+      const updated: WorkItemFull = { ...wiFull, description: "와이셔츠 세탁", price: 5000 };
+      mockAmend.mockResolvedValue(updated);
       useWorkItemStore.setState({ workItems: [wi1, wi2], selectedItem: wiFull });
 
-      await useWorkItemStore.getState().update(1, { description: "와이셔츠 세탁", price: 5000 });
-      expect(useWorkItemStore.getState().workItems[0].description).toBe("와이셔츠 세탁");
-      expect(useWorkItemStore.getState().selectedItem?.description).toBe("와이셔츠 세탁");
+      await useWorkItemStore.getState().amend(1, { description: "와이셔츠 세탁", priceOverride: 5000 });
+      expect(useWorkItemStore.getState().workItems[0]).toEqual({ ...wi1, description: "와이셔츠 세탁", price: 5000 });
+      expect(useWorkItemStore.getState().selectedItem).toEqual(updated);
     });
   });
 

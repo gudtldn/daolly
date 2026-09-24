@@ -13,6 +13,7 @@ export type {
   TopItem,
   RevenueSummary,
   PaymentRecord,
+  CreditPayment,
   PaymentMethod,
 } from "./models";
 
@@ -26,7 +27,7 @@ export type {
   DetailInput,
   Prepayment,
   ReceiveOrder,
-  UpdateWorkItem,
+  AmendOrder,
   CreatePayment,
   UpdatePayment,
 } from "./dto";

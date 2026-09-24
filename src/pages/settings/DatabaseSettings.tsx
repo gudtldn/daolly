@@ -7,6 +7,7 @@ import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { databaseApi } from "@/bindings";
 import type { BackupInfo, BackupKind, BackupSettings } from "@/types";
 import { errorMessage } from "@/utils/errors";
+import { CreditPaymentReview } from "@/pages/settings/CreditPaymentReview";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -298,6 +299,9 @@ export function DatabaseSettings() {
       )}
 
       <div className="space-y-6 pb-10">
+        {/* 예전 버전이 남긴 외상 결제 점검 (있을 때만 표시) */}
+        <CreditPaymentReview />
+
         {/* DB 위치 */}
         <section className="bg-surface-card rounded-lg border border-border-default p-5 shadow-sm">
           <h4 className="text-sm font-semibold text-on-surface mb-4">데이터베이스 위치</h4>

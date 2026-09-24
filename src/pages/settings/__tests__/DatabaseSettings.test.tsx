@@ -16,7 +16,9 @@ const api = vi.hoisted(() => ({
   clearAllData: vi.fn(),
 }));
 
-vi.mock("@/bindings", () => ({ databaseApi: api }));
+const payments = vi.hoisted(() => ({ listCredit: vi.fn(), delete: vi.fn() }));
+
+vi.mock("@/bindings", () => ({ databaseApi: api, paymentApi: payments }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
 
 import { DatabaseSettings } from "@/pages/settings/DatabaseSettings";
@@ -35,6 +37,7 @@ function mockSettings(settings: BackupSettings) {
 describe("DatabaseSettings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    payments.listCredit.mockResolvedValue([]);
     api.getDbPath.mockResolvedValue("C:/data/daolly.db");
     api.listBackups.mockResolvedValue(backups);
     mockSettings({ mirrorDir: null, lastMirror: null });

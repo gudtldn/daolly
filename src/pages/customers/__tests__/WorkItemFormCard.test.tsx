@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { WorkItemFormCard } from "../WorkItemFormCard";
 import type { ComponentProps } from "react";
-import type { ReceiveOrder, WorkItemFull } from "@/types";
+import type { AmendOrder, ReceiveOrder, WorkItemFull } from "@/types";
 
 type OnSave = ComponentProps<typeof WorkItemFormCard>["onSave"];
 
@@ -73,6 +73,43 @@ describe("WorkItemFormCard 날짜 전송", () => {
     await user.click(screen.getByRole("button", { name: "저장" }));
 
     expect(onSave.mock.calls[0][0].receivedAt).toBeNull();
+  });
+});
+
+describe("WorkItemFormCard 수정", () => {
+  it("상태·내용·품목을 한 번에 보내고 단가표 품목 연결을 유지한다", async () => {
+    const user = userEvent.setup();
+    const onSave = renderEdit();
+
+    await user.click(screen.getByRole("button", { name: "저장" }));
+
+    const amendment = onSave.mock.calls[0][0] as AmendOrder;
+    expect(amendment.lines).toEqual([
+      { priceItemId: 3, itemName: "와이셔츠", unitPrice: 3000, quantity: 1, optionsMemo: null },
+    ]);
+    expect(amendment.priceOverride).toBeNull();
+    expect(amendment.status).toBeNull();
+  });
+
+  it("품목명을 바꾸면 단가표 품목 연결을 끊는다", async () => {
+    const user = userEvent.setup();
+    const onSave = renderEdit();
+
+    const name = screen.getByPlaceholderText("품목명");
+    await user.clear(name);
+    await user.type(name, "블라우스");
+    await user.click(screen.getByRole("button", { name: "저장" }));
+
+    const amendment = onSave.mock.calls[0][0] as AmendOrder;
+    expect(amendment.lines?.[0]).toMatchObject({ priceItemId: null, itemName: "블라우스" });
+  });
+
+  it("결제 수단에 외상이 없다 (외상은 결제를 기록하지 않음)", () => {
+    render(
+      <WorkItemFormCard open mode="edit" customerId={1} workItem={workItem} initialTab="payment" onSave={vi.fn()} onClose={vi.fn()} />,
+    );
+    expect(screen.getByRole("option", { name: "현금" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "외상" })).not.toBeInTheDocument();
   });
 });
 
