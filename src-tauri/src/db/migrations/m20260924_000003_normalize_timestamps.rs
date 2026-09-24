@@ -14,7 +14,7 @@ use crate::timestamp;
 pub struct Migration;
 
 /// 정규화할 시각 컬럼
-const TIMESTAMP_COLUMNS: [(&str, &[&str]); 3] = [
+pub(crate) const TIMESTAMP_COLUMNS: [(&str, &[&str]); 3] = [
     ("customers", &["created_at", "last_modified_at"]),
     (
         "work_items",

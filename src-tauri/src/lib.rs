@@ -10,6 +10,9 @@ mod updater;
 #[cfg(test)]
 pub mod test_helpers;
 
+#[cfg(test)]
+mod rehearsal;
+
 use tauri::{Manager, RunEvent};
 use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 
