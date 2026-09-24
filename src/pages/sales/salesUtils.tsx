@@ -66,7 +66,7 @@ export function PaymentMethodBadge({ method }: { method: string }) {
 
   const m = method.toLowerCase();
   const baseClass = "inline-flex items-center gap-1 font-bold px-1.5 py-0.5 rounded border whitespace-nowrap";
-  const smallText = "text-[0.6875rem]";
+  const smallText = "text-xs";
 
   if (m === "card" || m === "카드") {
     return (
@@ -99,7 +99,7 @@ export function PaymentMethodBadge({ method }: { method: string }) {
 
   // 매칭되는 것이 없으면 텍스트라도 표시
   return (
-    <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-surface-elevated text-on-surface-muted border border-border-default text-[0.625rem] font-bold whitespace-nowrap">
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-surface-elevated text-on-surface-muted border border-border-default text-xs font-bold whitespace-nowrap">
       {method}
     </span>
   );

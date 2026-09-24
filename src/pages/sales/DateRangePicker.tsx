@@ -108,7 +108,7 @@ export function DateRangePicker({ value, onApply, onClear }: Props) {
 
           <div className="flex items-center gap-2">
             <div className="flex-1">
-              <label htmlFor="drp-from" className="block text-[0.6875rem] font-semibold text-on-surface-muted mb-1">시작일</label>
+              <label htmlFor="drp-from" className="block text-xs font-semibold text-on-surface-muted mb-1">시작일</label>
               <input
                 id="drp-from"
                 type="date"
@@ -120,7 +120,7 @@ export function DateRangePicker({ value, onApply, onClear }: Props) {
             </div>
             <ArrowRight className="w-4 h-4 text-on-surface-muted shrink-0 mt-4" />
             <div className="flex-1">
-              <label htmlFor="drp-to" className="block text-[0.6875rem] font-semibold text-on-surface-muted mb-1">종료일</label>
+              <label htmlFor="drp-to" className="block text-xs font-semibold text-on-surface-muted mb-1">종료일</label>
               <input
                 id="drp-to"
                 type="date"

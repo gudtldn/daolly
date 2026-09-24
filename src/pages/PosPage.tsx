@@ -275,7 +275,7 @@ function CustomerPanel({
                       )}
                     </div>
                     {idx === highlightIdx && (
-                      <span className="text-[0.6rem] text-on-surface-muted bg-surface-elevated px-1.5 py-0.5 rounded border border-border-default shrink-0 animate-in fade-in duration-200">Enter</span>
+                      <span className="text-xs text-on-surface-muted bg-surface-elevated px-1.5 py-0.5 rounded border border-border-default shrink-0 animate-in fade-in duration-200">Enter</span>
                     )}
                   </button>
                 ))}
@@ -307,7 +307,7 @@ function CustomerPanel({
                           <span className="truncate">"{query.trim()}"님 신규 등록</span>
                         </div>
                         {highlightIdx === results.length && (
-                          <span className="text-[0.65rem] text-on-surface-muted bg-surface-elevated px-1.5 py-0.5 rounded border border-border-default shrink-0 animate-in fade-in duration-200">Enter</span>
+                          <span className="text-xs text-on-surface-muted bg-surface-elevated px-1.5 py-0.5 rounded border border-border-default shrink-0 animate-in fade-in duration-200">Enter</span>
                         )}
                       </div>
                     </button>

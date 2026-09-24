@@ -27,7 +27,7 @@ import { customerApi, workItemApi } from "@/bindings";
 import { errorMessage } from "@/utils/errors";
 
 // 삭제 후 '되돌리기'를 누를 수 있는 시간
-const UNDO_DURATION_MS = 10_000;
+const UNDO_DURATION_MS = 20_000;
 import { CustomerFormCard } from "@/pages/customers/CustomerFormCard";
 import { WorkItemFormCard } from "@/pages/customers/WorkItemFormCard";
 
@@ -645,7 +645,7 @@ function WorkItemListPanel({
                                   <td className="py-1.5 text-on-surface">
                                     <span>{d.itemName}</span>
                                     {d.optionsMemo && (
-                                      <p className="mt-0.5 text-[0.6875rem] text-on-surface-muted">&#8627; {d.optionsMemo}</p>
+                                      <p className="mt-0.5 text-xs text-on-surface-muted">&#8627; {d.optionsMemo}</p>
                                     )}
                                   </td>
                                   <td className="py-1.5 text-center text-on-surface-muted">{d.quantity}</td>
