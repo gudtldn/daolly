@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { MemoryRouter, Routes, Route, Navigate } from "react-router";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 import { check } from "@tauri-apps/plugin-updater";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { RefreshCw, Download, AlertCircle } from "lucide-react";
@@ -9,6 +9,8 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GlobalDialog } from "@/components/GlobalDialog";
 import { Layout } from "@/components/Layout";
 import { useThemeEffect } from "@/hooks/useThemeEffect";
+import { databaseApi } from "@/bindings/database";
+import { useDialogStore } from "@/stores/dialogStore";
 import { PosPage } from "@/pages/PosPage";
 import { CustomersPage } from "@/pages/CustomersPage";
 import { SalesPage } from "@/pages/SalesPage";
@@ -174,6 +176,32 @@ function App() {
 
     runUpdate();
   }, [finishSplash]);
+
+  // 기동 중 발생한 알림 (백업 복원 결과 등)
+  useEffect(() => {
+    if (!showApp) return;
+    databaseApi
+      .takeStartupNotices()
+      .then((notices) => {
+        for (const notice of notices) {
+          if (notice.type === "restoreApplied") {
+            toast.success("백업에서 데이터를 복원했습니다.");
+          } else {
+            void useDialogStore.getState().showAlert({
+              title: "복원하지 못했습니다",
+              message: (
+                <>
+                  선택한 백업으로 복원하지 못해 복원 전 데이터로 되돌렸습니다.
+                  <br />
+                  (사유: {notice.reason})
+                </>
+              ),
+            });
+          }
+        }
+      })
+      .catch((e) => console.error("Failed to load startup notices:", e));
+  }, [showApp]);
 
   return (
     <ErrorBoundary>

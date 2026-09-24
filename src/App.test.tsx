@@ -34,6 +34,13 @@ vi.mock("@/bindings", () => ({
   },
 }));
 
+// App이 기동 알림을 조회하므로 mock 필요
+vi.mock("@/bindings/database", () => ({
+  databaseApi: {
+    takeStartupNotices: vi.fn().mockResolvedValue([]),
+  },
+}));
+
 // 매출 관리 페이지는 salesApi를 직접 import하므로 별도 mock 필요
 vi.mock("@/bindings/sales", () => ({
   salesApi: {

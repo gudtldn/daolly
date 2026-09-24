@@ -1,16 +1,11 @@
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Database, FolderOpen, DownloadCloud, UploadCloud, AlertTriangle, History } from "lucide-react";
+import { Database, FolderOpen, DownloadCloud, UploadCloud, AlertTriangle, History, HardDrive } from "lucide-react";
 import { useDialogStore } from "@/stores/dialogStore";
 import { toast } from "sonner";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
-
-interface BackupInfo {
-  filename: string;
-  createdAt: string;
-  sizeBytes: number;
-}
+import { databaseApi } from "@/bindings";
+import type { BackupInfo, BackupKind, BackupSettings } from "@/types";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -18,11 +13,28 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
+const KIND_BADGES: Record<BackupKind, { label: string; cls: string }> = {
+  manual: { label: "직접 백업", cls: "bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300" },
+  daily: { label: "자동", cls: "bg-surface-elevated text-on-surface-muted" },
+  preMigration: { label: "업데이트 전", cls: "bg-warning-50 text-warning-700 dark:bg-warning-950 dark:text-warning-300" },
+  preRestore: { label: "복원 전", cls: "bg-warning-50 text-warning-700 dark:bg-warning-950 dark:text-warning-300" },
+  preClear: { label: "초기화 전", cls: "bg-danger-50 text-danger-700 dark:bg-danger-950 dark:text-danger-300" },
+  preImport: { label: "가져오기 전", cls: "bg-warning-50 text-warning-700 dark:bg-warning-950 dark:text-warning-300" },
+  legacy: { label: "이전 버전", cls: "bg-surface-elevated text-on-surface-muted" },
+};
+
 export function DatabaseSettings() {
   const [dbPath, setDbPath] = useState<string>("...");
   const [backups, setBackups] = useState<BackupInfo[]>([]);
+  const [backupSettings, setBackupSettings] = useState<BackupSettings>({ mirrorDir: null, lastMirror: null });
   const [loading, setLoading] = useState(false);
   const [backupLoading, setBackupLoading] = useState(false);
+  const [mirrorLoading, setMirrorLoading] = useState(false);
+  const [restoreLoading, setRestoreLoading] = useState(false);
   const [migrationLoading, setMigrationLoading] = useState(false);
   const [clearLoading, setClearLoading] = useState(false);
   const [error, setError] = useState("");
@@ -30,10 +42,11 @@ export function DatabaseSettings() {
   const { showCustom } = useDialogStore();
 
   useEffect(() => {
-    invoke<string>("get_db_path")
+    databaseApi.getDbPath()
       .then(setDbPath)
       .catch(() => setDbPath("알 수 없음"));
     loadBackups();
+    loadBackupSettings();
   }, []);
 
   useEffect(() => {
@@ -45,20 +58,27 @@ export function DatabaseSettings() {
   const loadBackups = async () => {
     setLoading(true);
     try {
-      const list = await invoke<BackupInfo[]>("list_backups");
-      setBackups(list);
+      setBackups(await databaseApi.listBackups());
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     } finally {
       setLoading(false);
     }
   };
 
+  const loadBackupSettings = async () => {
+    try {
+      setBackupSettings(await databaseApi.getBackupSettings());
+    } catch (e: unknown) {
+      setError(errorMessage(e));
+    }
+  };
+
   const handleOpenFolder = async () => {
     try {
-      await invoke("open_db_folder");
+      await databaseApi.openDbFolder();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     }
   };
 
@@ -67,17 +87,57 @@ export function DatabaseSettings() {
     setError("");
     setSuccess("");
     try {
-      const filename = await invoke<string>("backup_db");
-      setSuccess(`백업 완료: ${filename}`);
-      await loadBackups();
+      const outcome = await databaseApi.backup();
+      setSuccess(`백업 완료: ${outcome.info.createdAt}${outcome.mirror?.ok ? " (추가 백업 폴더에도 복사했습니다)" : ""}`);
+      if (outcome.mirror && !outcome.mirror.ok) {
+        setError(`백업은 완료했지만 추가 백업 폴더에 복사하지 못했습니다: ${outcome.mirror.message ?? ""}`);
+      }
+      await Promise.all([loadBackups(), loadBackupSettings()]);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     } finally {
       setBackupLoading(false);
     }
   };
 
-  const handleRestoreClick = async (filename: string) => {
+  const handleChooseMirror = async () => {
+    const selected = await open({
+      directory: true,
+      multiple: false,
+      title: "추가 백업 폴더 선택",
+    });
+    if (!selected) return;
+
+    setMirrorLoading(true);
+    setError("");
+    setSuccess("");
+    try {
+      const outcome = await databaseApi.setBackupMirrorDir(selected);
+      if (outcome?.mirror?.ok) {
+        setSuccess("추가 백업 폴더를 지정하고 백업을 복사했습니다.");
+      } else if (outcome?.mirror) {
+        setError(`폴더는 지정했지만 백업을 복사하지 못했습니다: ${outcome.mirror.message ?? ""}`);
+      }
+      await Promise.all([loadBackups(), loadBackupSettings()]);
+    } catch (e: unknown) {
+      setError(errorMessage(e));
+    } finally {
+      setMirrorLoading(false);
+    }
+  };
+
+  const handleClearMirror = async () => {
+    setError("");
+    try {
+      await databaseApi.setBackupMirrorDir(null);
+      await loadBackupSettings();
+      setSuccess("추가 백업 폴더를 해제했습니다.");
+    } catch (e: unknown) {
+      setError(errorMessage(e));
+    }
+  };
+
+  const handleRestoreClick = async (backup: BackupInfo) => {
     const confirmed = await showCustom({
       title: "복원 확인",
       isDestructive: false,
@@ -85,26 +145,36 @@ export function DatabaseSettings() {
       cancelText: "취소",
       customContent: (
         <div>
-          <p className="text-sm text-on-surface mb-2">다음 백업 파일로 복원하시겠습니까?</p>
-          <p className="text-sm text-on-surface-muted font-mono bg-surface-elevated px-3 py-2 rounded-lg mb-4 break-all">
-            {filename}
-          </p>
+          <p className="text-sm text-on-surface mb-2">다음 백업 시점으로 복원하시겠습니까?</p>
+          <div className="bg-surface-elevated px-3 py-2 rounded-lg mb-4">
+            <p className="text-sm font-semibold text-on-surface">
+              {backup.createdAt} · {KIND_BADGES[backup.kind].label}
+            </p>
+            <p className="text-sm text-on-surface-muted font-mono break-all">{backup.filename}</p>
+          </div>
           <div className="flex items-start gap-2 bg-warning-50 dark:bg-warning-950 border border-warning-200 dark:border-warning-800 rounded-lg px-4 py-3 text-sm text-warning-700 dark:text-warning-300">
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>현재 데이터가 모두 교체됩니다. 복원 후 앱이 자동으로 재시작됩니다.</span>
+            <span>
+              데이터가 선택한 백업 시점으로 바뀝니다. 지금 데이터는 복원 직전에 자동으로 백업해 두며,
+              복원 후 앱이 다시 시작됩니다.
+            </span>
           </div>
         </div>
       ),
     });
     if (!confirmed) return;
     setError("");
+    setRestoreLoading(true);
     try {
-      await invoke("restore_db", { filename });
+      await databaseApi.restore(backup.filename);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = errorMessage(e);
+      // 재시작으로 인한 연결 끊김은 에러로 처리하지 않음
       if (!msg.includes("Could not connect") && !msg.includes("Disconnected")) {
         setError(msg);
       }
+    } finally {
+      setRestoreLoading(false);
     }
   };
 
@@ -126,7 +196,7 @@ export function DatabaseSettings() {
         customContent: (
           <div className="space-y-3">
             <p className="text-sm text-on-surface">
-              선택한 파일에서 데이터를 가져옵니다. 
+              선택한 파일에서 데이터를 가져옵니다.
               기존 데이터가 있는 경우 <strong className="text-primary-600 dark:text-primary-400">자동으로 백업</strong> 후 진행됩니다.
             </p>
             <p className="text-sm text-on-surface-muted font-mono bg-surface-elevated px-3 py-2 rounded-lg break-all">
@@ -145,9 +215,9 @@ export function DatabaseSettings() {
       setMigrationLoading(true);
       setError("");
       try {
-        await invoke("migrate_from_legacy", { legacyPath: selected });
+        await databaseApi.migrateFromLegacy(selected);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
+        const msg = errorMessage(e);
         // 자동 재시작으로 인한 연결 끊김은 에러로 처리하지 않음
         if (!msg.includes("Could not connect") && !msg.includes("Disconnected")) {
           throw e;
@@ -156,7 +226,7 @@ export function DatabaseSettings() {
       toast.success("데이터 이관 완료. 앱을 재시작합니다.");
       await loadBackups();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
       toast.error("마이그레이션 실패");
     } finally {
       setMigrationLoading(false);
@@ -179,8 +249,8 @@ export function DatabaseSettings() {
             </div>
           </div>
           <p className="text-sm text-on-surface">
-            삭제 전 <strong className="text-primary-600 dark:text-primary-400">자동으로 백업</strong>이 생성되며, 
-            삭제 완료 후 상태 초기화를 위해 <strong className="text-primary-600 dark:text-primary-400">앱이 재시작</strong>됩니다. 
+            삭제 전 <strong className="text-primary-600 dark:text-primary-400">자동으로 백업</strong>이 생성되며,
+            삭제 완료 후 상태 초기화를 위해 <strong className="text-primary-600 dark:text-primary-400">앱이 재시작</strong>됩니다.
             정말로 모든 데이터를 삭제하시겠습니까?
           </p>
         </div>
@@ -193,24 +263,27 @@ export function DatabaseSettings() {
     setError("");
     setSuccess("");
     try {
-      await invoke("clear_all_data");
+      await databaseApi.clearAllData();
       setSuccess("모든 데이터가 삭제되었습니다. (삭제 전 백업이 생성되었습니다)");
       await loadBackups();
       toast.success("초기화 완료");
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
       toast.error("데이터 삭제 실패");
     } finally {
       setClearLoading(false);
     }
   };
 
+  const lastMirror = backupSettings.lastMirror;
+
   return (
     <div className="h-full overflow-y-auto relative">
       <LoadingOverlay isLoading={migrationLoading} message="데이터를 가져오는 중입니다..." absolute={false} />
-      <LoadingOverlay isLoading={backupLoading} message="데이터베이스 백업 중..." absolute={false} />
+      <LoadingOverlay isLoading={backupLoading || mirrorLoading} message="데이터베이스 백업 중..." absolute={false} />
+      <LoadingOverlay isLoading={restoreLoading} message="복원 준비 중... 잠시 후 앱이 다시 시작됩니다." absolute={false} />
       <LoadingOverlay isLoading={clearLoading} message="모든 데이터를 삭제 중..." absolute={false} />
-      
+
       <div className="flex items-center gap-2 mb-6">
         <Database className="w-5 h-5 text-on-surface-muted" />
         <h3 className="text-lg font-bold text-on-surface">데이터 관리</h3>
@@ -265,14 +338,65 @@ export function DatabaseSettings() {
           </div>
         </section>
 
+        {/* 추가 백업 폴더 */}
+        <section className="bg-surface-card rounded-lg border border-border-default p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h4 className="text-sm font-semibold text-on-surface">추가 백업 폴더</h4>
+              <p className="text-sm text-on-surface-muted mt-1">
+                USB나 OneDrive·구글 드라이브 폴더를 지정하면 백업할 때마다 그곳에도 복사합니다.
+                컴퓨터가 고장 나도 데이터를 지킬 수 있습니다.
+              </p>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <button
+                onClick={handleChooseMirror}
+                disabled={mirrorLoading}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-950 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <HardDrive className="w-4 h-4" />
+                {backupSettings.mirrorDir ? "폴더 변경" : "폴더 선택"}
+              </button>
+              {backupSettings.mirrorDir && (
+                <button
+                  onClick={handleClearMirror}
+                  disabled={mirrorLoading}
+                  className="px-4 py-2 text-sm text-on-surface-muted border border-border-default rounded-lg hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  해제
+                </button>
+              )}
+            </div>
+          </div>
+          {backupSettings.mirrorDir && (
+            <div className="mt-4 space-y-2">
+              <p className="text-sm text-on-surface-muted font-mono bg-surface-elevated px-3 py-2 rounded-lg break-all">
+                {backupSettings.mirrorDir}
+              </p>
+              {lastMirror && (
+                <p className={`text-sm ${lastMirror.ok ? "text-success-700 dark:text-success-300" : "text-danger-700 dark:text-danger-300"}`}>
+                  {lastMirror.ok
+                    ? `마지막 복사: ${lastMirror.at}`
+                    : `마지막 복사 실패 (${lastMirror.at}): ${lastMirror.message ?? ""}`}
+                </p>
+              )}
+            </div>
+          )}
+        </section>
+
         {/* 백업 */}
         <section className="bg-surface-card rounded-lg border border-border-default p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h4 className="text-sm font-semibold text-on-surface">백업 내역</h4>
+            <div>
+              <h4 className="text-sm font-semibold text-on-surface">백업 내역</h4>
+              <p className="text-sm text-on-surface-muted mt-1">
+                하루 한 번 자동으로 백업하며, 업데이트·복원·초기화 직전에도 백업을 남깁니다.
+              </p>
+            </div>
             <button
               onClick={handleBackup}
               disabled={backupLoading}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors cursor-pointer disabled:opacity-50 shadow-sm"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors cursor-pointer disabled:opacity-50 shadow-sm shrink-0"
             >
               <DownloadCloud className="w-4 h-4" />
               {backupLoading ? "백업 중..." : "지금 백업"}
@@ -292,6 +416,7 @@ export function DatabaseSettings() {
                 <thead className="sticky top-0 bg-surface-elevated text-on-surface-muted z-10">
                   <tr>
                     <th className="px-4 py-3 text-left font-medium">생성 일시</th>
+                    <th className="px-4 py-3 text-left font-medium w-32">종류</th>
                     <th className="px-4 py-3 text-right font-medium w-24">크기</th>
                     <th className="w-24"></th>
                   </tr>
@@ -300,11 +425,17 @@ export function DatabaseSettings() {
                   {backups.map((b) => (
                     <tr key={b.filename} className="hover:bg-surface-elevated/50 transition-colors">
                       <td className="px-4 py-3 text-on-surface">{b.createdAt}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-block px-2 py-0.5 rounded-lg text-sm font-medium whitespace-nowrap ${KIND_BADGES[b.kind].cls}`}>
+                          {KIND_BADGES[b.kind].label}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 text-right text-on-surface-muted w-24">{formatBytes(b.sizeBytes)}</td>
                       <td className="px-4 py-3 text-center w-24">
                         <button
-                          onClick={() => handleRestoreClick(b.filename)}
-                          className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium border border-border-default rounded-lg hover:bg-surface-elevated transition-colors cursor-pointer"
+                          onClick={() => handleRestoreClick(b)}
+                          disabled={restoreLoading}
+                          className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium border border-border-default rounded-lg hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-50"
                         >
                           <UploadCloud className="w-3.5 h-3.5" />
                           복원

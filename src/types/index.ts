@@ -31,3 +31,12 @@ export type {
 } from "./dto";
 
 export type { AppSettings, GeneralSettings, UiSettings, FontSize } from "./settings";
+
+export type {
+  BackupKind,
+  BackupInfo,
+  MirrorStatus,
+  BackupOutcome,
+  BackupSettings,
+  StartupNotice,
+} from "./backup";

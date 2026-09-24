@@ -1,11 +1,12 @@
+mod backup;
 mod commands;
 mod db;
 mod services;
+mod startup;
 
 #[cfg(test)]
 pub mod test_helpers;
 
-use sea_orm::DatabaseConnection;
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -23,16 +24,15 @@ pub fn run() {
                 .app_data_dir()
                 .expect("failed to resolve app data directory");
 
-            // pending restore가 있으면 DB 초기화 전에 적용
-            let pending = app_data_dir.join("daolly.db.pending_restore");
-            if pending.exists() {
-                let db_path = app_data_dir.join("daolly.db");
-                std::fs::rename(&pending, &db_path).expect("failed to apply pending restore");
-            }
+            // 예약된 복원 적용(실패 시 원복) 후 DB 초기화.
+            // Tauri setup은 sync 클로저이므로 block_on으로 실행
+            let (db, notices) =
+                tauri::async_runtime::block_on(startup::open_database(&app_data_dir));
+            let db = db.expect("failed to initialize database");
+            app.manage(startup::StartupNotices::new(notices));
 
-            // Tauri setup은 sync 클로저이므로 block_on으로 async DB 초기화 실행
-            let db: DatabaseConnection = tauri::async_runtime::block_on(db::init(app_data_dir))
-                .expect("failed to initialize database");
+            // 하루 1회 자동 백업 (앱을 켜 둔 동안 주기적으로 확인)
+            backup::spawn_daily_backup(db.clone(), app_data_dir);
 
             // 커맨드에서 State<DatabaseConnection>으로 주입받아 사용
             app.manage(db);
@@ -120,6 +120,9 @@ pub fn run() {
             commands::database::backup_db,
             commands::database::list_backups,
             commands::database::restore_db,
+            commands::database::get_backup_settings,
+            commands::database::set_backup_mirror_dir,
+            commands::database::take_startup_notices,
             commands::database::migrate_from_legacy,
             commands::database::clear_all_data,
             // sales
