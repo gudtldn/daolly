@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { AlertTriangle, FileText, RotateCcw, UploadCloud } from "lucide-react";
+import { AlertTriangle, Download, FileText, RotateCcw, UploadCloud } from "lucide-react";
 import { databaseApi } from "@/bindings/database";
+import { updateApi, isUpdateStatus } from "@/bindings/updates";
 import { useDialogStore } from "@/stores/dialogStore";
 import { reportError } from "@/utils/logging";
-import type { BackupInfo, BackupKind } from "@/types";
+import type { BackupInfo, BackupKind, UpdateStatus } from "@/types";
 
 const KIND_LABELS: Record<BackupKind, string> = {
   manual: "직접 백업",
@@ -29,6 +30,8 @@ export function RecoveryScreen({ message }: { message: string }) {
   const [loading, setLoading] = useState(true);
   const [restoring, setRestoring] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [update, setUpdate] = useState<UpdateStatus>({ state: "idle" });
+  const [installing, setInstalling] = useState(false);
   const { showConfirm } = useDialogStore();
 
   useEffect(() => {
@@ -37,7 +40,35 @@ export function RecoveryScreen({ message }: { message: string }) {
       .then(setBackups)
       .catch((e) => setError(errorMessage(e)))
       .finally(() => setLoading(false));
+
+    // 문제를 고친 새 버전이 있으면 바로 설치할 수 있게 함
+    updateApi
+      .getStatus()
+      .then((s) => {
+        if (isUpdateStatus(s)) setUpdate(s);
+      })
+      .catch(() => {});
+    const unlisten = updateApi.onStatus(setUpdate).catch(() => undefined);
+    return () => {
+      void unlisten.then((fn) => fn?.());
+    };
   }, []);
+
+  const handleInstallUpdate = async () => {
+    setError("");
+    setInstalling(true);
+    try {
+      await updateApi.installNow();
+    } catch (e) {
+      const msg = errorMessage(e);
+      if (!msg.includes("Could not connect") && !msg.includes("Disconnected")) {
+        setError(msg);
+        reportError("RecoveryScreen.installUpdate", e);
+      }
+    } finally {
+      setInstalling(false);
+    }
+  };
 
   const handleRestore = async (backup: BackupInfo) => {
     const confirmed = await showConfirm({
@@ -86,6 +117,27 @@ export function RecoveryScreen({ message }: { message: string }) {
             </p>
           </div>
         </div>
+
+        {update.state === "ready" && (
+          <div className="flex items-center justify-between gap-4 px-4 py-3 bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800 rounded-lg">
+            <p className="text-base text-primary-700 dark:text-primary-300">
+              새 버전({update.version})이 준비되어 있습니다. 업데이트하면 문제가 해결될 수 있습니다.
+            </p>
+            <button
+              onClick={handleInstallUpdate}
+              disabled={installing}
+              className="flex items-center gap-2 px-4 py-2.5 text-base font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+            >
+              <Download className="w-5 h-5" />
+              {installing ? "설치 중..." : "업데이트 설치"}
+            </button>
+          </div>
+        )}
+        {update.state === "downloading" && (
+          <p className="text-base text-on-surface-muted">
+            새 버전({update.version})을 받는 중입니다{update.progress !== null ? ` (${update.progress}%)` : ""}...
+          </p>
+        )}
 
         {error && (
           <div className="px-4 py-3 bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 rounded-lg text-base text-danger-700 dark:text-danger-300">

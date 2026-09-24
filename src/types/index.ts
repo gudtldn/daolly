@@ -41,3 +41,5 @@ export type {
   StartupNotice,
   StartupStatus,
 } from "./backup";
+
+export type { UpdateStatus } from "./update";

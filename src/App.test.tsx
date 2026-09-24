@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // Tauri API 및 플러그인 mock
@@ -9,8 +9,16 @@ vi.mock("@tauri-apps/api/window", () => ({
   }),
 }));
 
-vi.mock("@tauri-apps/plugin-updater", () => ({
-  check: vi.fn().mockResolvedValue({ available: false }),
+// 업데이트 상태 이벤트: 테스트에서 핸들러를 직접 호출
+const updateApi = vi.hoisted(() => ({
+  getStatus: vi.fn(),
+  check: vi.fn(),
+  installNow: vi.fn(),
+  onStatus: vi.fn(),
+}));
+vi.mock("@/bindings/updates", () => ({
+  updateApi,
+  isUpdateStatus: (v: unknown) => typeof v === "object" && v !== null && "state" in v,
 }));
 
 // CustomersPage가 마운트 시 Tauri invoke를 호출하므로 mock 필요
@@ -65,6 +73,8 @@ describe("App", () => {
     databaseApi.getStartupStatus.mockResolvedValue({ state: "ready" });
     databaseApi.takeStartupNotices.mockResolvedValue([]);
     databaseApi.listBackups.mockResolvedValue([]);
+    updateApi.getStatus.mockResolvedValue({ state: "idle" });
+    updateApi.onStatus.mockResolvedValue(() => {});
   });
 
   afterEach(() => {
@@ -133,5 +143,30 @@ describe("App", () => {
     render(<App />);
     expect(await screen.findByText("복원하지 못했습니다")).toBeInTheDocument();
     expect(screen.getByText(/사유: file is not a database/)).toBeInTheDocument();
+  });
+
+  it("새 버전을 받아 두면 종료 시 설치된다고 알려준다", async () => {
+    render(<App />);
+    await screen.findByRole("banner");
+    await waitFor(() => expect(updateApi.onStatus).toHaveBeenCalled());
+
+    const handler = updateApi.onStatus.mock.calls[0][0] as (s: unknown) => void;
+    act(() => handler({ state: "ready", version: "0.3.0", notes: null }));
+
+    expect(await screen.findByText("새 버전(0.3.0)을 받아 두었습니다.")).toBeInTheDocument();
+    expect(screen.getByText("프로그램을 끄면 설치된 뒤 다시 열립니다.")).toBeInTheDocument();
+  });
+
+  it("복구 화면에서 준비된 업데이트를 바로 설치할 수 있다", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    databaseApi.getStartupStatus.mockResolvedValue({ state: "failed", message: "migration failed" });
+    updateApi.getStatus.mockResolvedValue({ state: "ready", version: "0.3.1", notes: null });
+    updateApi.installNow.mockResolvedValue(undefined);
+    render(<App />);
+
+    const button = await screen.findByRole("button", { name: /업데이트 설치/ });
+    expect(screen.getByText(/새 버전\(0\.3\.1\)이 준비되어 있습니다/)).toBeInTheDocument();
+    await user.click(button);
+    expect(updateApi.installNow).toHaveBeenCalled();
   });
 });

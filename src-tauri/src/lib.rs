@@ -3,11 +3,12 @@ mod commands;
 mod db;
 mod services;
 mod startup;
+mod updater;
 
 #[cfg(test)]
 pub mod test_helpers;
 
-use tauri::Manager;
+use tauri::{Manager, RunEvent};
 use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 
 /// 로그 파일 설정: 앱 로그 폴더에 daolly.log (1MB씩 최근 5개 보관)
@@ -62,6 +63,10 @@ pub fn run() {
             let (db, notices) =
                 tauri::async_runtime::block_on(startup::open_database(&app_data_dir));
             app.manage(startup::StartupNotices::new(notices));
+
+            // 업데이트는 백그라운드에서 확인·다운로드하고 종료 시 설치 (DB 상태와 무관하게 동작)
+            app.manage(updater::UpdaterState::default());
+            updater::spawn_background_check(app.handle().clone());
 
             match db {
                 Ok(db) => {
@@ -177,7 +182,16 @@ pub fn run() {
             commands::sales::list_top_items,
             commands::sales::get_revenue_summary,
             commands::sales::list_payment_records,
+            // updates
+            commands::updates::get_update_status,
+            commands::updates::check_for_update,
+            commands::updates::install_update_now,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| match event {
+            RunEvent::ExitRequested { code, .. } => updater::on_exit_requested(app, code),
+            RunEvent::Exit => updater::on_exit(app),
+            _ => {}
+        });
 }

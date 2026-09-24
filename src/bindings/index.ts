@@ -6,3 +6,4 @@ export { workItemApi } from "./workItems";
 export { paymentApi } from "./payments";
 export { salesApi } from "./sales";
 export { databaseApi } from "./database";
+export { updateApi } from "./updates";

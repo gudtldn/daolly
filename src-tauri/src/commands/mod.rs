@@ -9,6 +9,7 @@ pub mod payments;
 pub mod price_items;
 pub mod price_settings;
 pub mod sales;
+pub mod updates;
 pub mod work_items;
 
 use serde::Serialize;
