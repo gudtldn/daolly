@@ -1,42 +1,11 @@
-use sea_orm::{DatabaseConnection, EntityTrait};
-use serde::{Deserialize, Serialize};
+use sea_orm::DatabaseConnection;
+use serde::Serialize;
 use std::collections::HashMap;
 use tauri::State;
 
-use crate::commands::{AppError, CmdResult, require_non_empty, require_non_negative};
+use crate::commands::{AppError, CmdResult};
 use crate::db::entities::{payment, work_item, work_item::WorkItemStatus, work_item_detail};
 use crate::services;
-use crate::services::work_items::DetailInput;
-
-/// 접수 생성 DTO
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CreateWorkItem {
-    pub customer_id: i32,
-    /// None이면 details에서 자동 생성
-    pub description: Option<String>,
-    /// 요양
-    pub price: i64,
-    pub note: Option<String>,
-    /// 접수 일시 (RFC3339). None이면 현재 시각 사용
-    pub received_at: Option<String>,
-    /// 항목 스냅샷
-    pub details: Vec<DetailInput>,
-}
-
-/// 접수 부분 수정 DTO
-/// NOTE: None인 필드는 변경하지 않습니다.
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateWorkItem {
-    pub description: Option<String>,
-    pub price: Option<i64>,
-    pub note: Option<String>,
-    /// 접수 일시 변경
-    pub received_at: Option<String>,
-    /// 수령 일시 변경
-    pub picked_up_at: Option<String>,
-}
 
 /// 접수 상세 DTO
 /// NOTE: work_item + details + payments를 포함합니다.
@@ -63,7 +32,7 @@ pub async fn list_work_items(
 pub async fn get_work_item(db: State<'_, DatabaseConnection>, id: i32) -> CmdResult<WorkItemFull> {
     let (wi, details, payments) = services::work_items::get_full(db.inner(), id)
         .await?
-        .ok_or_else(|| AppError::NotFound(format!("work_item {id}")))?;
+        .ok_or_else(|| AppError::NotFound("접수"))?;
 
     Ok(WorkItemFull {
         work_item: wi,
@@ -72,88 +41,26 @@ pub async fn get_work_item(db: State<'_, DatabaseConnection>, id: i32) -> CmdRes
     })
 }
 
-#[tauri::command]
-pub async fn create_work_item(
-    db: State<'_, DatabaseConnection>,
-    data: CreateWorkItem,
-) -> CmdResult<work_item::Model> {
-    require_non_negative(data.price, "청구 금액")?;
-    Ok(services::work_items::create(
-        db.inner(),
-        data.customer_id,
-        data.description,
-        data.price,
-        data.note,
-        data.received_at,
-        data.details,
-    )
-    .await?)
-}
-
-#[tauri::command]
-pub async fn update_work_item(
-    db: State<'_, DatabaseConnection>,
-    id: i32,
-    data: UpdateWorkItem,
-) -> CmdResult<work_item::Model> {
-    if let Some(ref desc) = data.description {
-        require_non_empty(desc, "작업 설명")?;
-    }
-    if let Some(price) = data.price {
-        require_non_negative(price, "청구 금액")?;
-    }
-    let existing = work_item::Entity::find_by_id(id)
-        .one(db.inner())
-        .await?
-        .ok_or_else(|| AppError::NotFound(format!("work_item {id}")))?;
-
-    Ok(services::work_items::update(
-        db.inner(),
-        existing,
-        data.description,
-        data.price,
-        data.note,
-        data.received_at,
-        data.picked_up_at,
-    )
-    .await?)
-}
-
+/// 상태만 바꿉니다. (내용·품목까지 고치는 수정은 amend_order)
 #[tauri::command]
 pub async fn update_work_item_status(
     db: State<'_, DatabaseConnection>,
     id: i32,
     status: WorkItemStatus,
 ) -> CmdResult<work_item::Model> {
-    let existing = work_item::Entity::find_by_id(id)
-        .one(db.inner())
-        .await?
-        .ok_or_else(|| AppError::NotFound(format!("work_item {id}")))?;
-
-    Ok(services::work_items::update_status(db.inner(), existing, status).await?)
-}
-
-#[tauri::command]
-pub async fn replace_work_item_details(
-    db: State<'_, DatabaseConnection>,
-    work_item_id: i32,
-    details: Vec<DetailInput>,
-) -> CmdResult<Vec<work_item_detail::Model>> {
-    work_item::Entity::find_by_id(work_item_id)
-        .one(db.inner())
-        .await?
-        .ok_or_else(|| AppError::NotFound(format!("work_item {work_item_id}")))?;
-
-    Ok(services::work_items::replace_details(db.inner(), work_item_id, details).await?)
+    services::orders::change_status(db.inner(), id, status).await
 }
 
 #[tauri::command]
 pub async fn delete_work_item(db: State<'_, DatabaseConnection>, id: i32) -> CmdResult<()> {
-    let rows = services::work_items::delete(db.inner(), id).await?;
-    if rows == 0 {
-        return Err(AppError::NotFound(format!("work_item {id}")));
-    }
-    Ok(())
+    // 지우지 않고 취소 표시 (받은 결제도 함께 취소, 기록은 남음)
+    services::orders::cancel(db.inner(), id).await
+}
+
+/// 삭제(취소)한 접수 되돌리기
+#[tauri::command]
+pub async fn restore_work_item(db: State<'_, DatabaseConnection>, id: i32) -> CmdResult<()> {
+    services::orders::restore(db.inner(), id).await
 }
 
 #[tauri::command]

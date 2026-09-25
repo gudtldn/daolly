@@ -17,6 +17,9 @@ pub struct Model {
     /// 결제 일시
     pub paid_at: String,
     pub created_at: String,
+    /// 결제를 취소한 시각. 받은 금액과 매출에서 빠지지만 기록은 남음
+    #[serde(skip)]
+    pub voided_at: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

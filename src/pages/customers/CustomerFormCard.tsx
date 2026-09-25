@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import type { Customer, CreateCustomer, UpdateCustomer } from "@/types";
+import { errorMessage } from "@/utils/errors";
 
 // 전화번호 포맷: 02-XXX(X)-XXXX / 0XX-XXX(X)-XXXX
 function formatPhone(digits: string): string {
@@ -117,7 +118,7 @@ export function CustomerFormCard({ open, mode, customer, onSave, onClose }: Prop
       });
       onClose();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     } finally {
       setSaving(false);
     }

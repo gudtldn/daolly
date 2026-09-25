@@ -1,16 +1,53 @@
+mod backup;
 mod commands;
 mod db;
+mod error;
 mod services;
+mod startup;
+mod timestamp;
+mod updater;
 
 #[cfg(test)]
 pub mod test_helpers;
 
-use sea_orm::DatabaseConnection;
-use tauri::Manager;
+#[cfg(test)]
+mod rehearsal;
+
+use tauri::{Manager, RunEvent};
+use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
+
+/// 로그 파일 설정: 앱 로그 폴더에 daolly.log (1MB씩 최근 5개 보관)
+fn log_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
+    tauri_plugin_log::Builder::new()
+        .clear_targets()
+        .target(Target::new(TargetKind::LogDir {
+            file_name: Some("daolly".into()),
+        }))
+        .target(Target::new(TargetKind::Stdout))
+        .level(log::LevelFilter::Info)
+        .timezone_strategy(TimezoneStrategy::UseLocal)
+        .rotation_strategy(RotationStrategy::KeepSome(5))
+        .max_file_size(1_000_000)
+        .build()
+}
+
+/// panic 내용을 로그 파일에 남깁니다. (Windows 릴리스는 콘솔이 없어 그대로는 흔적이 남지 않음)
+fn install_panic_logger() {
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        log::error!(
+            "비정상 종료(panic): {info}\n{}",
+            std::backtrace::Backtrace::force_capture()
+        );
+        default_hook(info);
+    }));
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // 다른 플러그인의 로그도 남도록 가장 먼저 등록
+        .plugin(log_plugin())
         .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -18,24 +55,40 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .setup(|app| {
+            install_panic_logger();
+            log::info!("다올리 {} 시작", app.package_info().version);
+
             let app_data_dir = app
                 .path()
                 .app_data_dir()
                 .expect("failed to resolve app data directory");
 
-            // pending restore가 있으면 DB 초기화 전에 적용
-            let pending = app_data_dir.join("daolly.db.pending_restore");
-            if pending.exists() {
-                let db_path = app_data_dir.join("daolly.db");
-                std::fs::rename(&pending, &db_path).expect("failed to apply pending restore");
+            // 예약된 복원 적용(실패 시 원복) 후 DB 초기화.
+            // Tauri setup은 sync 클로저이므로 block_on으로 실행
+            let (db, notices) =
+                tauri::async_runtime::block_on(startup::open_database(&app_data_dir));
+            app.manage(startup::StartupNotices::new(notices));
+
+            // 업데이트는 백그라운드에서 확인·다운로드하고 종료 시 설치 (DB 상태와 무관하게 동작)
+            app.manage(updater::UpdaterState::default());
+            updater::spawn_background_check(app.handle().clone());
+
+            match db {
+                Ok(db) => {
+                    // 하루 1회 자동 백업 (앱을 켜 둔 동안 주기적으로 확인)
+                    backup::spawn_daily_backup(db.clone(), app_data_dir);
+                    // 커맨드에서 State<DatabaseConnection>으로 주입받아 사용
+                    app.manage(db);
+                    app.manage(startup::StartupStatus::Ready);
+                }
+                Err(e) => {
+                    // 종료하지 않고 복구 화면으로 시작 (백업 복원, 로그 확인, 업데이트 가능)
+                    log::error!("DB를 열지 못해 복구 모드로 시작합니다: {e}");
+                    app.manage(startup::StartupStatus::Failed {
+                        message: e.to_string(),
+                    });
+                }
             }
-
-            // Tauri setup은 sync 클로저이므로 block_on으로 async DB 초기화 실행
-            let db: DatabaseConnection = tauri::async_runtime::block_on(db::init(app_data_dir))
-                .expect("failed to initialize database");
-
-            // 커맨드에서 State<DatabaseConnection>으로 주입받아 사용
-            app.manage(db);
 
             // DPI 및 모니터 크기 대응 (Safe Capping)
             if let (Some(window), Ok(Some(monitor))) = (
@@ -87,6 +140,7 @@ pub fn run() {
             commands::customers::create_customer,
             commands::customers::update_customer,
             commands::customers::delete_customer,
+            commands::customers::restore_customer,
             // categories
             commands::categories::list_categories,
             commands::categories::create_category,
@@ -100,12 +154,14 @@ pub fn run() {
             // work_items
             commands::work_items::list_work_items,
             commands::work_items::get_work_item,
-            commands::work_items::create_work_item,
-            commands::work_items::update_work_item,
             commands::work_items::update_work_item_status,
-            commands::work_items::replace_work_item_details,
             commands::work_items::delete_work_item,
+            commands::work_items::restore_work_item,
             commands::work_items::get_all_unpaid_amounts,
+            // orders
+            commands::orders::receive_order,
+            commands::orders::amend_order,
+            commands::orders::pickup_order,
             // price_settings
             commands::price_settings::export_price_settings_to_file,
             commands::price_settings::import_price_settings_from_file,
@@ -114,12 +170,18 @@ pub fn run() {
             commands::payments::create_payment,
             commands::payments::update_payment,
             commands::payments::delete_payment,
+            commands::payments::list_credit_payments,
             // database
             commands::database::open_db_folder,
             commands::database::get_db_path,
             commands::database::backup_db,
             commands::database::list_backups,
             commands::database::restore_db,
+            commands::database::get_backup_settings,
+            commands::database::set_backup_mirror_dir,
+            commands::database::take_startup_notices,
+            commands::database::get_startup_status,
+            commands::database::open_log_folder,
             commands::database::migrate_from_legacy,
             commands::database::clear_all_data,
             // sales
@@ -129,7 +191,16 @@ pub fn run() {
             commands::sales::list_top_items,
             commands::sales::get_revenue_summary,
             commands::sales::list_payment_records,
+            // updates
+            commands::updates::get_update_status,
+            commands::updates::check_for_update,
+            commands::updates::install_update_now,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| match event {
+            RunEvent::ExitRequested { code, .. } => updater::on_exit_requested(app, code),
+            RunEvent::Exit => updater::on_exit(app),
+            _ => {}
+        });
 }

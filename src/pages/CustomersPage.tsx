@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { Virtuoso } from "react-virtuoso";
 import type { VirtuosoHandle } from "react-virtuoso";
 import { useLocation } from "react-router";
+import { toast } from "sonner";
 import { useSearch } from "@/hooks/useSearch";
 import { useSortableData } from "@/hooks/useSortableData";
 import { useListInteraction, type InteractionSource } from "@/hooks/useListInteraction";
@@ -18,11 +19,15 @@ import {
   X,
 } from "lucide-react";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
-import type { Customer, WorkItemFull, WorkItemDetail, WorkItemStatus, CreateWorkItem, UpdateWorkItem, DetailInput, CreateCustomer, UpdateCustomer } from "@/types";
+import type { Customer, WorkItemFull, WorkItemDetail, WorkItemStatus, ReceiveOrder, AmendOrder, CreateCustomer, UpdateCustomer } from "@/types";
 import { useCustomerStore } from "@/stores/customerStore";
 import { useWorkItemStore } from "@/stores/workItemStore";
 import { useDialogStore } from "@/stores/dialogStore";
-import { workItemApi } from "@/bindings";
+import { customerApi, workItemApi } from "@/bindings";
+import { errorMessage } from "@/utils/errors";
+
+// 삭제 후 '되돌리기'를 누를 수 있는 시간
+const UNDO_DURATION_MS = 20_000;
 import { CustomerFormCard } from "@/pages/customers/CustomerFormCard";
 import { WorkItemFormCard } from "@/pages/customers/WorkItemFormCard";
 
@@ -640,7 +645,7 @@ function WorkItemListPanel({
                                   <td className="py-1.5 text-on-surface">
                                     <span>{d.itemName}</span>
                                     {d.optionsMemo && (
-                                      <p className="mt-0.5 text-[0.6875rem] text-on-surface-muted">&#8627; {d.optionsMemo}</p>
+                                      <p className="mt-0.5 text-xs text-on-surface-muted">&#8627; {d.optionsMemo}</p>
                                     )}
                                   </td>
                                   <td className="py-1.5 text-center text-on-surface-muted">{d.quantity}</td>
@@ -720,18 +725,44 @@ export function CustomersPage() {
 
   const handleDelete = async () => {
     if (!selectedCustomer) return;
+    // 고객은 목록에서만 빠지고 지난 접수·결제는 매출 기록으로 남음
+    const unpaid = useCustomerStore.getState().unpaidMap[selectedCustomer.id] ?? 0;
     const confirmed = await showConfirm({
       title: "고객 삭제",
-      message: `"${selectedCustomer.name}" 고객을 삭제하시겠습니까? 관련 접수 내역도 모두 삭제됩니다.`,
+      message: `"${selectedCustomer.name}" 고객을 목록에서 삭제하시겠습니까? 지난 접수·결제 기록은 매출에 그대로 남습니다.${
+        unpaid > 0 ? ` 남은 미수금 ${unpaid.toLocaleString()}원은 미수금 목록에서 빠집니다.` : ""
+      }`,
       confirmText: "삭제",
       isDestructive: true,
     });
     if (!confirmed) return;
-    await deleteCustomer(selectedCustomer.id);
+    const deleted = selectedCustomer;
+    await deleteCustomer(deleted.id);
     await loadCustomers(searchKeyword);
     const { customers: remaining } = useCustomerStore.getState();
     if (remaining.length > 0) select(remaining[0]);
     loadUnpaid();
+    toast.success(`"${deleted.name}" 고객을 삭제했습니다.`, {
+      duration: UNDO_DURATION_MS,
+      action: {
+        label: "되돌리기",
+        onClick: async () => {
+          try {
+            await customerApi.restore(deleted.id);
+            await loadCustomers(searchKeyword);
+            const restored = useCustomerStore.getState().customers.find((c) => c.id === deleted.id);
+            if (restored) {
+              select(restored);
+              setScrollToCustomerId(restored.id);
+            }
+            loadUnpaid();
+            toast.success(`"${deleted.name}" 고객을 되돌렸습니다.`);
+          } catch (e) {
+            toast.error(`되돌리지 못했습니다: ${errorMessage(e)}`);
+          }
+        },
+      },
+    });
   };
 
   const handleCardSave = async (data: CreateCustomer | UpdateCustomer) => {
@@ -758,10 +789,28 @@ export function CustomersPage() {
   const handleWiDelete = async (id: number) => {
     const item = useWorkItemStore.getState().workItems.find((w) => w.id === id);
     if (!item) return;
-    const confirmed = await showConfirm({ title: "작업 삭제", message: `"${item.description}" 작업을 삭제하시겠습니까?`, confirmText: "삭제", isDestructive: true });
+    // 접수는 취소 표시만 하고 기록은 남음. 받은 결제도 함께 취소되어 매출에서 빠짐
+    const paidNote = item.paidAmount > 0 ? ` 받은 결제 ${item.paidAmount.toLocaleString()}원도 함께 취소되어 매출에서 빠집니다.` : "";
+    const confirmed = await showConfirm({ title: "작업 삭제", message: `"${item.description}" 작업을 삭제하시겠습니까?${paidNote}`, confirmText: "삭제", isDestructive: true });
     if (!confirmed) return;
     await useWorkItemStore.getState().delete(id);
     loadUnpaid();
+    toast.success(`"${item.description}" 작업을 삭제했습니다.`, {
+      duration: UNDO_DURATION_MS,
+      action: {
+        label: "되돌리기",
+        onClick: async () => {
+          try {
+            await workItemApi.restore(id);
+            await useWorkItemStore.getState().load();
+            loadUnpaid();
+            toast.success(`"${item.description}" 작업을 되돌렸습니다.`);
+          } catch (e) {
+            toast.error(`되돌리지 못했습니다: ${errorMessage(e)}`);
+          }
+        },
+      },
+    });
   };
 
   const handleWiChangeStatus = async (id: number, status: WorkItemStatus) => {
@@ -788,15 +837,12 @@ export function CustomersPage() {
     setWiCardOpen(true);
   };
 
-  const handleWiCardSave = async (data: CreateWorkItem | UpdateWorkItem, details?: DetailInput[], status?: WorkItemStatus, pickedUpAtOverride?: string) => {
+  const handleWiCardSave = async (data: ReceiveOrder | AmendOrder) => {
+    // 새 접수와 수정 모두 한 번에 저장 (중간에 실패해도 반쯤 저장되지 않음)
     if (wiCardMode === "create") {
-      const created = await useWorkItemStore.getState().create(data as CreateWorkItem);
-      if (status) await useWorkItemStore.getState().updateStatus(created.id, status);
-      if (pickedUpAtOverride) await useWorkItemStore.getState().update(created.id, { pickedUpAt: pickedUpAtOverride });
+      await useWorkItemStore.getState().receive(data as ReceiveOrder);
     } else if (editingWorkItem) {
-      if (status) await useWorkItemStore.getState().updateStatus(editingWorkItem.id, status);
-      await useWorkItemStore.getState().update(editingWorkItem.id, data as UpdateWorkItem);
-      if (details) await workItemApi.replaceDetails(editingWorkItem.id, details);
+      await useWorkItemStore.getState().amend(editingWorkItem.id, data as AmendOrder);
       setDetailsRefreshId({ id: editingWorkItem.id, nonce: Date.now() });
     }
     loadUnpaid();

@@ -19,10 +19,6 @@ Object.defineProperty(window, "matchMedia", {
 });
 
 // Tauri Plugins Mock
-vi.mock("@tauri-apps/plugin-updater", () => ({
-  check: vi.fn().mockResolvedValue(null),
-}));
-
 vi.mock("@tauri-apps/plugin-process", () => ({
   relaunch: vi.fn(),
 }));

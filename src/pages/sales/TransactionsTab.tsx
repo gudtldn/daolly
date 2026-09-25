@@ -157,7 +157,7 @@ export function TransactionsTab() {
           <TableVirtuoso
             data={filtered}
             fixedHeaderContent={() => {
-              const isMultiDay = activeRange.from.slice(0, 10) !== activeRange.to.slice(0, 10);
+              const isMultiDay = activeRange.from !== activeRange.to;
               return (
                 <tr className="bg-surface-elevated border-b border-border-default">
                   {isMultiDay ? (
@@ -178,7 +178,7 @@ export function TransactionsTab() {
             }}
             itemContent={(_index, r) => {
               const { date, time, isToday } = formatSmartDateTime(r.receivedAt);
-              const isMultiDay = activeRange.from.slice(0, 10) !== activeRange.to.slice(0, 10);
+              const isMultiDay = activeRange.from !== activeRange.to;
               return (
                 <>
                   {isMultiDay && (

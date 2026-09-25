@@ -2,10 +2,10 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   WorkItem,
   WorkItemFull,
-  WorkItemDetail,
   WorkItemStatus,
-  CreateWorkItem,
-  UpdateWorkItem,
+  ReceiveOrder,
+  AmendOrder,
+  PaymentMethod,
 } from "@/types";
 
 export const workItemApi = {
@@ -20,27 +20,32 @@ export const workItemApi = {
     return invoke("get_work_item", { id });
   },
 
-  create(data: CreateWorkItem): Promise<WorkItem> {
-    return invoke("create_work_item", { data });
+  /** 접수 (품목, 선결제 포함)를 한 번에 저장 */
+  receive(order: ReceiveOrder): Promise<WorkItemFull> {
+    return invoke("receive_order", { order });
   },
 
-  update(id: number, data: UpdateWorkItem): Promise<WorkItem> {
-    return invoke("update_work_item", { id, data });
+  /** 출고: 수령 처리와 남은 금액 받기를 한 번에 (method가 없으면 미수금으로 둠) */
+  pickup(id: number, method: PaymentMethod | null): Promise<WorkItemFull> {
+    return invoke("pickup_order", { id, method });
+  },
+
+  /** 상태·내용·품목을 한 번에 수정 */
+  amend(id: number, amendment: AmendOrder): Promise<WorkItemFull> {
+    return invoke("amend_order", { id, amendment });
   },
 
   updateStatus(id: number, status: WorkItemStatus): Promise<WorkItem> {
     return invoke("update_work_item_status", { id, status });
   },
 
-  replaceDetails(
-    workItemId: number,
-    details: CreateWorkItem["details"],
-  ): Promise<WorkItemDetail[]> {
-    return invoke("replace_work_item_details", { workItemId, details });
-  },
-
   delete(id: number): Promise<void> {
     return invoke("delete_work_item", { id });
+  },
+
+  /** 삭제(취소)한 접수 되돌리기. 함께 취소한 결제도 되살림 */
+  restore(id: number): Promise<void> {
+    return invoke("restore_work_item", { id });
   },
 
   getAllUnpaidAmounts(): Promise<Record<number, number>> {

@@ -1,81 +1,31 @@
 import { useEffect, useState, useCallback } from "react";
 import { MemoryRouter, Routes, Route, Navigate } from "react-router";
-import { Toaster } from "sonner";
-import { check } from "@tauri-apps/plugin-updater";
+import { Toaster, toast } from "sonner";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { RefreshCw, Download, AlertCircle } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GlobalDialog } from "@/components/GlobalDialog";
 import { Layout } from "@/components/Layout";
 import { useThemeEffect } from "@/hooks/useThemeEffect";
+import { databaseApi } from "@/bindings/database";
+import { updateApi } from "@/bindings/updates";
+import { useDialogStore } from "@/stores/dialogStore";
+import { RecoveryScreen } from "@/components/RecoveryScreen";
+import type { StartupStatus } from "@/types";
 import { PosPage } from "@/pages/PosPage";
 import { CustomersPage } from "@/pages/CustomersPage";
 import { SalesPage } from "@/pages/SalesPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import "./App.css";
 
-function UpdateSplashScreen({
-  status,
-  progress,
-  error,
-  isClosing,
-}: {
-  status: string;
-  progress?: number;
-  error?: string;
-  isClosing: boolean;
-}) {
+function SplashScreen({ isClosing }: { isClosing: boolean }) {
   return (
     <div
       className={`fixed inset-0 z-[9999] bg-surface-container flex flex-col items-center justify-center p-6 transition-all duration-700 ease-in-out ${
         isClosing ? "opacity-0 scale-105 pointer-events-none" : "opacity-100"
       }`}
     >
-      <div className="w-full max-w-xs space-y-8 text-center">
-        <div className="space-y-2">
-          <Logo size="lg" />
-          <p className="text-sm text-on-surface-muted">최신 버전을 준비하고 있습니다</p>
-        </div>
-
-        <div className="relative py-8">
-          {error ? (
-            <div className="flex flex-col items-center gap-3 text-danger-500">
-              <AlertCircle className="w-12 h-12" />
-              <p className="text-sm font-medium">{error}</p>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-4">
-              <div className="relative">
-                <RefreshCw className="w-12 h-12 text-primary-500 animate-spin" />
-                {status === "downloading" && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Download className="w-5 h-5 text-primary-600" />
-                  </div>
-                )}
-              </div>
-              <div className="space-y-2 w-full">
-                <p className="text-sm font-medium text-on-surface">
-                  {status === "checking" && "업데이트 확인 중..."}
-                  {status === "downloading" && "새 버전 다운로드 중..."}
-                  {status === "installing" && "업데이트 설치 중..."}
-                </p>
-                {status === "downloading" && typeof progress === "number" && (
-                  <div className="space-y-1.5">
-                    <div className="h-1.5 w-full bg-surface-elevated rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary-500 transition-all duration-300 ease-out"
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
-                    <p className="text-sm text-on-surface-muted font-mono">{progress}%</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      <Logo size="lg" />
     </div>
   );
 }
@@ -100,13 +50,20 @@ function AppContent() {
 }
 
 function App() {
-  const [updateStatus, setUpdateStatus] = useState<{
-    status: "checking" | "downloading" | "installing" | "done" | "error";
-    progress: number;
-    error?: string;
-  }>({ status: "checking", progress: 0 });
   const [isClosing, setIsClosing] = useState(false);
   const [showApp, setShowApp] = useState(false);
+  // DB를 열지 못했으면 복구 화면을 보여줌 (확인 전에는 본문을 그리지 않음)
+  const [startup, setStartup] = useState<StartupStatus | null>(null);
+
+  useEffect(() => {
+    databaseApi
+      .getStartupStatus()
+      .then(setStartup)
+      .catch((e) => {
+        console.error("Failed to get startup status:", e);
+        setStartup({ state: "ready" });
+      });
+  }, []);
 
   // 스플래시 페이드아웃 및 앱 노출 시퀀스
   const finishSplash = useCallback((delay = 0) => {
@@ -118,76 +75,71 @@ function App() {
     return () => clearTimeout(timer);
   }, []);
 
+  // 창을 띄우고 잠깐 로고를 보여준 뒤 본문 표시.
+  // 업데이트는 Rust가 백그라운드에서 받아 두었다가 프로그램을 끌 때 설치하므로 기다리지 않음
   useEffect(() => {
-    const runUpdate = async () => {
-      try {
-        await getCurrentWindow().show();
-      } catch (e) {
-        console.error("Failed to show window:", e);
-      }
-
-      if (import.meta.env.DEV) {
-        finishSplash(100);
-        return;
-      }
-
-      try {
-        const update = await check();
-        if (!update?.available) {
-          finishSplash(500);
-          return;
-        }
-
-        let downloaded = 0;
-        let total = 0;
-
-        await update.downloadAndInstall((event) => {
-          switch (event.event) {
-            case "Started":
-              total = event.data.contentLength ?? 0;
-              setUpdateStatus({ status: "downloading", progress: 0 });
-              break;
-            case "Progress":
-              downloaded += event.data.chunkLength;
-              if (total > 0) {
-                setUpdateStatus({
-                  status: "downloading",
-                  progress: Math.round((downloaded / total) * 100),
-                });
-              }
-              break;
-            case "Finished":
-              // Windows 재시작 로직 대기
-              break;
-          }
-        });
-      } catch (e) {
-        console.error("Update failed:", e);
-        setUpdateStatus({
-          status: "error",
-          progress: 0,
-          error: "업데이트를 확인하지 못했습니다.",
-        });
-        finishSplash(2000); // 에러 메시지를 볼 수 있도록 충분히 대기
-      }
-    };
-
-    runUpdate();
+    getCurrentWindow()
+      .show()
+      .catch((e) => console.error("Failed to show window:", e));
+    return finishSplash(import.meta.env.DEV ? 100 : 300);
   }, [finishSplash]);
+
+  // 새 버전을 받아 두었으면 한 번 알림
+  useEffect(() => {
+    const unlisten = updateApi
+      .onStatus((status) => {
+        if (status.state === "ready") {
+          toast.success(`새 버전(${status.version})을 받아 두었습니다.`, {
+            description: "프로그램을 끄면 설치된 뒤 다시 열립니다.",
+            duration: 10000,
+          });
+        }
+      })
+      .catch((e) => {
+        console.error("Failed to listen update status:", e);
+        return undefined;
+      });
+    return () => {
+      void unlisten.then((fn) => fn?.());
+    };
+  }, []);
+
+  // 기동 중 발생한 알림 (백업 복원 결과 등)
+  useEffect(() => {
+    if (!showApp) return;
+    databaseApi
+      .takeStartupNotices()
+      .then((notices) => {
+        for (const notice of notices) {
+          if (notice.type === "restoreApplied") {
+            toast.success("백업에서 데이터를 복원했습니다.");
+          } else {
+            void useDialogStore.getState().showAlert({
+              title: "복원하지 못했습니다",
+              message: (
+                <>
+                  선택한 백업으로 복원하지 못해 복원 전 데이터로 되돌렸습니다.
+                  <br />
+                  (사유: {notice.reason})
+                </>
+              ),
+            });
+          }
+        }
+      })
+      .catch((e) => console.error("Failed to load startup notices:", e));
+  }, [showApp]);
 
   return (
     <ErrorBoundary>
-      {!showApp && (
-        <UpdateSplashScreen
-          status={updateStatus.status}
-          progress={updateStatus.progress}
-          error={updateStatus.error}
-          isClosing={isClosing}
-        />
-      )}
+      {!showApp && <SplashScreen isClosing={isClosing} />}
       {/* 본문은 항상 뒤에 렌더링해두어 페이드아웃 시 자연스럽게 보이게 함 */}
       <div className={`h-full bg-surface transition-opacity duration-700 ${isClosing ? "opacity-100" : "opacity-0"}`}>
-        <AppContent />
+        {startup?.state === "failed" ? (
+          <RecoveryScreen message={startup.message} />
+        ) : startup?.state === "ready" ? (
+          <AppContent />
+        ) : null}
       </div>
       <GlobalDialog />
       <Toaster

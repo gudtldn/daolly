@@ -107,8 +107,31 @@ export interface TopItem {
 }
 
 export interface RevenueSummary {
+  /** 기간 중 접수 금액 합계 */
   totalSales: number;
+  /** 기간 중 입금 합계 */
   actualIncome: number;
+  /** 입금 중 카드 */
+  cardIncome: number;
+  /** 입금 중 현금 */
+  cashIncome: number;
+  /** 입금 중 계좌이체 */
+  transferIncome: number;
+  /** 입금 중 그 밖의 수단 */
+  otherIncome: number;
+  /** 입금 중 기간 이전에 접수된 건의 잔금 (미수 수납) */
+  backPaymentIncome: number;
+}
+
+/** 예전 버전에서 결제 수단을 '외상'으로 등록한 결제 (데이터 점검용) */
+export interface CreditPayment {
+  paymentId: number;
+  workItemId: number;
+  customerId: number;
+  customerName: string;
+  description: string | null;
+  amount: number;
+  paidAt: string;
 }
 
 export interface PaymentRecord {
