@@ -7,6 +7,10 @@ on:
   # 릴리스 워크플로에서 빌드 전에 호출합니다.
   workflow_call:
 
+# 저장소를 읽기만 합니다. (GITHUB_TOKEN 권한을 최소로)
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Lint & Test
