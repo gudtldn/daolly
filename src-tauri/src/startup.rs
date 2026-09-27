@@ -51,6 +51,14 @@ impl StartupNotices {
     }
 }
 
+/// 화면에 보여 줄 오류 문장. 직접 쓴 한국어 문장에는 "Custom Error: " 같은 접두어를 붙이지 않음
+pub fn describe(e: &DbErr) -> String {
+    match e {
+        DbErr::Custom(message) | DbErr::Migration(message) => message.clone(),
+        other => other.to_string(),
+    }
+}
+
 /// 예약된 복원을 적용(실패 시 원복)하고 DB를 엽니다.
 pub async fn open_database(
     data_dir: &Path,
@@ -84,7 +92,7 @@ pub async fn open_database(
                         log::error!("복원 되돌리기 실패: {e}");
                     }
                     notices.push(StartupNotice::RestoreFailed {
-                        reason: e.to_string(),
+                        reason: describe(&e),
                     });
                 }
             },
@@ -184,8 +192,10 @@ mod tests {
     use super::*;
     use crate::backup::{self, BackupKind};
     use crate::db::entities::customer;
+    use crate::db::migrations::Migrator;
     use crate::services::customers;
-    use sea_orm::EntityTrait;
+    use sea_orm::{ConnectionTrait, EntityTrait};
+    use sea_orm_migration::MigratorTrait;
 
     async fn names(db: &DatabaseConnection) -> Vec<String> {
         customer::Entity::find()
@@ -195,6 +205,15 @@ mod tests {
             .into_iter()
             .map(|c| c.name)
             .collect()
+    }
+
+    #[test]
+    fn describe_hides_error_kind_prefix() {
+        assert_eq!(describe(&DbErr::Custom("문장".into())), "문장");
+        assert_eq!(
+            describe(&DbErr::RecordNotFound("x".into())),
+            DbErr::RecordNotFound("x".into()).to_string()
+        );
     }
 
     #[tokio::test]
@@ -230,6 +249,60 @@ mod tests {
         assert_eq!(names(&db).await, vec!["백업 시점 고객"]);
         assert!(!dir.path().join(PENDING_RESTORE_FILE).exists());
         assert!(!dir.path().join(BEFORE_RESTORE_FILE).exists());
+    }
+
+    /// 예전 버전 백업에 부모 없이 남은 행이 있어도 복원되고, 그 행은 그대로 남음
+    #[tokio::test]
+    async fn restores_old_backup_with_orphan_rows() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = db::init(dir.path()).await.unwrap();
+        customers::create(&db, "지금 고객".into(), None, None)
+            .await
+            .unwrap();
+
+        // 0.2.7 백업: 접수는 없어졌는데 그 접수의 결제가 남은 상태
+        let backups = dir.path().join(backup::BACKUPS_DIR);
+        std::fs::create_dir_all(&backups).unwrap();
+        {
+            let old = db::connect(&backups.join("daolly_20260901_090000.db"), false)
+                .await
+                .unwrap();
+            Migrator::up(&old, Some(2)).await.unwrap();
+            old.execute_unprepared("PRAGMA foreign_keys = OFF")
+                .await
+                .unwrap();
+            old.execute_unprepared(
+                "INSERT INTO customers (id, name, created_at, last_modified_at)
+                 VALUES (1, '그때 고객', '2026-09-01T00:00:00+00:00', '2026-09-01T00:00:00+00:00');
+                 INSERT INTO payments (work_item_id, amount, method, paid_at, created_at)
+                 VALUES (5, 1000, 'cash', '2026-09-01T00:00:00+00:00', '2026-09-01T00:00:00+00:00');",
+            )
+            .await
+            .unwrap();
+            old.close().await.unwrap();
+        }
+
+        backup::stage_restore(Some(&db), dir.path(), "daolly_20260901_090000.db")
+            .await
+            .unwrap();
+        db.close().await.unwrap();
+
+        let (db, notices) = open_database(dir.path()).await;
+        let db = db.unwrap();
+        assert_eq!(notices, vec![StartupNotice::RestoreApplied]);
+        assert_eq!(names(&db).await, vec!["그때 고객"]);
+        assert_eq!(
+            db.query_one(sea_orm::Statement::from_string(
+                sea_orm::DbBackend::Sqlite,
+                "SELECT COUNT(*) FROM payments",
+            ))
+            .await
+            .unwrap()
+            .unwrap()
+            .try_get_by_index::<i64>(0)
+            .unwrap(),
+            1
+        );
     }
 
     #[tokio::test]

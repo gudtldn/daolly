@@ -1,6 +1,7 @@
 pub mod entities;
 pub mod migrations;
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::time::Duration;
 
@@ -67,6 +68,8 @@ pub async fn init(app_data_dir: &Path) -> Result<DatabaseConnection, DbErr> {
 ///    중간에 실패하면 반쯤 적용된 스키마가 남음)
 /// 3. SQLite는 테이블 재생성 시 DROP TABLE이 ON DELETE CASCADE로 자식 행을 지우므로
 ///    FK를 끈 상태에서 실행하고, 커밋 전에 `foreign_key_check`로 무결성을 확인합니다.
+///    예전부터 부모 없이 남아 있던 행(고아 데이터)은 그대로 두고, 이번 변경이 새로 만든
+///    위반만 막습니다. (예전 데이터 때문에 업데이트가 막혀 프로그램을 못 쓰게 되지 않도록)
 pub(crate) async fn run_migrations<M: MigratorTrait>(
     db: &DatabaseConnection,
     data_dir: &Path,
@@ -118,23 +121,64 @@ async fn migrate_in_transaction<M: MigratorTrait>(db: &DatabaseConnection) -> Re
         ));
     }
 
+    let before = foreign_key_violations(&txn).await?;
     M::up(&txn, None).await?;
+    let after = foreign_key_violations(&txn).await?;
 
-    let violations = txn
-        .query_all(Statement::from_string(
-            DbBackend::Sqlite,
-            "PRAGMA foreign_key_check",
-        ))
-        .await?;
-    if !violations.is_empty() {
+    let introduced: BTreeSet<_> = after.difference(&before).cloned().collect();
+    if !introduced.is_empty() {
         // txn을 커밋하지 않고 반환하면 롤백됨
         return Err(DbErr::Custom(format!(
-            "DB 구조 변경 후 외래 키 위반이 {}건 있어 변경을 취소했습니다",
-            violations.len()
+            "DB 구조 변경 중 연결이 끊어진 기록이 {}건 생겨 변경을 취소했습니다 ({})",
+            introduced.len(),
+            summarize_violations(&introduced)
         )));
+    }
+    if !before.is_empty() {
+        log::warn!(
+            "업데이트 전부터 부모 없이 남아 있던 행 {}건은 그대로 둡니다 ({})",
+            before.len(),
+            summarize_violations(&before)
+        );
     }
 
     txn.commit().await
+}
+
+/// 외래 키 위반 행: (테이블, rowid, 부모 테이블)
+pub(crate) type Violation = (String, Option<i64>, String);
+
+/// `PRAGMA foreign_key_check` 결과. FK 설정과 관계없이 모든 테이블을 검사합니다.
+pub(crate) async fn foreign_key_violations<C: ConnectionTrait>(
+    conn: &C,
+) -> Result<BTreeSet<Violation>, DbErr> {
+    conn.query_all(Statement::from_string(
+        DbBackend::Sqlite,
+        "PRAGMA foreign_key_check",
+    ))
+    .await?
+    .into_iter()
+    .map(|row| {
+        Ok((
+            row.try_get_by_index(0)?,
+            row.try_get_by_index(1)?,
+            row.try_get_by_index(2)?,
+        ))
+    })
+    .collect()
+}
+
+/// "payments→work_items 2건, work_items→customers 1건" 형태의 요약
+fn summarize_violations(violations: &BTreeSet<Violation>) -> String {
+    let mut counts: BTreeMap<(&str, &str), usize> = BTreeMap::new();
+    for (table, _, parent) in violations {
+        *counts.entry((table, parent)).or_default() += 1;
+    }
+    counts
+        .iter()
+        .map(|((table, parent), n)| format!("{table}→{parent} {n}건"))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 #[cfg(test)]
@@ -204,6 +248,23 @@ mod tests {
                 .await?;
             db.execute_unprepared("DROP TABLE customers").await?;
             db.execute_unprepared("ALTER TABLE customers_new RENAME TO customers")
+                .await?;
+            Ok(())
+        }
+    );
+
+    // 부모가 없는 결제를 만드는 (잘못된) 마이그레이션
+    test_migrator!(
+        OrphaningMigrator,
+        OrphaningMigration,
+        "m29990101_000003_orphaning",
+        |manager| {
+            manager
+                .get_connection()
+                .execute_unprepared(
+                    "INSERT INTO payments (work_item_id, amount, method, paid_at, created_at)
+                     VALUES (999, 1000, 'cash', '2026-09-20T01:00:00.000Z', '2026-09-20T01:00:00.000Z')",
+                )
                 .await?;
             Ok(())
         }
@@ -362,5 +423,67 @@ mod tests {
             .map(|b| b.kind)
             .collect();
         assert_eq!(kinds, vec![BackupKind::PreMigration]);
+    }
+
+    #[tokio::test]
+    async fn migration_that_breaks_references_is_rolled_back() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = init(dir.path()).await.unwrap();
+        seed(&db).await;
+
+        let err = run_migrations::<OrphaningMigrator>(&db, dir.path(), true)
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("payments→work_items 1건"), "{err}");
+        assert_eq!(scalar(&db, "SELECT COUNT(*) FROM payments").await, 1);
+        assert_eq!(scalar(&db, "PRAGMA foreign_keys").await, 1);
+    }
+
+    /// 예전 버전에서 부모 없이 남은 행(고아 데이터)이 있어도 업데이트는 진행되고, 그 행은 그대로 남음
+    #[tokio::test]
+    async fn upgrade_keeps_orphans_that_existed_before() {
+        let dir = tempfile::tempdir().unwrap();
+        {
+            let db = connect(&dir.path().join(DB_FILE_NAME), false)
+                .await
+                .unwrap();
+            Migrator::up(&db, Some(2)).await.unwrap();
+            db.execute_unprepared("PRAGMA foreign_keys = OFF")
+                .await
+                .unwrap();
+            db.execute_unprepared(
+                "INSERT INTO customers (id, name, created_at, last_modified_at)
+                 VALUES (1, '고객', '2026-09-20T01:00:00+00:00', '2026-09-20T01:00:00+00:00');
+                 INSERT INTO work_items (id, customer_id, status, price, paid_amount, received_at, created_at, last_modified_at)
+                 VALUES (1, 1, 'Received', 1000, 1000, '2026-09-20T01:00:00+00:00', '2026-09-20T01:00:00+00:00', '2026-09-20T01:00:00+00:00'),
+                        (2, 7, 'Received', 2000, 0, '2026-09-20T01:00:00+00:00', '2026-09-20T01:00:00+00:00', '2026-09-20T01:00:00+00:00');
+                 INSERT INTO work_item_details (work_item_id, item_name, unit_price, quantity)
+                 VALUES (1, '셔츠', 1000, 1), (8, '바지', 3000, 1);
+                 INSERT INTO payments (work_item_id, amount, method, paid_at, created_at)
+                 VALUES (1, 1000, 'cash', '2026-09-20T01:00:00+00:00', '2026-09-20T01:00:00+00:00'),
+                        (8, 3000, 'card', '2026-09-20T01:00:00+00:00', '2026-09-20T01:00:00+00:00');",
+            )
+            .await
+            .unwrap();
+            db.close().await.unwrap();
+        }
+
+        let db = init(dir.path()).await.unwrap();
+
+        assert_eq!(
+            scalar(&db, "SELECT COUNT(*) FROM seaql_migrations").await,
+            Migrator::migrations().len() as i64
+        );
+        assert_eq!(scalar(&db, "SELECT COUNT(*) FROM work_items").await, 2);
+        assert_eq!(
+            scalar(&db, "SELECT COUNT(*) FROM work_item_details").await,
+            2
+        );
+        assert_eq!(scalar(&db, "SELECT COUNT(*) FROM payments").await, 2);
+        assert_eq!(
+            scalar(&db, "SELECT COUNT(*) FROM pragma_foreign_key_check").await,
+            3
+        );
+        assert_eq!(scalar(&db, "PRAGMA foreign_keys").await, 1);
     }
 }

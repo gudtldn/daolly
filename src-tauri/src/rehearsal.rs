@@ -13,7 +13,7 @@
 //! 지정한 파일은 다시 임시 폴더로 복사해서 쓰므로 바뀌지 않습니다.
 //! 출력에는 건수·금액·날짜·번호만 있고 고객 이름·전화번호는 없어 그대로 공유해도 됩니다.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::time::Instant;
 
@@ -21,7 +21,7 @@ use chrono::{DateTime, Duration, Local, NaiveDate, NaiveDateTime};
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement};
 
 use crate::db::migrations::m20260924_000003_normalize_timestamps::TIMESTAMP_COLUMNS;
-use crate::db::{self, DB_FILE_NAME};
+use crate::db::{self, DB_FILE_NAME, Violation};
 use crate::services::payments::won;
 use crate::services::sales;
 use crate::timestamp;
@@ -68,6 +68,8 @@ async fn rehearsal() {
     println!("{before:?}");
     print_timestamp_formats(&before_db).await;
     print_review_items(&before_db).await;
+    let orphans_before = db::foreign_key_violations(&before_db).await.unwrap();
+    print_orphans(&before_db, &orphans_before).await;
     before_db.close().await.unwrap();
 
     // 2. 실제 기동 경로로 적용 (업데이트 전 백업 → 한 트랜잭션으로 마이그레이션)
@@ -90,8 +92,13 @@ async fn rehearsal() {
     println!("적용된 마이그레이션: {:?}", migrations(&after_db).await);
     let integrity = text(&after_db, "PRAGMA integrity_check").await;
     println!("무결성 검사: {integrity}");
-    let fk_violations = scalar(&after_db, "SELECT COUNT(*) FROM pragma_foreign_key_check").await;
-    println!("외래 키 위반: {fk_violations}건");
+    let orphans_after = db::foreign_key_violations(&after_db).await.unwrap();
+    let introduced: BTreeSet<_> = orphans_after.difference(&orphans_before).cloned().collect();
+    println!(
+        "부모 없는 행: {}건 (이번 업데이트로 새로 생긴 것 {}건)",
+        orphans_after.len(),
+        introduced.len()
+    );
     let after = totals(&after_db).await;
     println!("{after:?}");
     print_timestamp_formats(&after_db).await;
@@ -116,9 +123,12 @@ async fn rehearsal() {
     let same = before == after;
     println!("건수·금액 합계 전후 동일: {}", mark(same));
     println!("무결성: {}", mark(integrity == "ok"));
-    println!("외래 키: {}", mark(fk_violations == 0));
+    println!(
+        "외래 키 (새로 끊어진 연결 없음): {}",
+        mark(introduced.is_empty())
+    );
     assert!(
-        same && integrity == "ok" && fk_violations == 0,
+        same && integrity == "ok" && introduced.is_empty(),
         "리허설 실패"
     );
     println!("리허설 통과\n");
@@ -242,6 +252,78 @@ async fn print_review_items(db: &DatabaseConnection) {
         let count: i64 = row.try_get_by_index(0).unwrap();
         let amount: i64 = row.try_get_by_index(1).unwrap();
         println!("  {label}: {count}건 ({})", won(amount));
+    }
+}
+
+/// 부모 행이 없는 행(고아 데이터). 업데이트는 그대로 두고 진행하지만, 새 버전의 매출·미수금
+/// 화면에서는 빠지거나 고객 이름 없이 보일 수 있어 개수와 금액, 기록된 날짜를 확인합니다.
+async fn print_orphans(db: &DatabaseConnection, violations: &BTreeSet<Violation>) {
+    println!("부모 없는 행 (예전부터 있던 것, 업데이트해도 그대로 둠):");
+    if violations.is_empty() {
+        println!("  없음");
+        return;
+    }
+    let mut groups: BTreeMap<(&str, &str), Vec<i64>> = BTreeMap::new();
+    for (table, rowid, parent) in violations {
+        groups
+            .entry((table, parent))
+            .or_default()
+            .extend(rowid.iter().copied());
+    }
+    for ((table, parent), ids) in groups {
+        let list = ids.iter().map(i64::to_string).collect::<Vec<_>>().join(",");
+        // (금액, 기록 날짜, 부모를 가리키는 컬럼, 새 버전에서 어떻게 보이는지)
+        let (amount, date, parent_column, effect) = match table {
+            "payments" => (
+                "amount",
+                "paid_at",
+                "work_item_id",
+                "새 버전 입금 합계에서 빠짐 (0.2.7은 포함)",
+            ),
+            "work_items" => (
+                "price",
+                "received_at",
+                "customer_id",
+                "접수 합계에 포함. 고객 화면에는 안 보이고 매출 내역·미수금 목록에는 고객 이름 없이 보임",
+            ),
+            "work_item_details" => (
+                "unit_price * quantity",
+                "NULL",
+                "work_item_id",
+                "화면·합계에 쓰이지 않음",
+            ),
+            "price_items" => ("default_price", "NULL", "category_id", "단가표에 안 보임"),
+            _ => ("0", "NULL", "NULL", ""),
+        };
+        let row = db
+            .query_one(Statement::from_string(
+                DbBackend::Sqlite,
+                format!(
+                    "SELECT COUNT(*), COALESCE(SUM({amount}), 0),
+                            COALESCE(MIN({date}), ''), COALESCE(MAX({date}), ''),
+                            COALESCE(GROUP_CONCAT(DISTINCT {parent_column}), '')
+                     FROM {table} WHERE id IN ({list})"
+                ),
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        let count: i64 = row.try_get_by_index(0).unwrap();
+        let sum: i64 = row.try_get_by_index(1).unwrap();
+        let first: String = row.try_get_by_index(2).unwrap();
+        let last: String = row.try_get_by_index(3).unwrap();
+        let missing: String = row.try_get_by_index(4).unwrap();
+        print!("  {table} → 없는 {parent}: {count}건 ({})", won(sum));
+        if !first.is_empty() {
+            let day = |v: &str| v.chars().take(10).collect::<String>();
+            print!(" 기록 날짜 {}~{}", day(&first), day(&last));
+        }
+        println!();
+        println!("    {effect}");
+        println!("    행 번호: {:?}", &ids[..ids.len().min(20)]);
+        if !missing.is_empty() {
+            println!("    없는 {parent} 번호: {missing}");
+        }
     }
 }
 

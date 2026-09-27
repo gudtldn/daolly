@@ -85,7 +85,7 @@ pub fn run() {
                     // 종료하지 않고 복구 화면으로 시작 (백업 복원, 로그 확인, 업데이트 가능)
                     log::error!("DB를 열지 못해 복구 모드로 시작합니다: {e}");
                     app.manage(startup::StartupStatus::Failed {
-                        message: e.to_string(),
+                        message: startup::describe(&e),
                     });
                 }
             }
