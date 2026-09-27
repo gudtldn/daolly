@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { errorMessage } from "@/utils/errors";
+import { loadRecentCustomers, rememberRecentCustomer } from "@/utils/recentCustomers";
 import { useSearch } from "@/hooks/useSearch";
 import { useListInteraction } from "@/hooks/useListInteraction";
 import { CurrencyInput } from "@/components/CurrencyInput";
@@ -1030,12 +1031,10 @@ export function PosPage() {
 
   // 다른 페이지에서 돌아왔을 때 cartStore.customerId로 고객 복원 및 최근 목록 로드
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("pos_recent_customers");
-      if (stored) setRecentCustomers(JSON.parse(stored));
-    } catch (e) {
-      console.warn("Failed to load recent customers:", e);
-    }
+    let cancelled = false;
+    loadRecentCustomers()
+      .then((list) => { if (!cancelled) setRecentCustomers(list); })
+      .catch((e) => console.warn("Failed to load recent customers:", e));
 
     const storedId = useCartStore.getState().customerId;
     if (storedId && !selectedCustomer) {
@@ -1046,18 +1045,13 @@ export function PosPage() {
         useCartStore.getState().setCustomer(null); // stale id cleanup
       });
     }
+    return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSelectCustomer = (c: Customer) => {
     setSelectedCustomer(c);
     setCustomer(c.id);
-
-    setRecentCustomers((prev) => {
-      const filtered = prev.filter((p) => p.id !== c.id);
-      const next = [c, ...filtered].slice(0, 5);
-      localStorage.setItem("pos_recent_customers", JSON.stringify(next));
-      return next;
-    });
+    setRecentCustomers(rememberRecentCustomer(recentCustomers, c));
   };
 
   const handleDeselectCustomer = () => {
