@@ -67,7 +67,7 @@ pub async fn update_price_item(
     let existing = price_item::Entity::find_by_id(id)
         .one(db.inner())
         .await?
-        .ok_or_else(|| AppError::NotFound(format!("price_item {id}")))?;
+        .ok_or_else(|| AppError::NotFound("품목"))?;
 
     Ok(services::price_items::update(
         db.inner(),
@@ -83,7 +83,7 @@ pub async fn update_price_item(
 pub async fn delete_price_item(db: State<'_, DatabaseConnection>, id: i32) -> CmdResult<()> {
     let rows = services::price_items::delete(db.inner(), id).await?;
     if rows == 0 {
-        return Err(AppError::NotFound(format!("price_item {id}")));
+        return Err(AppError::NotFound("품목"));
     }
     Ok(())
 }

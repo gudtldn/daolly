@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { SalesRecord, UnpaidRecord, ChartDay, TopItem, RevenueSummary, PaymentRecord } from "@/types";
 
+// 기간(from, to)은 이 PC 기준 날짜 "YYYY-MM-DD"이며 양끝을 포함합니다.
 export const salesApi = {
   getRevenueSummary(from?: string, to?: string): Promise<RevenueSummary> {
     return invoke("get_revenue_summary", { from: from ?? null, to: to ?? null });

@@ -48,19 +48,20 @@ export function formatSmartDateTime(iso: string): { date: string; time: string; 
 }
 
 /**
- * 로컬 날짜의 시작 시각(00:00:00)을 UTC ISO 스트링으로 변환
+ * Date를 이 PC 기준 날짜 문자열(YYYY-MM-DD)로 변환 (매출 조회 기간에 사용)
  */
-export function getStartOfLocalDateAsUTC(date: Date): string {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString();
+export function toLocalDateString(date: Date): string {
+  const y = date.getFullYear();
+  const m = (date.getMonth() + 1).toString().padStart(2, "0");
+  const d = date.getDate().toString().padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 /**
- * 로컬 날짜의 종료 시각(23:59:59)을 UTC ISO 스트링으로 변환
+ * 날짜 문자열(YYYY-MM-DD)을 이 PC 기준 자정의 Date로 변환
+ * (new Date("YYYY-MM-DD")는 UTC 자정으로 해석되므로 쓰지 않음)
  */
-export function getEndOfLocalDateAsUTC(date: Date): string {
-  const d = new Date(date);
-  d.setHours(23, 59, 59, 999);
-  return d.toISOString();
+export function parseLocalDate(date: string): Date {
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(y, m - 1, d);
 }

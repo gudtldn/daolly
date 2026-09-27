@@ -2,7 +2,7 @@ use sea_orm::DatabaseConnection;
 use serde::Deserialize;
 use tauri::State;
 
-use crate::commands::{CmdResult, require_positive};
+use crate::commands::{CmdResult, normalize_time, require_positive};
 use crate::db::entities::payment;
 use crate::services;
 
@@ -42,14 +42,15 @@ pub async fn create_payment(
     data: CreatePayment,
 ) -> CmdResult<payment::Model> {
     require_positive(data.amount, "결제 금액")?;
-    Ok(services::payments::create(
+    let paid_at = normalize_time(data.paid_at, "결제 일시")?;
+    services::payments::create(
         db.inner(),
         data.work_item_id,
         data.amount,
         data.method,
-        data.paid_at,
+        paid_at,
     )
-    .await?)
+    .await
 }
 
 #[tauri::command]
@@ -59,11 +60,19 @@ pub async fn update_payment(
     data: UpdatePayment,
 ) -> CmdResult<payment::Model> {
     require_positive(data.amount, "결제 금액")?;
-    Ok(services::payments::update(db.inner(), id, data.amount, data.method, data.paid_at).await?)
+    let paid_at = normalize_time(data.paid_at, "결제 일시")?;
+    services::payments::update(db.inner(), id, data.amount, data.method, paid_at).await
 }
 
 #[tauri::command]
 pub async fn delete_payment(db: State<'_, DatabaseConnection>, id: i32) -> CmdResult<()> {
-    services::payments::delete(db.inner(), id).await?;
-    Ok(())
+    services::payments::delete(db.inner(), id).await
+}
+
+/// 예전 버전에서 결제 수단을 '외상'으로 등록한 결제 목록 (데이터 점검용)
+#[tauri::command]
+pub async fn list_credit_payments(
+    db: State<'_, DatabaseConnection>,
+) -> CmdResult<Vec<services::payments::CreditPayment>> {
+    Ok(services::payments::list_credit(db.inner()).await?)
 }

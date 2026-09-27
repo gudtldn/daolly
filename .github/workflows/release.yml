@@ -10,7 +10,12 @@ permissions:
   contents: write
 
 jobs:
+  # 테스트를 통과해야만 빌드/릴리스가 진행됩니다.
+  test:
+    uses: ./.github/workflows/ci.yml
+
   prepare:
+    needs: test
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get-version.outputs.version }}
@@ -84,7 +89,8 @@ jobs:
         with:
           tagName: v${{ needs.prepare.outputs.version }}
           releaseName: 'daolly v${{ needs.prepare.outputs.version }}'
-          releaseDraft: false
+          # 드래프트로 생성 → 직접 확인 후 게시해야 자동 업데이트(latest.json)에 노출됩니다.
+          releaseDraft: true
           prerelease: false
           includeUpdaterJson: true
           generateReleaseNotes: true

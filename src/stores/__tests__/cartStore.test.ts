@@ -3,19 +3,22 @@ import { useCartStore } from "@/stores/cartStore";
 
 vi.mock("@/bindings", () => ({
   workItemApi: {
-    create: vi.fn(),
-  },
-  paymentApi: {
-    create: vi.fn(),
+    receive: vi.fn(),
   },
 }));
 
 import { workItemApi } from "@/bindings";
+import type { WorkItemFull } from "@/types";
 
-const mockCreate = vi.mocked(workItemApi.create);
+const mockReceive = vi.mocked(workItemApi.receive);
+
+const receipt: WorkItemFull = {
+  id: 1, customerId: 1, status: "Received", description: "와이셔츠, 바지", price: 7000, paidAmount: 7000, note: "급행",
+  receivedAt: "", completedAt: null, pickedUpAt: null, createdAt: "", lastModifiedAt: "", details: [], payments: [],
+};
 
 function resetStore() {
-  useCartStore.setState({ customerId: null, items: [] });
+  useCartStore.setState({ customerId: null, items: [], requestId: null });
 }
 
 const sampleItem = { priceItemId: 1, name: "와이셔츠", unitPrice: 3000 };
@@ -93,41 +96,84 @@ describe("cartStore", () => {
   });
 
   describe("submit", () => {
+    function fillCart() {
+      useCartStore.setState({ customerId: 1 });
+      useCartStore.getState().addItem(sampleItem);
+      useCartStore.getState().addItem({ priceItemId: 2, name: "바지", unitPrice: 4000 });
+    }
+
     it("고객 미선택 시 에러", async () => {
       useCartStore.getState().addItem(sampleItem);
-      await expect(useCartStore.getState().submit("card")).rejects.toThrow(
-        "Customer is not selected",
-      );
+      await expect(useCartStore.getState().submit("card")).rejects.toThrow("고객을 먼저 선택해 주세요.");
     });
 
     it("빈 카트 시 에러", async () => {
       useCartStore.setState({ customerId: 1 });
-      await expect(useCartStore.getState().submit("card")).rejects.toThrow("Cart is empty");
+      await expect(useCartStore.getState().submit("card")).rejects.toThrow("접수할 품목이 없습니다.");
     });
 
-    it("성공 시 API 호출 + 카트 초기화", async () => {
-      const mockWorkItem = { id: 1, customerId: 1, status: "Received" as const, description: null, price: 7000, paidAmount: 0, note: null, receivedAt: "", completedAt: null, pickedUpAt: null, createdAt: "", lastModifiedAt: "" };
-      mockCreate.mockResolvedValue(mockWorkItem);
-
-      useCartStore.setState({ customerId: 1 });
-      useCartStore.getState().addItem(sampleItem);
-      useCartStore.getState().addItem({ priceItemId: 2, name: "바지", unitPrice: 4000 });
+    it("접수와 결제를 한 번에 요청하고 카트 초기화 (총액은 서버가 계산)", async () => {
+      mockReceive.mockResolvedValue(receipt);
+      fillCart();
 
       const result = await useCartStore.getState().submit("card", "급행");
 
-      expect(mockCreate).toHaveBeenCalledWith({
+      expect(mockReceive).toHaveBeenCalledTimes(1);
+      expect(mockReceive).toHaveBeenCalledWith({
+        requestId: expect.any(String),
         customerId: 1,
-        price: 7000,
         note: "급행",
-        details: [
+        lines: [
           { itemName: "와이셔츠", unitPrice: 3000, quantity: 1, priceItemId: 1, optionsMemo: null },
           { itemName: "바지", unitPrice: 4000, quantity: 1, priceItemId: 2, optionsMemo: null },
         ],
+        payment: { method: "card" },
       });
-      expect(result).toEqual(mockWorkItem);
+      expect(result).toEqual(receipt);
       // 아이템만 초기화, 고객은 유지 (접수 후 동일 고객 연속 접수 지원)
       expect(useCartStore.getState().items).toHaveLength(0);
       expect(useCartStore.getState().customerId).toBe(1);
+      expect(useCartStore.getState().requestId).toBeNull();
+    });
+
+    it("외상이면 결제 없이 접수", async () => {
+      mockReceive.mockResolvedValue(receipt);
+      fillCart();
+
+      await useCartStore.getState().submit("credit");
+      expect(mockReceive.mock.calls[0][0].payment).toBeNull();
+    });
+
+    it("결과를 받기 전에 다시 누르면 요청을 한 번만 보냄", async () => {
+      let resolve!: (r: WorkItemFull) => void;
+      mockReceive.mockReturnValue(new Promise((r) => { resolve = r; }));
+      fillCart();
+
+      const first = useCartStore.getState().submit("cash");
+      const second = useCartStore.getState().submit("cash");
+      resolve(receipt);
+
+      await expect(first).resolves.toEqual(receipt);
+      await expect(second).resolves.toEqual(receipt);
+      expect(mockReceive).toHaveBeenCalledTimes(1);
+    });
+
+    it("실패 후 다시 보내면 같은 요청 ID를 쓰고, 장바구니가 바뀌면 새 ID를 씀", async () => {
+      mockReceive.mockRejectedValueOnce({ code: "BUSY", message: "잠시 후 다시 시도해 주세요." });
+      fillCart();
+
+      await expect(useCartStore.getState().submit("cash")).rejects.toEqual(
+        expect.objectContaining({ code: "BUSY" }),
+      );
+      mockReceive.mockRejectedValueOnce({ code: "BUSY", message: "잠시 후 다시 시도해 주세요." });
+      await expect(useCartStore.getState().submit("cash")).rejects.toBeTruthy();
+      const [first, retry] = mockReceive.mock.calls.map((c) => c[0].requestId);
+      expect(retry).toBe(first);
+
+      useCartStore.getState().updateQuantity(0, 2);
+      mockReceive.mockResolvedValueOnce(receipt);
+      await useCartStore.getState().submit("cash");
+      expect(mockReceive.mock.calls[2][0].requestId).not.toBe(first);
     });
   });
 

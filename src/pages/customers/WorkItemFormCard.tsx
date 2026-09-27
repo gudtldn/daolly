@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { X, Plus, Trash2, Pencil, Check } from "lucide-react";
-import type { WorkItemFull, WorkItemStatus, CreateWorkItem, UpdateWorkItem, DetailInput, Payment } from "@/types";
+import type { WorkItemFull, WorkItemStatus, ReceiveOrder, AmendOrder, DetailInput, Payment } from "@/types";
 import { paymentApi } from "@/bindings";
+import { errorMessage } from "@/utils/errors";
+import { useDialogStore } from "@/stores/dialogStore";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { NumberInput } from "@/components/NumberInput";
 
@@ -12,9 +14,19 @@ function toLocalInput(iso: string | null): string {
   const pad = (n: number) => n.toString().padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+/** datetime-local 값(현지 시각)을 저장 형식(UTC ISO)으로 변환. 빈 값은 "" */
 function fromLocalInput(local: string): string {
-  // Return local time as-is (with seconds) - no UTC conversion
-  return local ? local + ":00" : "";
+  return local ? new Date(local).toISOString() : "";
+}
+
+/**
+ * 날짜 입력이 처음 값과 달라졌을 때만 저장 형식으로 돌려줍니다.
+ * 바뀌지 않았으면 null(변경 없음), 비웠으면 ""(지우기).
+ * 비울 수 없는 값(접수·결제 일시)은 `|| null`로 ""를 변경 없음으로 취급합니다.
+ */
+function changedDate(current: string, initial: string): string | null {
+  if (current === initial) return null;
+  return fromLocalInput(current);
 }
 
 // 결제 수단 키 -> 한글 표시 변환 (영문 key 기준, 구형 DB 한글 key fallback 포함)
@@ -44,7 +56,8 @@ interface Props {
   workItem?: WorkItemFull | null;
   /** edit 모드에서 초기 탭 선택 */
   initialTab?: Tab;
-  onSave: (data: CreateWorkItem | UpdateWorkItem, details?: DetailInput[], status?: WorkItemStatus, pickedUpAt?: string) => Promise<void>;
+  /** create: 새 접수 / edit: 상태·내용·품목 수정 (각각 한 번에 저장) */
+  onSave: (data: ReceiveOrder | AmendOrder) => Promise<void>;
   onClose: () => void;
   /** 결제 변경 후 외부 상태 갱신 */
   onPaymentChange?: () => void;
@@ -71,6 +84,11 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
   const descRef = useRef<HTMLInputElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
   const itemRefs = useRef<Map<number, HTMLInputElement>>(new Map());
+  // 열 때의 날짜 입력값. 사용자가 바꾼 날짜만 보내기 위함
+  // (예전에는 메모만 고쳐도 접수 일시를 다시 저장해 초 단위가 사라지고 형식이 바뀌었음)
+  const initialDates = useRef({ receivedAt: "", pickedUpAt: "", payDate: "" });
+  // 새 접수의 요청 ID (열 때마다 새로 만듦). 저장을 두 번 눌러도 접수는 한 번만 생김
+  const requestId = useRef("");
 
   // 결제 탭 상태
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -83,10 +101,10 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
   const [editAmount, setEditAmount] = useState(0);
   const [editMethod, setEditMethod] = useState("");
   const [editDate, setEditDate] = useState("");
+  const [editDateInitial, setEditDateInitial] = useState("");
 
   // 자동 합산 가격
   const autoPrice = details.reduce((sum, d) => sum + d.unitPrice * d.quantity, 0);
-  const effectivePrice = manualPrice ? priceInput : autoPrice;
 
   // 열릴 때 폼 초기화 및 포커스 저장
   useEffect(() => {
@@ -108,10 +126,13 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       setStatus(workItem.status);
       setReceivedAt(toLocalInput(workItem.receivedAt));
       setPickedUpAt(toLocalInput(workItem.pickedUpAt));
+      initialDates.current.receivedAt = toLocalInput(workItem.receivedAt);
+      initialDates.current.pickedUpAt = toLocalInput(workItem.pickedUpAt);
       setDetails(
         workItem.details.length > 0
           ? workItem.details.map((d) => ({
               _key: d.id + Math.random(),
+              priceItemId: d.priceItemId,
               itemName: d.itemName,
               unitPrice: d.unitPrice,
               quantity: d.quantity,
@@ -129,6 +150,9 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       setStatus("Received");
       setReceivedAt(toLocalInput(new Date().toISOString()));
       setPickedUpAt("");
+      initialDates.current.receivedAt = toLocalInput(new Date().toISOString());
+      initialDates.current.pickedUpAt = "";
+      requestId.current = crypto.randomUUID();
       setDetails([emptyDetail()]);
       setManualPrice(false);
       setPriceInput(0);
@@ -147,6 +171,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
     }
     setPayMethod("cash");
     setPayDate(toLocalInput(new Date().toISOString()));
+    initialDates.current.payDate = toLocalInput(new Date().toISOString());
     setPayLoading(false);
     setEditingPaymentId(null);
   }, [open, mode, workItem, initialTab]);
@@ -166,7 +191,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
     if (!workItem || payAmount <= 0) return;
     setPayLoading(true);
     try {
-      await paymentApi.create({ workItemId: workItem.id, amount: payAmount, method: payMethod, paidAt: payDate ? fromLocalInput(payDate) : undefined });
+      await paymentApi.create({ workItemId: workItem.id, amount: payAmount, method: payMethod, paidAt: changedDate(payDate, initialDates.current.payDate) || undefined });
       const updated = await paymentApi.list(workItem.id);
       setPayments(updated);
       const newPaid = updated.reduce((s, p) => s + p.amount, 0);
@@ -174,7 +199,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       setPayAmount(remaining > 0 ? remaining : 0);
       onPaymentChange?.();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     } finally {
       setPayLoading(false);
     }
@@ -186,6 +211,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
     setEditAmount(p.amount);
     setEditMethod(p.method ?? "cash");
     setEditDate(toLocalInput(p.paidAt));
+    setEditDateInitial(toLocalInput(p.paidAt));
   };
 
   // 결제 수정 저장
@@ -196,7 +222,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       await paymentApi.update(editingPaymentId, {
         amount: editAmount,
         method: editMethod || null,
-        paidAt: editDate ? fromLocalInput(editDate) : undefined,
+        paidAt: changedDate(editDate, editDateInitial) || undefined,
       });
       const updated = await paymentApi.list(workItem.id);
       setPayments(updated);
@@ -206,7 +232,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       setEditingPaymentId(null);
       onPaymentChange?.();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     } finally {
       setPayLoading(false);
     }
@@ -224,12 +250,19 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
     }
   }, [activeTab]);
 
-  // 결제 삭제
-  const handleDeletePayment = async (paymentId: number) => {
+  // 결제 취소 (기록은 남고 받은 금액과 매출에서 빠짐)
+  const handleDeletePayment = async (payment: Payment) => {
     if (!workItem) return;
+    const confirmed = await useDialogStore.getState().showConfirm({
+      title: "결제 취소",
+      message: `${payment.amount.toLocaleString()}원 결제를 취소하시겠습니까? 받은 금액과 매출에서 빠집니다.`,
+      confirmText: "결제 취소",
+      isDestructive: true,
+    });
+    if (!confirmed) return;
     setPayLoading(true);
     try {
-      await paymentApi.delete(paymentId);
+      await paymentApi.delete(payment.id);
       const updated = await paymentApi.list(workItem.id);
       setPayments(updated);
       const newPaid = updated.reduce((s, p) => s + p.amount, 0);
@@ -237,7 +270,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       setPayAmount(remaining > 0 ? remaining : 0);
       onPaymentChange?.();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     } finally {
       setPayLoading(false);
     }
@@ -246,7 +279,11 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
   // 품목 행 변경
   const updateDetail = (key: number, field: keyof DetailInput, value: string | number) => {
     setDetails((prev) =>
-      prev.map((d) => (d._key === key ? { ...d, [field]: value } : d))
+      prev.map((d) => {
+        if (d._key !== key) return d;
+        // 품목명을 바꾸면 더 이상 단가표의 그 품목이 아니므로 연결을 끊음
+        return field === "itemName" ? { ...d, itemName: String(value), priceItemId: null } : { ...d, [field]: value };
+      })
     );
   };
 
@@ -268,6 +305,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
   };
 
   const handleSubmit = async () => {
+    if (saving) return;
     const trimmedDesc = description.trim();
     if (!trimmedDesc) {
       setError("작업내용을 입력해주세요.");
@@ -285,6 +323,8 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
     setSaving(true);
     try {
       const detailInputs: DetailInput[] = validDetails.map((d) => ({
+        // 단가표 품목 연결 유지 (예전에는 수정할 때마다 빠졌음)
+        priceItemId: d.priceItemId ?? null,
         itemName: d.itemName.trim(),
         unitPrice: d.unitPrice,
         quantity: d.quantity,
@@ -292,33 +332,38 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       }));
 
       if (mode === "create") {
-        const statusOverride = status !== "Received" ? status : undefined;
-        const pickupDate = pickedUpAt ? fromLocalInput(pickedUpAt) : undefined;
-        await onSave({
+        const order: ReceiveOrder = {
+          requestId: requestId.current,
           customerId,
           description: trimmedDesc,
-          price: effectivePrice,
           note: note.trim() || null,
-          receivedAt: receivedAt ? fromLocalInput(receivedAt) : null,
-          details: detailInputs,
-        } as CreateWorkItem, undefined, statusOverride, pickupDate);
+          // 기본값(연 시각)을 그대로 두면 서버가 저장 시각을 사용
+          receivedAt: changedDate(receivedAt, initialDates.current.receivedAt) || null,
+          lines: detailInputs,
+          // 직접 입력하지 않으면 서버가 품목 합계로 계산
+          priceOverride: manualPrice ? priceInput : null,
+          status,
+          pickedUpAt: status === "PickedUp" ? changedDate(pickedUpAt, initialDates.current.pickedUpAt) || null : null,
+        };
+        await onSave(order);
       } else {
-        const statusChanged = workItem && status !== workItem.status ? status : undefined;
-        await onSave(
-          {
-            description: trimmedDesc,
-            price: effectivePrice,
-            note: note.trim(),
-            receivedAt: receivedAt ? fromLocalInput(receivedAt) : null,
-            pickedUpAt: pickedUpAt ? fromLocalInput(pickedUpAt) : "",
-          } as UpdateWorkItem,
-          detailInputs,
-          statusChanged,
-        );
+        const amendment: AmendOrder = {
+          description: trimmedDesc,
+          note: note.trim(),
+          // null = 변경 없음
+          receivedAt: changedDate(receivedAt, initialDates.current.receivedAt) || null,
+          // 수령 일시는 '수령' 상태일 때만 있음 (상태를 되돌리면 서버가 지움)
+          pickedUpAt: status === "PickedUp" ? changedDate(pickedUpAt, initialDates.current.pickedUpAt) || null : null,
+          lines: detailInputs,
+          // 직접 입력하지 않으면 서버가 품목 합계로 계산
+          priceOverride: manualPrice ? priceInput : null,
+          status: workItem && status !== workItem.status ? status : null,
+        };
+        await onSave(amendment);
       }
       onClose();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     } finally {
       setSaving(false);
     }
@@ -480,13 +525,13 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                           className="w-full px-2 py-1 border border-border-default rounded-lg text-sm bg-surface-card text-on-surface focus:outline-none focus:border-primary-500"
                         />
                         <div className="mt-1 flex items-center gap-1">
-                          <span className="text-[0.6875rem] text-on-surface-muted/60 shrink-0">&#8627;</span>
+                          <span className="text-xs text-on-surface-muted/60 shrink-0">&#8627;</span>
                           <input
                             type="text"
                             value={d.optionsMemo ?? ""}
                             onChange={(e) => updateDetail(d._key, "optionsMemo", e.target.value)}
                             placeholder="옵션 메모 (선택)"
-                            className="flex-1 px-2 py-0.5 border border-border-default rounded text-[0.6875rem] bg-surface text-on-surface-muted placeholder:text-on-surface-muted/50 focus:outline-none focus:border-primary-400"
+                            className="flex-1 px-2 py-0.5 border border-border-default rounded text-xs bg-surface text-on-surface-muted placeholder:text-on-surface-muted/50 focus:outline-none focus:border-primary-400"
                           />
                         </div>
                       </td>
@@ -638,7 +683,6 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                                     <option value="cash">현금</option>
                                     <option value="card">카드</option>
                                     <option value="transfer">계좌이체</option>
-                                    <option value="credit">외상</option>
                                   </select>
                                 </td>
                                 <td className="px-1 py-1.5">
@@ -677,7 +721,8 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                                       <Pencil className="w-3.5 h-3.5" />
                                     </button>
                                     <button
-                                      onClick={() => handleDeletePayment(p.id)}
+                                      onClick={() => handleDeletePayment(p)}
+                                      title="결제 취소"
                                       disabled={payLoading}
                                       className="p-1.5 text-on-surface-muted hover:text-danger-500 transition-colors cursor-pointer disabled:opacity-30"
                                     >
@@ -728,7 +773,6 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                           <option value="cash">현금</option>
                           <option value="card">카드</option>
                           <option value="transfer">계좌이체</option>
-                          <option value="credit">외상</option>
                         </select>
                       </div>
                       <button

@@ -12,9 +12,8 @@ describe("Sidebar", () => {
   });
 
 
-  it("메인 네비게이션 메뉴 4개를 렌더링한다", () => {
+  it("메인 네비게이션 메뉴 3개를 렌더링한다", () => {
     renderWithRouter(<Sidebar />);
-    expect(screen.getByText("대시보드")).toBeInTheDocument();
     expect(screen.getByText("접수 / 출고")).toBeInTheDocument();
     expect(screen.getByText("고객 관리")).toBeInTheDocument();
     expect(screen.getByText("매출 관리")).toBeInTheDocument();
@@ -27,7 +26,6 @@ describe("Sidebar", () => {
 
   it("모든 메뉴가 올바른 경로를 가진다", () => {
     renderWithRouter(<Sidebar />);
-    expect(screen.getByText("대시보드").closest("a")).toHaveAttribute("href", "/dashboard");
     expect(screen.getByText("접수 / 출고").closest("a")).toHaveAttribute("href", "/pos");
     expect(screen.getByText("고객 관리").closest("a")).toHaveAttribute("href", "/customers");
     expect(screen.getByText("매출 관리").closest("a")).toHaveAttribute("href", "/sales");
@@ -42,7 +40,7 @@ describe("Sidebar", () => {
 
   it("비활성 메뉴는 기본 스타일을 가진다", () => {
     renderWithRouter(<Sidebar />, { initialEntries: ["/customers"] });
-    const inactiveLink = screen.getByText("대시보드").closest("a");
+    const inactiveLink = screen.getByText("매출 관리").closest("a");
     expect(inactiveLink?.className).toContain("text-secondary-400");
   });
 
@@ -53,7 +51,7 @@ describe("Sidebar", () => {
     await user.click(screen.getByLabelText("사이드바 접기"));
 
     // 접힌 상태: 라벨이 숨겨짐
-    expect(screen.queryByText("대시보드")).not.toBeInTheDocument();
+    expect(screen.queryByText("고객 관리")).not.toBeInTheDocument();
     // 로고 텍스트가 DOM에서 제거됨
     expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
     // aside 너비 클래스 변경
@@ -68,7 +66,7 @@ describe("Sidebar", () => {
     await user.click(screen.getByLabelText("사이드바 접기"));
     await user.click(screen.getByLabelText("사이드바 펼치기"));
 
-    expect(screen.getByText("대시보드")).toBeInTheDocument();
+    expect(screen.getByText("고객 관리")).toBeInTheDocument();
     const aside = document.querySelector("aside");
     expect(aside?.className).toContain("w-60");
   });

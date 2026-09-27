@@ -1,17 +1,17 @@
-use chrono::Utc;
-use sea_orm::{
-    ConnectionTrait, Database, DatabaseConnection, DbErr, EntityTrait, Set, TransactionTrait,
-};
+use chrono::Local;
+use sea_orm::{ConnectionTrait, DatabaseConnection, DbErr, EntityTrait, Set, TransactionTrait};
 use std::collections::HashSet;
 use std::path::PathBuf;
 
 use crate::db::entities::{category, customer, payment, price_item, work_item, work_item_detail};
+use crate::timestamp;
 
 /// 모든 데이터를 삭제합니다.
 pub async fn clear_database(db: &DatabaseConnection) -> Result<(), DbErr> {
     db.transaction::<_, (), DbErr>(|txn| {
         Box::pin(async move {
             // 하위 테이블부터 삭제 (외래 키 제약 조건 고려)
+            txn.execute_unprepared("DELETE FROM audit_log").await?;
             work_item_detail::Entity::delete_many().exec(txn).await?;
             payment::Entity::delete_many().exec(txn).await?;
             work_item::Entity::delete_many().exec(txn).await?;
@@ -31,19 +31,21 @@ pub async fn clear_database(db: &DatabaseConnection) -> Result<(), DbErr> {
 pub async fn migrate_from_legacy(
     db: &DatabaseConnection,
     legacy_path: PathBuf,
-) -> Result<(), Box<dyn std::error::Error>> {
-    // 1. 레거시 DB 연결
-    let legacy_url = format!("sqlite:{}?mode=ro", legacy_path.display());
-    let legacy_db = Database::connect(&legacy_url).await?;
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // 1. 레거시 DB 연결 (읽기 전용)
+    let legacy_db = crate::db::connect(&legacy_path, true).await?;
+    let result = import_legacy(db, &legacy_db).await;
+    let _ = legacy_db.close_by_ref().await;
+    result
+}
 
-    // 2. 외래 키 체크 일시 중지
-    db.execute(sea_orm::Statement::from_string(
-        sea_orm::DatabaseBackend::Sqlite,
-        "PRAGMA foreign_keys = OFF",
-    ))
-    .await?;
-
-    // 3. 트랜잭션 시작
+async fn import_legacy(
+    db: &DatabaseConnection,
+    legacy_db: &DatabaseConnection,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // 2~3. 트랜잭션 시작 (실패하면 전체 롤백)
+    // 외래 키 검사는 켠 채로 둡니다: 자식 → 부모 순으로 지우고 부모 → 자식 순으로 넣으므로
+    // 끌 필요가 없고, 끈 채로 실패하면 이후 CASCADE가 동작하지 않는 문제가 있었습니다.
     let tx = db.begin().await?;
 
     // 3.1 기존 데이터 완전 초기화 (Clean Slate)
@@ -76,7 +78,7 @@ pub async fn migrate_from_legacy(
         ))
         .await?;
 
-    let now = Utc::now().to_rfc3339();
+    let now = timestamp::now();
     let mut imported_customer_ids = HashSet::new();
     let mut customer_models = Vec::new();
 
@@ -95,6 +97,7 @@ pub async fn migrate_from_legacy(
             note: Set(note),
             created_at: Set(now.clone()),
             last_modified_at: Set(now.clone()),
+            deleted_at: Set(None),
         });
         imported_customer_ids.insert(old_id);
     }
@@ -118,6 +121,7 @@ pub async fn migrate_from_legacy(
         )),
         created_at: Set(now.clone()),
         last_modified_at: Set(now.clone()),
+        deleted_at: Set(None),
     };
     customer::Entity::insert(orphan_model).exec(&tx).await?;
 
@@ -150,13 +154,15 @@ pub async fn migrate_from_legacy(
         let mut completed_at = None;
         let mut paid_amount = 0;
 
-        // ISO 8601 변환
+        // 레거시 날짜(YYYY-MM-DD)는 이 PC 현지 자정으로 보고 저장 형식(UTC)으로 변환
         let recv_at = reception_date
-            .as_ref()
-            .map(|d| format!("{}T00:00:00", d))
-            .unwrap_or_else(|| Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string());
+            .as_deref()
+            .and_then(|d| timestamp::normalize_legacy(d, &Local))
+            .unwrap_or_else(|| now.clone());
 
-        let proc_at = processing_date.as_ref().map(|d| format!("{}T00:00:00", d));
+        let proc_at = processing_date
+            .as_deref()
+            .and_then(|d| timestamp::normalize_legacy(d, &Local));
 
         // 1. 납품일자가 있으면 무조건 수거완료(PickedUp)
         if proc_at.is_some() {
@@ -188,6 +194,8 @@ pub async fn migrate_from_legacy(
             picked_up_at: Set(picked_up_at),
             created_at: Set(now.clone()),
             last_modified_at: Set(now.clone()),
+            request_id: Set(None),
+            deleted_at: Set(None),
         };
         work_item::Entity::insert(model).exec(&tx).await?;
 
@@ -207,13 +215,6 @@ pub async fn migrate_from_legacy(
 
     tx.commit().await?;
 
-    // 6. 외래 키 체크 다시 활성화
-    db.execute(sea_orm::Statement::from_string(
-        sea_orm::DatabaseBackend::Sqlite,
-        "PRAGMA foreign_keys = ON",
-    ))
-    .await?;
-
     Ok(())
 }
 
@@ -222,18 +223,14 @@ mod tests {
     use super::*;
     use crate::db::entities::{customer, payment, work_item};
     use crate::test_helpers::setup_test_db;
-    use sea_orm::EntityTrait;
-    use std::fs;
+    use sea_orm::{Database, EntityTrait};
 
     #[tokio::test]
     async fn test_full_migration_flow() {
         // 1. 테스트용 레거시 DB 생성
-        let legacy_path = PathBuf::from("test_legacy.db");
+        let dir = tempfile::tempdir().unwrap();
+        let legacy_path = dir.path().join("test_legacy.db");
         let legacy_url = format!("sqlite:{}?mode=rwc", legacy_path.display());
-
-        if legacy_path.exists() {
-            fs::remove_file(&legacy_path).unwrap();
-        }
 
         {
             let legacy_db = Database::connect(&legacy_url).await.unwrap();
@@ -292,8 +289,103 @@ mod tests {
         assert_eq!(payments.len(), 1);
         assert_eq!(payments[0].amount, 5000);
         assert_eq!(payments[0].method, Some("transfer".to_owned()));
+    }
 
-        // 4. 테스트 파일 정리
-        fs::remove_file(legacy_path).unwrap();
+    /// 이관이 중간에 실패해도 기존 데이터는 그대로이고, 외래 키 검사(CASCADE)가 계속 동작해야 함
+    #[tokio::test]
+    async fn failed_import_keeps_data_and_foreign_keys() {
+        let dir = tempfile::tempdir().unwrap();
+        let legacy_path = dir.path().join("broken_legacy.db");
+        {
+            let legacy_url = format!("sqlite:{}?mode=rwc", legacy_path.display());
+            let legacy_db = Database::connect(&legacy_url).await.unwrap();
+            // garments 테이블이 없어 고객 이관 후 실패
+            legacy_db
+                .execute_unprepared("CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT, phone_number TEXT, note TEXT)")
+                .await
+                .unwrap();
+        }
+
+        let db = setup_test_db().await.unwrap();
+        let existing = crate::services::customers::create(&db, "기존 고객".into(), None, None)
+            .await
+            .unwrap();
+        let wi = crate::services::work_items::create(
+            &db,
+            existing.id,
+            Some("접수".into()),
+            1000,
+            None,
+            None,
+            vec![],
+        )
+        .await
+        .unwrap();
+
+        assert!(migrate_from_legacy(&db, legacy_path).await.is_err());
+
+        // 트랜잭션 롤백으로 기존 데이터 유지
+        let names: Vec<String> = customer::Entity::find()
+            .all(&db)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|c| c.name)
+            .collect();
+        assert_eq!(names, vec!["기존 고객"]);
+
+        // 외래 키가 켜져 있음: 접수가 있는 고객 행은 지울 수 없음 (RESTRICT)
+        assert!(
+            db.execute_unprepared(&format!("DELETE FROM customers WHERE id = {}", existing.id))
+                .await
+                .is_err()
+        );
+        assert!(
+            work_item::Entity::find_by_id(wi.id)
+                .one(&db)
+                .await
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    /// '모든 데이터 삭제'는 외래 키가 RESTRICT여도 하위 테이블부터 지워 모두 비움
+    #[tokio::test]
+    async fn clear_database_removes_everything() {
+        let db = setup_test_db().await.unwrap();
+        let c = crate::services::customers::create(&db, "고객".into(), None, None)
+            .await
+            .unwrap();
+        let wi = crate::services::work_items::create(
+            &db,
+            c.id,
+            Some("접수".into()),
+            1000,
+            None,
+            None,
+            vec![],
+        )
+        .await
+        .unwrap();
+        crate::services::payments::create(&db, wi.id, 1000, Some("cash".into()), None)
+            .await
+            .unwrap();
+        crate::services::orders::cancel(&db, wi.id).await.unwrap();
+
+        clear_database(&db).await.unwrap();
+
+        for table in ["customers", "work_items", "payments", "audit_log"] {
+            let count: i64 = db
+                .query_one(sea_orm::Statement::from_string(
+                    sea_orm::DbBackend::Sqlite,
+                    format!("SELECT COUNT(*) FROM {table}"),
+                ))
+                .await
+                .unwrap()
+                .unwrap()
+                .try_get_by_index(0)
+                .unwrap();
+            assert_eq!(count, 0, "{table}");
+        }
     }
 }
