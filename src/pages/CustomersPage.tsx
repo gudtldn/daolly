@@ -26,8 +26,8 @@ import { useDialogStore } from "@/stores/dialogStore";
 import { customerApi, workItemApi } from "@/bindings";
 import { errorMessage } from "@/utils/errors";
 
-// 삭제 후 '되돌리기'를 누를 수 있는 시간
-const UNDO_DURATION_MS = 20_000;
+// 삭제 후 '되돌리기'를 누를 수 있는 시간 (알림 위에 마우스를 올리면 그동안은 사라지지 않음)
+const UNDO_DURATION_MS = 8_000;
 import { CustomerFormCard } from "@/pages/customers/CustomerFormCard";
 import { WorkItemFormCard } from "@/pages/customers/WorkItemFormCard";
 
