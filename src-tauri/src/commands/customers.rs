@@ -1,4 +1,4 @@
-use sea_orm::{DatabaseConnection, EntityTrait};
+use sea_orm::DatabaseConnection;
 use tauri::State;
 
 use crate::commands::{AppError, CmdResult, require_non_empty};
@@ -40,7 +40,7 @@ pub async fn get_customer(
 ) -> CmdResult<customer::Model> {
     services::customers::get_by_id(db.inner(), id)
         .await?
-        .ok_or_else(|| AppError::NotFound(format!("customer {id}")))
+        .ok_or_else(|| AppError::NotFound("고객"))
 }
 
 #[tauri::command]
@@ -59,10 +59,9 @@ pub async fn update_customer(
     data: UpdateCustomer,
 ) -> CmdResult<customer::Model> {
     require_non_empty(&data.name, "고객 이름")?;
-    let existing = customer::Entity::find_by_id(id)
-        .one(db.inner())
+    let existing = services::customers::get_by_id(db.inner(), id)
         .await?
-        .ok_or_else(|| AppError::NotFound(format!("customer {id}")))?;
+        .ok_or_else(|| AppError::NotFound("고객"))?;
 
     Ok(services::customers::update(
         db.inner(),
@@ -74,11 +73,19 @@ pub async fn update_customer(
     .await?)
 }
 
+/// 삭제한 고객 되돌리기
+#[tauri::command]
+pub async fn restore_customer(db: State<'_, DatabaseConnection>, id: i32) -> CmdResult<()> {
+    if !services::customers::restore(db.inner(), id).await? {
+        return Err(AppError::NotFound("고객"));
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn delete_customer(db: State<'_, DatabaseConnection>, id: i32) -> CmdResult<()> {
-    let rows = services::customers::delete(db.inner(), id).await?;
-    if rows == 0 {
-        return Err(AppError::NotFound(format!("customer {id}")));
+    if !services::customers::delete(db.inner(), id).await? {
+        return Err(AppError::NotFound("고객"));
     }
     Ok(())
 }

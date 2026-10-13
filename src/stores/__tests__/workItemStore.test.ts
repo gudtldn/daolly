@@ -6,8 +6,8 @@ vi.mock("@/bindings", () => ({
   workItemApi: {
     list: vi.fn(),
     get: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
+    receive: vi.fn(),
+    amend: vi.fn(),
     updateStatus: vi.fn(),
     delete: vi.fn(),
   },
@@ -17,8 +17,8 @@ import { workItemApi } from "@/bindings";
 
 const mockList = vi.mocked(workItemApi.list);
 const mockGet = vi.mocked(workItemApi.get);
-const mockCreate = vi.mocked(workItemApi.create);
-const mockUpdate = vi.mocked(workItemApi.update);
+const mockReceive = vi.mocked(workItemApi.receive);
+const mockAmend = vi.mocked(workItemApi.amend);
 const mockUpdateStatus = vi.mocked(workItemApi.updateStatus);
 const mockDelete = vi.mocked(workItemApi.delete);
 
@@ -89,27 +89,37 @@ describe("workItemStore", () => {
     });
   });
 
-  describe("create", () => {
-    it("생성 후 목록 맨 앞에 추가", async () => {
-      mockCreate.mockResolvedValue(wi1);
+  describe("receive", () => {
+    const order = { requestId: "req-1", customerId: 1, description: "와이셔츠", lines: [] };
+
+    it("접수 후 목록 맨 앞에 추가 (품목·결제는 목록에 넣지 않음)", async () => {
+      mockReceive.mockResolvedValue(wiFull);
       useWorkItemStore.setState({ workItems: [wi2] });
 
-      const result = await useWorkItemStore.getState().create({ customerId: 1, description: "와이셔츠", price: 3000, receivedAt: "2024-01-01", details: [] });
-      expect(result).toEqual(wi1);
+      const result = await useWorkItemStore.getState().receive(order);
+      expect(result).toEqual(wiFull);
       expect(useWorkItemStore.getState().workItems[0]).toEqual(wi1);
       expect(useWorkItemStore.getState().workItems).toHaveLength(2);
     });
+
+    it("같은 요청으로 이미 있는 접수가 돌아오면 목록에 두 번 넣지 않음", async () => {
+      mockReceive.mockResolvedValue(wiFull);
+      useWorkItemStore.setState({ workItems: [wi1, wi2] });
+
+      await useWorkItemStore.getState().receive(order);
+      expect(useWorkItemStore.getState().workItems.map((w) => w.id)).toEqual([1, 2]);
+    });
   });
 
-  describe("update", () => {
+  describe("amend", () => {
     it("수정 후 목록 + selectedItem 갱신", async () => {
-      const updated: WorkItem = { ...wi1, description: "와이셔츠 세탁", price: 5000 };
-      mockUpdate.mockResolvedValue(updated);
+      const updated: WorkItemFull = { ...wiFull, description: "와이셔츠 세탁", price: 5000 };
+      mockAmend.mockResolvedValue(updated);
       useWorkItemStore.setState({ workItems: [wi1, wi2], selectedItem: wiFull });
 
-      await useWorkItemStore.getState().update(1, { description: "와이셔츠 세탁", price: 5000 });
-      expect(useWorkItemStore.getState().workItems[0].description).toBe("와이셔츠 세탁");
-      expect(useWorkItemStore.getState().selectedItem?.description).toBe("와이셔츠 세탁");
+      await useWorkItemStore.getState().amend(1, { description: "와이셔츠 세탁", priceOverride: 5000 });
+      expect(useWorkItemStore.getState().workItems[0]).toEqual({ ...wi1, description: "와이셔츠 세탁", price: 5000 });
+      expect(useWorkItemStore.getState().selectedItem).toEqual(updated);
     });
   });
 

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { CalendarDays, ArrowRight, X } from "lucide-react";
+import { parseLocalDate, toLocalDateString } from "@/utils/dateUtils";
 
 interface DateRange {
   from: string; // YYYY-MM-DD 형식의 시작일
@@ -14,8 +15,8 @@ interface Props {
 }
 
 function formatDisplay(range: DateRange): string {
-  const from = new Date(range.from);
-  const to = new Date(range.to);
+  const from = parseLocalDate(range.from);
+  const to = parseLocalDate(range.to);
   const currentYear = new Date().getFullYear();
 
   const fmtFull = (d: Date) =>
@@ -41,7 +42,7 @@ function formatDisplay(range: DateRange): string {
 export function DateRangePicker({ value, onApply, onClear }: Props) {
   const [open, setOpen] = useState(false);
   const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
-  const today = new Date().toLocaleDateString("sv"); // local time YYYY-MM-DD
+  const today = toLocalDateString(new Date());
   const [from, setFrom] = useState(value?.from ?? today);
   const [to, setTo] = useState(value?.to ?? today);
   const triggerRef = useRef<HTMLDivElement>(null);
@@ -107,7 +108,7 @@ export function DateRangePicker({ value, onApply, onClear }: Props) {
 
           <div className="flex items-center gap-2">
             <div className="flex-1">
-              <label htmlFor="drp-from" className="block text-[0.6875rem] font-semibold text-on-surface-muted mb-1">시작일</label>
+              <label htmlFor="drp-from" className="block text-xs font-semibold text-on-surface-muted mb-1">시작일</label>
               <input
                 id="drp-from"
                 type="date"
@@ -119,7 +120,7 @@ export function DateRangePicker({ value, onApply, onClear }: Props) {
             </div>
             <ArrowRight className="w-4 h-4 text-on-surface-muted shrink-0 mt-4" />
             <div className="flex-1">
-              <label htmlFor="drp-to" className="block text-[0.6875rem] font-semibold text-on-surface-muted mb-1">종료일</label>
+              <label htmlFor="drp-to" className="block text-xs font-semibold text-on-surface-muted mb-1">종료일</label>
               <input
                 id="drp-to"
                 type="date"
