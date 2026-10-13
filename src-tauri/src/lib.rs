@@ -13,6 +13,8 @@ pub mod test_helpers;
 #[cfg(test)]
 mod rehearsal;
 
+use std::time::Duration;
+
 use tauri::{Manager, RunEvent};
 use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 
@@ -43,10 +45,29 @@ fn install_panic_logger() {
     }));
 }
 
+/// 화면 코드가 창을 띄우지 못하고 깨져도 이 시간이 지나면 창을 띄웁니다.
+/// (창이 보이지 않으면 닫을 수도 없어 받아 둔 업데이트도 설치되지 않음)
+const SHOW_WINDOW_FALLBACK: Duration = Duration::from_secs(10);
+
+/// 이미 떠 있는 창을 앞으로 가져옵니다.
+fn focus_main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        // 다른 플러그인의 로그도 남도록 가장 먼저 등록
+        // 아이콘을 다시 눌러도 두 번째 프로그램을 띄우지 않고 기존 창을 앞으로 (가장 먼저 등록해야 함).
+        // 업데이트 후 첫 실행처럼 시작이 오래 걸릴 때 두 번째 프로그램이 DB 잠금에 걸려
+        // 복구 화면을 띄우는 일을 막습니다.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            focus_main_window(app)
+        }))
+        // 다른 플러그인의 로그도 남도록 먼저 등록
         .plugin(log_plugin())
         .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -89,6 +110,18 @@ pub fn run() {
                     });
                 }
             }
+
+            // 화면 코드가 시작 중 깨져 창을 띄우지 못한 경우 대비
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(SHOW_WINDOW_FALLBACK).await;
+                if let Some(window) = handle.get_webview_window("main")
+                    && !window.is_visible().unwrap_or(true)
+                {
+                    log::warn!("화면이 창을 띄우지 않아 직접 띄웁니다");
+                    focus_main_window(&handle);
+                }
+            });
 
             // DPI 및 모니터 크기 대응 (Safe Capping)
             if let (Some(window), Ok(Some(monitor))) = (
