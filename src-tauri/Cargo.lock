@@ -895,6 +895,7 @@ dependencies = [
  "log",
  "sea-orm",
  "sea-orm-migration",
+ "semver",
  "serde",
  "serde_json",
  "tauri",

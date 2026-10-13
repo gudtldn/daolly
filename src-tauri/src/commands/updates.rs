@@ -17,9 +17,9 @@ pub async fn check_for_update(app: tauri::AppHandle) -> UpdateStatus {
 /// 받아 둔 업데이트를 지금 설치하고 다시 시작합니다.
 #[tauri::command]
 pub fn install_update_now(app: tauri::AppHandle) -> Result<(), String> {
-    if updater::install_downloaded(&app)? {
-        // Windows는 설치 프로그램 실행과 함께 종료되므로 여기까지 오지 않음
-        app.restart();
+    // Windows는 설치 프로그램을 실행하며 앱이 종료되고, 설치가 끝나면 다시 열림
+    if updater::install_now(&app)? {
+        return Ok(());
     }
     Err("설치할 업데이트가 없습니다".to_owned())
 }

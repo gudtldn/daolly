@@ -4,12 +4,17 @@
 //! 다운로드가 끝날 때까지 기다려야 했습니다. 이제는 백그라운드에서 확인·다운로드해 두었다가
 //! 사용자가 프로그램을 끌 때 설치합니다. (Windows MSI는 설치가 끝나면 앱을 다시 실행하며,
 //! 설치가 중간에 끊기면 롤백되어 이전 버전이 유지됩니다)
+//!
+//! 프로그램을 켜 둔 채 Windows를 끄면 '종료 요청' 없이 바로 꺼져 설치되지 않습니다.
+//! 그래서 받아 둔 버전을 파일에 적어 두고, 다음 실행에서도 아직 설치되지 않았으면
+//! 시작 직후 바로 설치합니다. (같은 버전은 한 번만 시도해 설치 실패가 반복되지 않게 함)
 
+use std::path::Path;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
@@ -19,6 +24,12 @@ const CHECK_TIMEOUT: Duration = Duration::from_secs(30);
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 /// 앱을 켜 둔 동안 다시 확인하는 주기
 const RECHECK_INTERVAL: Duration = Duration::from_secs(6 * 60 * 60);
+/// 확인·다운로드에 실패했을 때 다시 시도하는 간격 (켜자마자 인터넷이 늦게 붙는 경우)
+const RETRY_INTERVAL: Duration = Duration::from_secs(10 * 60);
+/// 시작 직후 설치는 이 시간 안에 받아 두었을 때만 (일하는 도중에 프로그램이 닫히지 않도록)
+const EARLY_INSTALL_WINDOW: Duration = Duration::from_secs(3 * 60);
+/// 받아 두고 아직 설치하지 못한 버전 기록 (앱 데이터 폴더)
+const PENDING_FILE: &str = "update_pending.json";
 /// 상태가 바뀔 때 프론트엔드로 보내는 이벤트
 pub const STATUS_EVENT: &str = "update-status";
 
@@ -139,6 +150,9 @@ async fn fetch<R: Runtime>(
         .await?;
 
     log::info!("새 버전 {version} 다운로드 완료 (프로그램을 끌 때 설치)");
+    if let Ok(dir) = app.path().app_data_dir() {
+        remember_downloaded(&dir, &version);
+    }
     let notes = update.body.clone();
     *app.state::<UpdaterState>()
         .downloaded
@@ -148,19 +162,107 @@ async fn fetch<R: Runtime>(
 }
 
 /// 앱을 켜 둔 동안 주기적으로 확인합니다. 받아 두었으면 더 확인하지 않습니다.
+/// 지난 실행에서 받아 두고 설치하지 못한 버전이 있으면, 이번에는 받는 대로 바로 설치합니다.
 /// 개발 빌드에서는 자동으로 확인하지 않습니다.
 pub fn spawn_background_check<R: Runtime>(app: AppHandle<R>) {
     if cfg!(debug_assertions) {
         return;
     }
+    let started = Instant::now();
+    let data_dir = app.path().app_data_dir().ok();
+    let install_early = data_dir
+        .as_deref()
+        .is_some_and(|dir| should_install_early(dir, &app.package_info().version));
     tauri::async_runtime::spawn(async move {
         loop {
-            if matches!(check_and_download(&app).await, UpdateStatus::Ready { .. }) {
-                break;
+            match check_and_download(&app).await {
+                UpdateStatus::Ready { version, .. } => {
+                    if install_early && started.elapsed() < EARLY_INSTALL_WINDOW {
+                        log::info!("지난번에 설치하지 못한 새 버전 {version}을 바로 설치합니다");
+                        if let Some(dir) = &data_dir {
+                            mark_early_attempt(dir, &version);
+                        }
+                        if let Err(e) = install_now(&app) {
+                            log::error!("시작 직후 업데이트 설치 실패: {e}");
+                        }
+                    }
+                    break;
+                }
+                UpdateStatus::Failed { .. } => tokio::time::sleep(RETRY_INTERVAL).await,
+                _ => tokio::time::sleep(RECHECK_INTERVAL).await,
             }
-            tokio::time::sleep(RECHECK_INTERVAL).await;
         }
     });
+}
+
+/// 받아 둔 업데이트를 지금 설치하고 다시 시작합니다. (Windows는 설치 프로그램이 앱을 닫고 다시 엶)
+pub fn install_now<R: Runtime>(app: &AppHandle<R>) -> Result<bool, String> {
+    let installed = install_downloaded(app)?;
+    if installed {
+        app.request_restart();
+    }
+    Ok(installed)
+}
+
+#[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PendingUpdate {
+    version: String,
+    /// 시작 직후 설치를 이미 시도했는지
+    early_attempted: bool,
+}
+
+fn read_pending(dir: &Path) -> Option<PendingUpdate> {
+    let text = std::fs::read_to_string(dir.join(PENDING_FILE)).ok()?;
+    serde_json::from_str(&text).ok()
+}
+
+fn write_pending(dir: &Path, pending: &PendingUpdate) {
+    let result = serde_json::to_string(pending)
+        .map_err(std::io::Error::other)
+        .and_then(|json| std::fs::write(dir.join(PENDING_FILE), json));
+    if let Err(e) = result {
+        log::warn!("업데이트 기록 저장 실패: {e}");
+    }
+}
+
+/// 다운로드를 마친 버전을 기록합니다. (같은 버전이면 시도 기록을 그대로 둠)
+fn remember_downloaded(dir: &Path, version: &str) {
+    if read_pending(dir).is_some_and(|p| p.version == version) {
+        return;
+    }
+    write_pending(
+        dir,
+        &PendingUpdate {
+            version: version.to_owned(),
+            early_attempted: false,
+        },
+    );
+}
+
+fn mark_early_attempt(dir: &Path, version: &str) {
+    write_pending(
+        dir,
+        &PendingUpdate {
+            version: version.to_owned(),
+            early_attempted: true,
+        },
+    );
+}
+
+/// 지난 실행에서 받아 둔 버전이 아직 설치되지 않았고, 시작 직후 설치를 시도한 적이 없으면 true.
+/// 이미 설치되었으면(지금 버전이 같거나 더 새로움) 기록을 지웁니다.
+fn should_install_early(dir: &Path, current: &semver::Version) -> bool {
+    let Some(pending) = read_pending(dir) else {
+        return false;
+    };
+    match semver::Version::parse(&pending.version) {
+        Ok(version) if version > *current => !pending.early_attempted,
+        _ => {
+            let _ = std::fs::remove_file(dir.join(PENDING_FILE));
+            false
+        }
+    }
 }
 
 /// 받아 둔 업데이트를 설치합니다. 받아 둔 것이 없으면 Ok(false).
@@ -205,5 +307,46 @@ pub fn on_exit<R: Runtime>(app: &AppHandle<R>) {
     }
     if let Err(e) = install_downloaded(app) {
         log::error!("종료 시 업데이트 설치 실패: {e}");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn v(s: &str) -> semver::Version {
+        semver::Version::parse(s).unwrap()
+    }
+
+    #[test]
+    fn installs_early_once_per_version() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir = dir.path();
+        assert!(!should_install_early(dir, &v("0.2.8")));
+
+        // 0.2.8에서 0.2.9를 받아 두었지만 설치하지 못하고 꺼짐
+        remember_downloaded(dir, "0.2.9");
+        assert!(should_install_early(dir, &v("0.2.8")));
+
+        // 시작 직후 설치를 시도했는데 여전히 0.2.8이면 다시 시도하지 않음
+        mark_early_attempt(dir, "0.2.9");
+        remember_downloaded(dir, "0.2.9");
+        assert!(!should_install_early(dir, &v("0.2.8")));
+
+        // 더 새 버전을 받으면 그 버전은 다시 한 번 시도
+        remember_downloaded(dir, "0.2.10");
+        assert!(should_install_early(dir, &v("0.2.8")));
+    }
+
+    #[test]
+    fn clears_record_once_installed() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir = dir.path();
+        remember_downloaded(dir, "0.2.9");
+        assert!(!should_install_early(dir, &v("0.2.9")));
+        assert!(!dir.join(PENDING_FILE).exists());
+
+        std::fs::write(dir.join(PENDING_FILE), "깨진 파일").unwrap();
+        assert!(!should_install_early(dir, &v("0.2.8")));
     }
 }
