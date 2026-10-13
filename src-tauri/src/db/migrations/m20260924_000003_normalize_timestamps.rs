@@ -82,10 +82,17 @@ impl MigrationTrait for Migration {
 
 /// 시각 컬럼을 저장 형식으로 바꿉니다. 타임존이 없는 값은 `tz` 현지 시각으로 해석하고,
 /// 해석할 수 없는 값은 로그만 남기고 그대로 둡니다.
+///
+/// 업데이트 후 첫 실행에서 창이 멈춰 있는 시간을 줄이기 위해, 바꿀 값을 임시 테이블에 묶어
+/// 넣고 컬럼마다 한 번에 UPDATE합니다. (한 줄씩 UPDATE하면 접수 6만 건에 25초 넘게 걸림)
 pub(crate) async fn normalize_timestamps<C: ConnectionTrait, Tz: TimeZone>(
     db: &C,
     tz: &Tz,
 ) -> Result<(), DbErr> {
+    db.execute_unprepared(
+        "CREATE TEMP TABLE IF NOT EXISTS normalized_timestamps (id INTEGER PRIMARY KEY, value TEXT NOT NULL)",
+    )
+    .await?;
     for (table, columns) in TIMESTAMP_COLUMNS {
         for column in columns {
             let rows = db
@@ -94,26 +101,57 @@ pub(crate) async fn normalize_timestamps<C: ConnectionTrait, Tz: TimeZone>(
                     format!("SELECT id, {column} FROM {table} WHERE {column} IS NOT NULL"),
                 ))
                 .await?;
+            let mut changed: Vec<(i32, String)> = Vec::new();
             for row in rows {
                 let id: i32 = row.try_get_by_index(0)?;
                 let value: String = row.try_get_by_index(1)?;
                 match timestamp::normalize_legacy(&value, tz) {
                     Some(normalized) if normalized == value => {}
-                    Some(normalized) => {
-                        db.execute(Statement::from_sql_and_values(
-                            DbBackend::Sqlite,
-                            format!("UPDATE {table} SET {column} = ? WHERE id = ?"),
-                            [normalized.into(), id.into()],
-                        ))
-                        .await?;
-                    }
+                    Some(normalized) => changed.push((id, normalized)),
                     None => log::warn!(
                         "{table}.{column} (id {id}): 해석할 수 없는 시각이라 그대로 둡니다: {value}"
                     ),
                 }
             }
+            apply(db, table, column, &changed).await?;
         }
     }
+    db.execute_unprepared("DROP TABLE normalized_timestamps")
+        .await?;
+    Ok(())
+}
+
+/// 임시 테이블에 (id, 새 값)을 넣고 한 번에 반영합니다.
+async fn apply<C: ConnectionTrait>(
+    db: &C,
+    table: &str,
+    column: &str,
+    changed: &[(i32, String)],
+) -> Result<(), DbErr> {
+    if changed.is_empty() {
+        return Ok(());
+    }
+    db.execute_unprepared("DELETE FROM normalized_timestamps")
+        .await?;
+    // 한 문장에 넣는 값 수는 SQLite 변수 한도(32766) 안에서
+    for chunk in changed.chunks(500) {
+        let placeholders = vec!["(?, ?)"; chunk.len()].join(", ");
+        let values = chunk
+            .iter()
+            .flat_map(|(id, value)| [(*id).into(), value.clone().into()]);
+        db.execute(Statement::from_sql_and_values(
+            DbBackend::Sqlite,
+            format!("INSERT INTO normalized_timestamps (id, value) VALUES {placeholders}"),
+            values,
+        ))
+        .await?;
+    }
+    db.execute_unprepared(&format!(
+        "UPDATE {table} SET {column} = \
+         (SELECT value FROM normalized_timestamps n WHERE n.id = {table}.id) \
+         WHERE id IN (SELECT id FROM normalized_timestamps)"
+    ))
+    .await?;
     Ok(())
 }
 
@@ -209,5 +247,37 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(again.total_sales, 3000);
+    }
+
+    /// 묶음(500개) 경계를 넘는 행 수도 빠짐없이 바꿈
+    #[tokio::test]
+    async fn normalizes_rows_across_batches() {
+        let db = setup_test_db().await.unwrap();
+        db.execute_unprepared(
+            "INSERT INTO customers (id, name, created_at, last_modified_at)
+             VALUES (1, '고객', '2026-09-20T01:00:00+00:00', '2026-09-20T01:00:00+00:00')",
+        )
+        .await
+        .unwrap();
+        let values = (1..=1234)
+            .map(|id| format!("({id}, 1, 'Received', 0, 0, '2026-09-23T23:00:00', 'x', 'x')"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        db.execute_unprepared(&format!(
+            "INSERT INTO work_items (id, customer_id, status, price, paid_amount, received_at, created_at, last_modified_at) VALUES {values}"
+        ))
+        .await
+        .unwrap();
+
+        normalize_timestamps(&db, &kst()).await.unwrap();
+
+        assert_eq!(
+            column(&db, "SELECT DISTINCT received_at FROM work_items").await,
+            vec![Some("2026-09-23T14:00:00.000Z".to_owned())]
+        );
+        assert_eq!(
+            column(&db, "SELECT DISTINCT created_at FROM customers").await,
+            vec![Some("2026-09-20T01:00:00.000Z".to_owned())]
+        );
     }
 }
