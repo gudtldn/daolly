@@ -18,6 +18,9 @@ const BEFORE_RESTORE_FILE: &str = "daolly.db.before_restore";
 const FAILED_RESTORE_FILE: &str = "daolly.db.failed_restore";
 /// SQLite가 DB 옆에 만드는 파일들. 교체 대상 이름에 남아 있으면 복원본에 잘못 적용될 수 있음
 const SIDECAR_SUFFIXES: [&str; 3] = ["-journal", "-wal", "-shm"];
+/// 이름 바꾸기 재시도 (Windows에서 백신 등이 막 쓴 파일을 잠깐 잡고 있으면 실패할 수 있음)
+const RENAME_ATTEMPTS: u32 = 5;
+const RENAME_RETRY_DELAY: std::time::Duration = std::time::Duration::from_millis(300);
 
 /// 기동 결과. DB를 열지 못하면 앱은 종료하지 않고 복구 화면으로 시작합니다.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -107,7 +110,26 @@ pub async fn open_database(
         }
     }
 
+    // 원래 데이터를 제자리에 돌려놓지 못했으면 빈 DB를 새로 만들지 않음
+    // (데이터가 모두 사라진 것처럼 보이고, 그 위에 새 접수가 쌓이면 되살리기 어려움)
+    if let Err(e) = ensure_original_in_place(data_dir) {
+        return (Err(e), notices);
+    }
     (db::init(data_dir).await, notices)
+}
+
+/// DB 파일이 없는데 복원 도중 옮겨 둔 원래 파일이 남아 있으면 에러를 돌려줍니다.
+fn ensure_original_in_place(data_dir: &Path) -> Result<(), DbErr> {
+    let before = data_dir.join(BEFORE_RESTORE_FILE);
+    if !data_dir.join(DB_FILE_NAME).exists() && before.exists() {
+        log::error!("DB 파일이 없고 {}만 남아 있습니다", before.display());
+        return Err(DbErr::Custom(format!(
+            "데이터 파일을 제자리로 옮기지 못했습니다. 원래 데이터는 {}에 그대로 있습니다. \
+             프로그램을 다시 시작해 보시고, 계속되면 이 화면을 사진으로 찍어 보내 주세요",
+            before.display()
+        )));
+    }
+    Ok(())
 }
 
 /// 현재 DB를 `before_restore`로 옮기고 복원 파일을 DB 자리에 놓습니다.
@@ -126,7 +148,7 @@ fn swap_in_pending_restore(data_dir: &Path) -> std::io::Result<()> {
     // DB 이름으로 남은 journal이 복원본에 적용되지 않도록 제거
     remove_sidecars(&db_path)?;
 
-    if let Err(e) = std::fs::rename(&pending, &db_path) {
+    if let Err(e) = rename_with_retry(&pending, &db_path) {
         if moved_current {
             let _ = move_with_sidecars(&before, &db_path);
         }
@@ -157,8 +179,24 @@ fn sidecar(path: &Path, suffix: &str) -> PathBuf {
     PathBuf::from(name)
 }
 
+/// 이름 바꾸기. 잠깐 잠겨 있는 경우를 위해 몇 번 다시 시도합니다.
+fn rename_with_retry(from: &Path, to: &Path) -> std::io::Result<()> {
+    let mut attempt = 1;
+    loop {
+        match std::fs::rename(from, to) {
+            Ok(()) => return Ok(()),
+            Err(e) if attempt < RENAME_ATTEMPTS && from.exists() => {
+                log::warn!("{} 이름 바꾸기 재시도 ({attempt}): {e}", from.display());
+                std::thread::sleep(RENAME_RETRY_DELAY);
+                attempt += 1;
+            }
+            Err(e) => return Err(e),
+        }
+    }
+}
+
 fn move_with_sidecars(from: &Path, to: &Path) -> std::io::Result<()> {
-    std::fs::rename(from, to)?;
+    rename_with_retry(from, to)?;
     for suffix in SIDECAR_SUFFIXES {
         let src = sidecar(from, suffix);
         if src.exists()
@@ -334,6 +372,21 @@ mod tests {
         let (db, notices) = open_database(dir.path()).await;
         assert!(notices.is_empty());
         assert_eq!(names(&db.unwrap()).await, vec!["원래 고객"]);
+    }
+
+    /// 원래 DB를 제자리에 돌려놓지 못했으면 빈 DB로 시작하지 않고 복구 화면으로
+    #[tokio::test]
+    async fn does_not_create_empty_database_when_original_is_set_aside() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join(BEFORE_RESTORE_FILE), b"original").unwrap();
+
+        let err = ensure_original_in_place(dir.path()).unwrap_err();
+        assert!(describe(&err).contains(BEFORE_RESTORE_FILE));
+        assert!(!dir.path().join(DB_FILE_NAME).exists());
+
+        // DB가 제자리에 있으면 문제없음
+        std::fs::write(dir.path().join(DB_FILE_NAME), b"db").unwrap();
+        assert!(ensure_original_in_place(dir.path()).is_ok());
     }
 
     #[tokio::test]
