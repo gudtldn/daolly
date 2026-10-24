@@ -11,6 +11,7 @@ pub mod price_items;
 pub mod price_settings;
 pub mod sales;
 pub mod updates;
+pub mod usage;
 pub mod work_items;
 
 pub use crate::error::AppError;

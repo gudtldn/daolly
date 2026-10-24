@@ -173,6 +173,7 @@ export function UnpaidTab() {
                   <div key={customer.customerId} className="group">
                     {/* 고객 행 */}
                     <div
+                      data-track="미수금 고객 행"
                       onClick={() => toggleExpand(customer.customerId)}
                       className={`grid ${gridCols} items-center px-4 py-3.5 transition-colors cursor-pointer ${
                         isExpanded ? "bg-surface-elevated/80" : "hover:bg-surface-elevated/40"

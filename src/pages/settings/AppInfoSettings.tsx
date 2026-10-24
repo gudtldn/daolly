@@ -1,15 +1,25 @@
 import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
-import { Info, RefreshCw, Download, CheckCircle, AlertCircle } from "lucide-react";
+import { save } from "@tauri-apps/plugin-dialog";
+import { toast } from "sonner";
+import { Info, RefreshCw, Download, CheckCircle, AlertCircle, FileArchive } from "lucide-react";
 import { updateApi, isUpdateStatus } from "@/bindings/updates";
+import { databaseApi } from "@/bindings/database";
 import type { UpdateStatus } from "@/types";
 import { errorMessage } from "@/utils/errors";
+import { flushUsage } from "@/utils/usage";
+
+function todayStamp(): string {
+  const d = new Date();
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+}
 
 export function AppInfoSettings() {
   const [version, setVersion] = useState("...");
   const [status, setStatus] = useState<UpdateStatus>({ state: "idle" });
   const [installing, setInstalling] = useState(false);
   const [installError, setInstallError] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     getVersion().then(setVersion).catch(() => setVersion("unknown"));
@@ -49,6 +59,24 @@ export function AppInfoSettings() {
       }
     } finally {
       setInstalling(false);
+    }
+  };
+
+  const handleExportLogs = async () => {
+    try {
+      const path = await save({
+        filters: [{ name: "ZIP", extensions: ["zip"] }],
+        defaultPath: `다올리-기록-${todayStamp()}.zip`,
+      });
+      if (!path) return;
+      setExporting(true);
+      await flushUsage();
+      await databaseApi.exportUsageLogs(path);
+      toast.success("기록을 저장했습니다. 이 파일을 보내 주세요.");
+    } catch (e: unknown) {
+      toast.error(`기록을 저장하지 못했습니다: ${errorMessage(e)}`);
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -154,6 +182,27 @@ export function AppInfoSettings() {
               <span>{installError}</span>
             </div>
           )}
+        </section>
+
+        {/* 사용 기록 */}
+        <section className="bg-surface-card rounded-lg border border-border-default p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h4 className="text-sm font-semibold text-on-surface">사용 기록</h4>
+              <p className="text-sm text-on-surface-muted mt-1">
+                프로그램을 더 편하게 고치려고 어떤 화면과 버튼을 쓰는지 이 컴퓨터에만 남깁니다.
+                고객 이름·전화번호·금액·입력한 내용은 남기지 않습니다.
+              </p>
+            </div>
+            <button
+              onClick={handleExportLogs}
+              disabled={exporting}
+              className="flex items-center gap-2 px-4 py-2 text-sm border border-border-default rounded-lg hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+            >
+              <FileArchive className="w-4 h-4" />
+              {exporting ? "저장 중..." : "기록 내보내기"}
+            </button>
+          </div>
         </section>
 
         <section className="bg-surface-card rounded-lg border border-border-default p-5">

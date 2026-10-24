@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { ReactNode } from "react";
+import { maskText, trackDialog } from "@/utils/usage";
 
 type DialogType = "alert" | "confirm" | "custom";
 
@@ -40,22 +41,26 @@ export const useDialogStore = create<DialogStore>((set, get) => ({
       // 이전 다이얼로그가 열려 있으면 false로 resolve하여 Promise leak 방지
       get().resolvePromise?.(false);
       set({ isOpen: true, config: { ...config, type: "alert" }, resolvePromise: resolve });
+      trackDialog("open", { type: "alert", title: maskText(config.title) });
     }),
 
   showConfirm: (config) =>
     new Promise((resolve) => {
       get().resolvePromise?.(false);
       set({ isOpen: true, config: { ...config, type: "confirm" }, resolvePromise: resolve });
+      trackDialog("open", { type: "confirm", title: maskText(config.title) });
     }),
 
   showCustom: (config) =>
     new Promise((resolve) => {
       get().resolvePromise?.(false);
       set({ isOpen: true, config: { ...config, type: "custom" }, resolvePromise: resolve });
+      trackDialog("open", { type: "custom", title: maskText(config.title) });
     }),
 
   close: (result) =>
     set((state) => {
+      if (state.config) trackDialog("close", { title: maskText(state.config.title), result });
       state.resolvePromise?.(result);
       return { isOpen: false, config: null, resolvePromise: null };
     }),

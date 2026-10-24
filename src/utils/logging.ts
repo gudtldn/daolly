@@ -1,4 +1,5 @@
 import { error as logError } from "@tauri-apps/plugin-log";
+import { track } from "@/utils/usage";
 
 // Tauri 환경 여부 확인 (테스트/브라우저에서는 로그 플러그인을 쓸 수 없음)
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -16,6 +17,8 @@ function describe(reason: unknown): string {
 /** 화면 쪽 오류를 앱 로그 파일에 남깁니다. (원격으로 문제를 파악하기 위함) */
 export function reportError(context: string, reason: unknown): void {
   console.error(`[${context}]`, reason);
+  // 사용 기록에는 어디서 났는지만 (앞뒤로 무엇을 하다 났는지 보기 위함)
+  track("error", { context });
   if (!isTauri) return;
   void logError(`[${context}] ${describe(reason)}`).catch(() => {});
 }

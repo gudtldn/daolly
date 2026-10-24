@@ -258,6 +258,7 @@ function CustomerPanel({
                   <button
                     key={c.id}
                     ref={setItemRef(idx)}
+                    data-track="고객 검색 결과"
                     onClick={() => handleSelect(c)}
                     onMouseMove={() => {
                       if (lastSource !== "mouse" || highlightIdx !== idx) {
@@ -291,6 +292,7 @@ function CustomerPanel({
                     {results.length > 0 && <div className="border-t border-border-default/50 my-1" />}
                     <button
                       ref={setItemRef(results.length)}
+                      data-track="검색어로 신규 등록"
                       onClick={handleAddNew}
                       onMouseMove={() => {
                         if (lastSource !== "mouse" || highlightIdx !== results.length) {
@@ -384,6 +386,7 @@ function CustomerPanel({
                         }`}
                       >
                       <button
+                        data-track="최근 접수 항목"
                         onClick={() => onViewHistory(selectedCustomer.id, item.id)}
                         className="flex-1 min-w-0 text-left px-3 py-2.5 rounded-lg transition-colors cursor-pointer hover:bg-primary-50 dark:hover:bg-primary-900/20"
                       >
@@ -435,6 +438,7 @@ function CustomerPanel({
                   {recentCustomers.map((c) => (
                     <button
                       key={c.id}
+                      data-track="최근 선택 고객"
                       onClick={() => onSelect(c)}
                       className="flex items-center justify-between w-full px-3 py-2.5 bg-surface hover:bg-surface-elevated border border-border-default hover:border-primary-300 rounded-lg transition-all cursor-pointer group text-left"
                     >

@@ -259,6 +259,7 @@ function CustomerListPanel({
             const isSelected = selectedId === c.id;
             return (
               <div
+                data-track="고객 목록 행"
                 onClick={() => onSelect(c)}
                 className={`p-4 cursor-pointer transition-colors border-b border-border-default ${
                   isSelected
@@ -593,6 +594,7 @@ function WorkItemListPanel({
                 <Fragment key={item.id}>
                   <tr
                     ref={setItemRef(itemIdx)}
+                    data-track="작업 항목 행"
                     onClick={() => handleToggle(item.id)}
                     onMouseEnter={() => lastSource === "mouse" && setHighlightedIdx(itemIdx)}
                     className={`transition-colors cursor-pointer ${isExpanded ? "bg-primary-50/60 dark:bg-primary-950/40" : ""} ${lastSource === "mouse" ? "hover:bg-surface-elevated" : ""} ${lastSource === "keyboard" && isHighlighted && isActive ? "ring-2 ring-inset ring-primary-400" : ""}`}

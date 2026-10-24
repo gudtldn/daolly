@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./invoke";
 import type {
   BackupInfo,
   BackupOutcome,
@@ -46,6 +46,11 @@ export const databaseApi = {
 
   openLogFolder(): Promise<void> {
     return invoke("open_log_folder");
+  },
+
+  /** 오류 로그와 사용 기록을 zip 파일 하나로 저장 (개발자에게 보내기 위함) */
+  exportUsageLogs(path: string): Promise<void> {
+    return invoke("export_usage_logs", { path });
   },
 
   /** 기동 중 발생한 알림(복원 결과 등). 한 번 가져가면 비워집니다. */

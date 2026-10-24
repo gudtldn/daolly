@@ -6,6 +6,7 @@ mod services;
 mod startup;
 mod timestamp;
 mod updater;
+mod usage;
 
 #[cfg(test)]
 pub mod test_helpers;
@@ -18,7 +19,8 @@ use std::time::Duration;
 use tauri::{Manager, RunEvent};
 use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 
-/// 로그 파일 설정: 앱 로그 폴더에 daolly.log (1MB씩 최근 5개 보관)
+/// 로그 파일 설정: 앱 로그 폴더에 daolly.log (2MB씩 최근 20개 보관).
+/// 개발자가 한동안 들여다보지 못해도 지난 오류가 남아 있도록 넉넉히 둡니다.
 fn log_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
     tauri_plugin_log::Builder::new()
         .clear_targets()
@@ -28,8 +30,8 @@ fn log_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
         .target(Target::new(TargetKind::Stdout))
         .level(log::LevelFilter::Info)
         .timezone_strategy(TimezoneStrategy::UseLocal)
-        .rotation_strategy(RotationStrategy::KeepSome(5))
-        .max_file_size(1_000_000)
+        .rotation_strategy(RotationStrategy::KeepSome(20))
+        .max_file_size(2_000_000)
         .build()
 }
 
@@ -78,6 +80,19 @@ pub fn run() {
         .setup(|app| {
             install_panic_logger();
             log::info!("다올리 {} 시작", app.package_info().version);
+
+            // 사용 기록 (로그 폴더/usage). 지난 날짜 압축·정리는 시작을 늦추지 않도록 따로
+            let log_dir = app
+                .path()
+                .app_log_dir()
+                .expect("failed to resolve app log directory");
+            app.manage(usage::UsageLog::new(&log_dir));
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                if let Err(e) = handle.state::<usage::UsageLog>().maintain() {
+                    log::warn!("사용 기록을 정리하지 못했습니다: {e}");
+                }
+            });
 
             let app_data_dir = app
                 .path()
@@ -228,6 +243,9 @@ pub fn run() {
             commands::updates::get_update_status,
             commands::updates::check_for_update,
             commands::updates::install_update_now,
+            // usage
+            commands::usage::record_usage,
+            commands::usage::export_usage_logs,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

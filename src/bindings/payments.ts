@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./invoke";
 import type { Payment, CreatePayment, UpdatePayment, CreditPayment } from "@/types";
 
 export const paymentApi = {
