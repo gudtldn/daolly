@@ -89,8 +89,8 @@ function App() {
     const unlisten = updateApi
       .onStatus((status) => {
         if (status.state === "ready") {
-          toast.success(`새 버전(${status.version})을 받아 두었습니다.`, {
-            description: "프로그램을 끄면 설치된 뒤 다시 열립니다.",
+          toast.success("업데이트 준비 완료", {
+            description: "프로그램을 끄면 설치됩니다.",
             duration: 10000,
           });
         }
@@ -112,17 +112,12 @@ function App() {
       .then((notices) => {
         for (const notice of notices) {
           if (notice.type === "restoreApplied") {
-            toast.success("백업에서 데이터를 복원했습니다.");
+            toast.success("복원 완료");
           } else {
+            // 사유는 로그 파일에 남음 (startup::open_database)
             void useDialogStore.getState().showAlert({
               title: "복원하지 못했습니다",
-              message: (
-                <>
-                  선택한 백업으로 복원하지 못했습니다. 지금 데이터는 복원 전 그대로이니 계속 쓰셔도 됩니다.
-                  <br />
-                  (사유: {notice.reason})
-                </>
-              ),
+              message: "현재 데이터는 그대로이니 계속 사용하시면 됩니다.",
             });
           }
         }

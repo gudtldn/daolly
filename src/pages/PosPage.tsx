@@ -466,7 +466,7 @@ function CustomerPanel({
           const desc = receipt.description ?? "세탁물";
           const left = receipt.price - receipt.paidAmount;
           if (method) {
-            toast.success(`${desc} 출고 완료 (${PAYMENT_LABELS[method]} ${collected.toLocaleString()}원 받음)`);
+            toast.success(`${desc} 출고 완료 (${PAYMENT_LABELS[method]} ${collected.toLocaleString()}원)`);
           } else if (left > 0) {
             toast.success(`${desc} 출고 완료 (미수금 ${left.toLocaleString()}원)`);
           } else {

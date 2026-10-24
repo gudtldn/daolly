@@ -30,7 +30,7 @@ pub enum AppError {
     Db(#[from] DbErr),
 
     /// 대상 없음. 값은 대상 이름 ("고객", "접수" 등)
-    #[error("{0} 정보를 찾을 수 없습니다. 이미 삭제되었을 수 있습니다.")]
+    #[error("{0} 정보를 찾을 수 없습니다.")]
     NotFound(&'static str),
 
     /// 입력 검증 실패. 값은 화면에 보여줄 문장
@@ -53,12 +53,10 @@ impl AppError {
             return self.to_string();
         };
         match db_error_code(e) {
-            ErrorCode::NotFound => "요청한 정보를 찾을 수 없습니다. 이미 삭제되었을 수 있습니다.",
-            ErrorCode::Conflict => {
-                "다른 데이터와 맞지 않아 저장하지 못했습니다. 화면을 새로 고친 뒤 다시 시도해 주세요."
-            }
+            ErrorCode::NotFound => "정보를 찾을 수 없습니다.",
+            ErrorCode::Conflict => "저장하지 못했습니다. 다시 시도해 주세요.",
             ErrorCode::Busy => "다른 작업이 진행 중입니다. 잠시 후 다시 시도해 주세요.",
-            _ => "처리 중 오류가 발생했습니다. 다시 시도해 주시고, 계속되면 프로그램을 다시 켜 주세요.",
+            _ => "오류가 발생했습니다. 다시 시도해 주세요.",
         }
         .to_owned()
     }
@@ -117,7 +115,7 @@ mod tests {
             serde_json::to_value(&e).unwrap(),
             json!({
                 "code": "NOT_FOUND",
-                "message": "고객 정보를 찾을 수 없습니다. 이미 삭제되었을 수 있습니다."
+                "message": "고객 정보를 찾을 수 없습니다."
             })
         );
     }

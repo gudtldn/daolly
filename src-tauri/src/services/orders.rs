@@ -66,9 +66,7 @@ where
 {
     let request_id = order.request_id.trim();
     if request_id.is_empty() || request_id.len() > 100 {
-        return Err(invalid(
-            "접수 요청이 올바르지 않습니다. 화면을 새로 고친 뒤 다시 시도해 주세요.",
-        ));
+        return Err(invalid("접수하지 못했습니다. 다시 시도해 주세요."));
     }
 
     let txn = db.begin().await?;
@@ -204,7 +202,7 @@ where
     };
     if price < current.paid_amount {
         return Err(invalid(format!(
-            "이미 받은 금액({})보다 낮게 고칠 수 없습니다. 결제 관리에서 결제를 먼저 고쳐 주세요.",
+            "받은 금액({})보다 낮은 가격으로 바꿀 수 없습니다.",
             won(current.paid_amount)
         )));
     }
@@ -637,7 +635,7 @@ mod tests {
         let err = receive(&db, over).await.unwrap_err();
         assert_eq!(
             err.to_string(),
-            "받은 금액이 청구 금액보다 많아집니다. (청구 3,000원, 받은 금액 30,000원)"
+            "받은 금액이 청구 금액(3,000원)보다 많아집니다."
         );
 
         let mut credit = order(cid, lines.clone());
@@ -791,7 +789,7 @@ mod tests {
         let err = amend(&db, wi.id, a).await.unwrap_err();
         assert!(
             err.to_string()
-                .starts_with("이미 받은 금액(10,000원)보다 낮게")
+                .starts_with("받은 금액(10,000원)보다 낮은 가격")
         );
 
         let mut override_price = amendment();

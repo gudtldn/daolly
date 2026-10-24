@@ -47,7 +47,7 @@ pub fn normalize_time(value: Option<String>, field: &str) -> Result<Option<Strin
     value
         .map(|v| {
             crate::timestamp::normalize_input(&v)
-                .map_err(|_| AppError::Validation(format!("{field} 형식이 올바르지 않습니다: {v}")))
+                .map_err(|_| AppError::Validation(format!("{field} 형식이 올바르지 않습니다.")))
         })
         .transpose()
 }

@@ -74,13 +74,8 @@ export function AppInfoSettings() {
 
         {/* 업데이트 */}
         <section className="bg-surface-card rounded-lg border border-border-default p-5 space-y-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h4 className="text-sm font-semibold text-on-surface">업데이트</h4>
-              <p className="text-sm text-on-surface-muted mt-1">
-                새 버전은 사용하는 동안 자동으로 받아 두었다가, 프로그램을 끌 때 설치합니다.
-              </p>
-            </div>
+          <div className="flex items-center justify-between gap-4">
+            <h4 className="text-sm font-semibold text-on-surface">업데이트</h4>
             {status.state !== "ready" && (
               <button
                 onClick={handleCheckUpdate}
@@ -125,8 +120,8 @@ export function AppInfoSettings() {
                 <div className="flex items-center gap-2 text-sm text-on-surface">
                   <CheckCircle className="w-4 h-4 text-success-600 dark:text-success-400 shrink-0" />
                   <span>
-                    새 버전(<span className="font-semibold text-primary-600 dark:text-primary-400">{status.version}</span>)을
-                    받아 두었습니다. 프로그램을 끄면 설치된 뒤 다시 열립니다.
+                    새 버전 <span className="font-semibold text-primary-600 dark:text-primary-400">{status.version}</span> 준비
+                    완료. 프로그램을 끄면 설치됩니다.
                   </span>
                 </div>
                 <button
@@ -149,7 +144,7 @@ export function AppInfoSettings() {
           {status.state === "failed" && (
             <div className="flex items-start gap-2 text-sm text-danger-600 dark:text-danger-400">
               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-              <span>업데이트를 확인하지 못했습니다. 인터넷 연결을 확인해 주세요. ({status.message})</span>
+              <span>업데이트를 확인하지 못했습니다. 인터넷 연결을 확인해 주세요.</span>
             </div>
           )}
 

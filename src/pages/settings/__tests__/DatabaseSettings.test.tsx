@@ -58,7 +58,7 @@ describe("DatabaseSettings", () => {
     });
     render(<DatabaseSettings />);
     expect(await screen.findByText("E:/USB")).toBeInTheDocument();
-    expect(screen.getByText(/마지막 복사 실패.*폴더를 찾을 수 없습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/2026.09.24 09:00:01 저장 실패. 폴더가 연결되어 있는지 확인해 주세요/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "폴더 변경" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "해제" })).toBeInTheDocument();
   });
@@ -73,7 +73,7 @@ describe("DatabaseSettings", () => {
     await user.click(await screen.findByRole("button", { name: /지금 백업/ }));
 
     expect(await screen.findByText(/백업 완료: 2026.09.24 09:00:00/)).toBeInTheDocument();
-    expect(screen.getByText(/추가 백업 폴더에 복사하지 못했습니다: 쓰기 권한이 없습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/추가 백업 폴더에 저장하지 못했습니다/)).toBeInTheDocument();
   });
 
   it("복원: 확인하면 선택한 백업 파일로 복원을 요청한다", async () => {

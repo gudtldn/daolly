@@ -142,14 +142,16 @@ describe("App", () => {
   it("백업 복원이 적용되었으면 알려준다", async () => {
     databaseApi.takeStartupNotices.mockResolvedValue([{ type: "restoreApplied" }]);
     render(<App />);
-    expect(await screen.findByText("백업에서 데이터를 복원했습니다.")).toBeInTheDocument();
+    expect(await screen.findByText("복원 완료")).toBeInTheDocument();
   });
 
-  it("백업 복원에 실패해 되돌렸으면 사유와 함께 알려준다", async () => {
+  it("백업 복원에 실패해 되돌렸으면 지금 데이터 그대로라고 알려준다", async () => {
     databaseApi.takeStartupNotices.mockResolvedValue([{ type: "restoreFailed", reason: "file is not a database" }]);
     render(<App />);
     expect(await screen.findByText("복원하지 못했습니다")).toBeInTheDocument();
-    expect(screen.getByText(/사유: file is not a database/)).toBeInTheDocument();
+    expect(screen.getByText("현재 데이터는 그대로이니 계속 사용하시면 됩니다.")).toBeInTheDocument();
+    // 기술적인 사유는 화면에 보이지 않음 (로그에 남음)
+    expect(screen.queryByText(/file is not a database/)).not.toBeInTheDocument();
   });
 
   it("새 버전을 받아 두면 종료 시 설치된다고 알려준다", async () => {
@@ -160,8 +162,8 @@ describe("App", () => {
     const handler = updateApi.onStatus.mock.calls[0][0] as (s: unknown) => void;
     act(() => handler({ state: "ready", version: "0.3.0", notes: null }));
 
-    expect(await screen.findByText("새 버전(0.3.0)을 받아 두었습니다.")).toBeInTheDocument();
-    expect(screen.getByText("프로그램을 끄면 설치된 뒤 다시 열립니다.")).toBeInTheDocument();
+    expect(await screen.findByText("업데이트 준비 완료")).toBeInTheDocument();
+    expect(screen.getByText("프로그램을 끄면 설치됩니다.")).toBeInTheDocument();
   });
 
   it("복구 화면에서 준비된 업데이트를 바로 설치할 수 있다", async () => {
@@ -172,7 +174,7 @@ describe("App", () => {
     render(<App />);
 
     const button = await screen.findByRole("button", { name: /업데이트 설치/ });
-    expect(screen.getByText(/새 버전\(0\.3\.1\)이 준비되어 있습니다/)).toBeInTheDocument();
+    expect(screen.getByText("새 버전으로 업데이트하면 해결될 수 있습니다.")).toBeInTheDocument();
     await user.click(button);
     expect(updateApi.installNow).toHaveBeenCalled();
   });

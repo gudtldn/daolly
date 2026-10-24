@@ -31,13 +31,13 @@ describe("PickupDialog", () => {
     expect(onPickedUp).toHaveBeenCalledWith(receipt, "cash", 5000);
   });
 
-  it("받지 않고 출고하면 미수금으로 둔다", async () => {
+  it("외상으로 출고하면 미수금으로 둔다", async () => {
     const user = userEvent.setup();
     api.pickup.mockResolvedValue({ ...receipt, paidAmount: 1000 });
     const onPickedUp = vi.fn();
     render(<PickupDialog item={item} onClose={vi.fn()} onPickedUp={onPickedUp} />);
 
-    await user.click(screen.getByRole("button", { name: /받지 않고 출고/ }));
+    await user.click(screen.getByRole("button", { name: /외상으로 출고/ }));
     expect(api.pickup).toHaveBeenCalledWith(7, null);
     expect(onPickedUp).toHaveBeenCalledWith(expect.anything(), null, 0);
   });

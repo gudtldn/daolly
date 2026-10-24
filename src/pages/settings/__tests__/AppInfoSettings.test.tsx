@@ -35,7 +35,7 @@ describe("AppInfoSettings", () => {
     updateApi.installNow.mockResolvedValue(undefined);
     renderWithStatus({ state: "ready", version: "0.3.0", notes: "- 백업 기능 개선" });
 
-    expect(await screen.findByText(/프로그램을 끄면 설치된 뒤 다시 열립니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/프로그램을 끄면 설치됩니다/)).toBeInTheDocument();
     expect(screen.getByText("0.3.0")).toBeInTheDocument();
     expect(screen.getByText("- 백업 기능 개선")).toBeInTheDocument();
     // 받아 둔 상태에서는 다시 확인할 필요가 없음
@@ -63,6 +63,7 @@ describe("AppInfoSettings", () => {
   it("확인에 실패하면 인터넷 연결 확인을 안내한다", async () => {
     renderWithStatus({ state: "failed", message: "network error" });
     expect(await screen.findByText(/인터넷 연결을 확인해 주세요/)).toBeInTheDocument();
+    expect(screen.queryByText(/network error/)).not.toBeInTheDocument();
   });
 
   it("백그라운드 상태 변경 이벤트를 반영한다", async () => {

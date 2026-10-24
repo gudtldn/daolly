@@ -70,7 +70,7 @@ export function RecoveryScreen({ message }: { message: string }) {
   const handleRestore = async (backup: BackupInfo) => {
     const confirmed = await showConfirm({
       title: "백업으로 복원",
-      message: `${backup.createdAt} 백업으로 복원합니다. 지금 파일은 따로 보관되며, 복원 후 프로그램이 다시 시작됩니다.`,
+      message: `${backup.createdAt} 백업으로 복원하시겠습니까? 복원 후 프로그램이 다시 시작됩니다.`,
       confirmText: "복원",
     });
     if (!confirmed) return;
@@ -109,8 +109,7 @@ export function RecoveryScreen({ message }: { message: string }) {
           <div className="space-y-2">
             <h1 className="text-2xl font-bold">데이터를 열지 못했습니다</h1>
             <p className="text-base text-on-surface-muted leading-relaxed">
-              프로그램을 시작하는 중 문제가 생겼습니다. 원래 데이터 파일은 지우지 않고 그대로 두었습니다.
-              아래 백업 중 하나로 복원하거나, 로그 폴더의 파일을 개발자에게 보내 주세요.
+              데이터는 그대로 있습니다. 다시 시작해 보시고, 계속되면 백업으로 복원해 주세요.
             </p>
           </div>
         </div>
@@ -118,7 +117,7 @@ export function RecoveryScreen({ message }: { message: string }) {
         {update.state === "ready" && (
           <div className="flex items-center justify-between gap-4 px-4 py-3 bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800 rounded-lg">
             <p className="text-base text-primary-700 dark:text-primary-300">
-              새 버전({update.version})이 준비되어 있습니다. 업데이트하면 문제가 해결될 수 있습니다.
+              새 버전으로 업데이트하면 해결될 수 있습니다.
             </p>
             <button
               onClick={handleInstallUpdate}
@@ -132,7 +131,7 @@ export function RecoveryScreen({ message }: { message: string }) {
         )}
         {update.state === "downloading" && (
           <p className="text-base text-on-surface-muted">
-            새 버전({update.version})을 받는 중입니다{update.progress !== null ? ` (${update.progress}%)` : ""}...
+            새 버전 받는 중...{update.progress !== null ? ` (${update.progress}%)` : ""}
           </p>
         )}
 

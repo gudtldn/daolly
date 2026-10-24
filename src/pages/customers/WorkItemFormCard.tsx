@@ -255,7 +255,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
     if (!workItem) return;
     const confirmed = await useDialogStore.getState().showConfirm({
       title: "결제 취소",
-      message: `${payment.amount.toLocaleString()}원 결제를 취소하시겠습니까? 받은 금액과 매출에서 빠집니다.`,
+      message: `${payment.amount.toLocaleString()}원 결제를 취소하시겠습니까?`,
       confirmText: "결제 취소",
       isDestructive: true,
     });

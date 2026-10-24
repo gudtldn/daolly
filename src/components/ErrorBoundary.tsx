@@ -40,12 +40,12 @@ function UpdateOffer() {
   };
 
   if (status.state === "downloading") {
-    return <p className="text-on-surface-muted mb-6">새 버전({status.version})을 받는 중입니다...</p>;
+    return <p className="text-on-surface-muted mb-6">새 버전 받는 중...</p>;
   }
   if (status.state !== "ready") return null;
   return (
     <div className="flex flex-col items-center gap-2 mb-6">
-      <p className="text-on-surface">새 버전({status.version})이 준비되어 있습니다. 설치하면 문제가 해결될 수 있습니다.</p>
+      <p className="text-on-surface">새 버전으로 업데이트하면 해결될 수 있습니다.</p>
       <button
         onClick={handleInstall}
         disabled={installing}

@@ -25,11 +25,9 @@ pub fn normalize_method(method: Option<&str>) -> Result<&'static str, AppError> 
         Some("cash" | "현금") => Ok("cash"),
         Some("card" | "카드") => Ok("card"),
         Some("transfer" | "계좌이체" | "이체") => Ok("transfer"),
-        Some("credit" | "외상") => Err(AppError::Validation(
-            "외상은 결제로 기록하지 않습니다. 돈을 받지 않았다면 결제를 등록하지 말고 미수금으로 두세요."
-                .into(),
+        _ => Err(AppError::Validation(
+            "결제 수단을 다시 선택해 주세요.".into(),
         )),
-        _ => Err(AppError::Validation("결제 수단을 다시 선택해 주세요.".into())),
     }
 }
 
@@ -37,9 +35,8 @@ pub fn normalize_method(method: Option<&str>) -> Result<&'static str, AppError> 
 pub fn check_not_overpaid(price: i64, paid_after: i64) -> Result<(), AppError> {
     if paid_after > price {
         return Err(AppError::Validation(format!(
-            "받은 금액이 청구 금액보다 많아집니다. (청구 {}, 받은 금액 {})",
-            won(price),
-            won(paid_after)
+            "받은 금액이 청구 금액({})보다 많아집니다.",
+            won(price)
         )));
     }
     Ok(())
@@ -358,7 +355,7 @@ mod tests {
             .unwrap_err();
         assert_eq!(
             err.to_string(),
-            "받은 금액이 청구 금액보다 많아집니다. (청구 10,000원, 받은 금액 40,000원)"
+            "받은 금액이 청구 금액(10,000원)보다 많아집니다."
         );
         assert!(
             update(&db, p.id, 12000, Some("cash".into()), None)
@@ -387,7 +384,7 @@ mod tests {
             let err = create(&db, wi_id, 7000, Some(method.into()), None)
                 .await
                 .unwrap_err();
-            assert!(err.to_string().contains("외상은 결제로 기록하지 않습니다"));
+            assert_eq!(err.to_string(), "결제 수단을 다시 선택해 주세요.");
         }
         assert!(create(&db, wi_id, 7000, None, None).await.is_err());
         let wi = work_item::Entity::find_by_id(wi_id)

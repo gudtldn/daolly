@@ -34,7 +34,7 @@ export function CreditPaymentReview() {
   const handleRemove = async (p: CreditPayment) => {
     const ok = await showConfirm({
       title: "외상 결제 정리",
-      message: `${p.customerName}님 '${p.description ?? "접수"}'의 ${p.amount.toLocaleString()}원 결제를 결제 내역에서 뺍니다. 이 금액은 미수금으로 다시 표시됩니다.`,
+      message: `${p.customerName}님 ${p.amount.toLocaleString()}원을 미수금으로 돌리시겠습니까?`,
       confirmText: "결제에서 빼기",
       isDestructive: true,
     });
@@ -58,8 +58,7 @@ export function CreditPaymentReview() {
         <div>
           <h4 className="text-sm font-semibold text-on-surface">외상으로 기록된 결제 {items.length}건</h4>
           <p className="text-sm text-on-surface-muted mt-1">
-            예전 버전에서는 결제 수단을 '외상'으로 등록하면 돈을 받지 않았는데도 받은 것으로 계산되었습니다.
-            실제로 받지 않은 결제라면 '결제에서 빼기'를 눌러 주세요. 미수금으로 다시 표시됩니다.
+            실제로 받지 않은 금액이라면 '결제에서 빼기'를 눌러 미수금으로 돌려 주세요.
           </p>
         </div>
       </div>

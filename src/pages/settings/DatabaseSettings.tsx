@@ -25,6 +25,9 @@ const KIND_BADGES: Record<BackupKind, { label: string; cls: string }> = {
   legacy: { label: "이전 버전", cls: "bg-surface-elevated text-on-surface-muted" },
 };
 
+const MIRROR_HINT = "폴더가 연결되어 있는지 확인해 주세요.";
+const MIRROR_FAILED = `추가 백업 폴더에 저장하지 못했습니다. ${MIRROR_HINT}`;
+
 export function DatabaseSettings() {
   const [dbPath, setDbPath] = useState<string>("...");
   const [backups, setBackups] = useState<BackupInfo[]>([]);
@@ -86,10 +89,8 @@ export function DatabaseSettings() {
     setSuccess("");
     try {
       const outcome = await databaseApi.backup();
-      setSuccess(`백업 완료: ${outcome.info.createdAt}${outcome.mirror?.ok ? " (추가 백업 폴더에도 복사했습니다)" : ""}`);
-      if (outcome.mirror && !outcome.mirror.ok) {
-        setError(`백업은 완료했지만 추가 백업 폴더에 복사하지 못했습니다: ${outcome.mirror.message ?? ""}`);
-      }
+      setSuccess(`백업 완료: ${outcome.info.createdAt}`);
+      if (outcome.mirror && !outcome.mirror.ok) setError(MIRROR_FAILED);
       await Promise.all([loadBackups(), loadBackupSettings()]);
     } catch (e: unknown) {
       setError(errorMessage(e));
@@ -112,9 +113,9 @@ export function DatabaseSettings() {
     try {
       const outcome = await databaseApi.setBackupMirrorDir(selected);
       if (outcome?.mirror?.ok) {
-        setSuccess("추가 백업 폴더를 지정하고 백업을 복사했습니다.");
+        setSuccess("추가 백업 폴더를 지정했습니다.");
       } else if (outcome?.mirror) {
-        setError(`폴더는 지정했지만 백업을 복사하지 못했습니다: ${outcome.mirror.message ?? ""}`);
+        setError(MIRROR_FAILED);
       }
       await Promise.all([loadBackups(), loadBackupSettings()]);
     } catch (e: unknown) {
@@ -148,14 +149,10 @@ export function DatabaseSettings() {
             <p className="text-sm font-semibold text-on-surface">
               {backup.createdAt} · {KIND_BADGES[backup.kind].label}
             </p>
-            <p className="text-sm text-on-surface-muted font-mono break-all">{backup.filename}</p>
           </div>
           <div className="flex items-start gap-2 bg-warning-50 dark:bg-warning-950 border border-warning-200 dark:border-warning-800 rounded-lg px-4 py-3 text-sm text-warning-700 dark:text-warning-300">
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>
-              데이터가 선택한 백업 시점으로 바뀝니다. 지금 데이터는 복원 직전에 자동으로 백업해 두며,
-              복원 후 앱이 다시 시작됩니다.
-            </span>
+            <span>현재 데이터는 자동으로 백업된 뒤 교체됩니다. 복원 후 앱이 자동으로 재시작됩니다.</span>
           </div>
         </div>
       ),
@@ -279,7 +276,7 @@ export function DatabaseSettings() {
     <div className="h-full overflow-y-auto relative">
       <LoadingOverlay isLoading={migrationLoading} message="데이터를 가져오는 중입니다..." absolute={false} />
       <LoadingOverlay isLoading={backupLoading || mirrorLoading} message="데이터베이스 백업 중..." absolute={false} />
-      <LoadingOverlay isLoading={restoreLoading} message="복원 준비 중... 잠시 후 앱이 다시 시작됩니다." absolute={false} />
+      <LoadingOverlay isLoading={restoreLoading} message="복원 중..." absolute={false} />
       <LoadingOverlay isLoading={clearLoading} message="모든 데이터를 삭제 중..." absolute={false} />
 
       <div className="flex items-center gap-2 mb-6">
@@ -345,8 +342,7 @@ export function DatabaseSettings() {
             <div className="min-w-0">
               <h4 className="text-sm font-semibold text-on-surface">추가 백업 폴더</h4>
               <p className="text-sm text-on-surface-muted mt-1">
-                USB나 OneDrive·구글 드라이브 폴더를 지정하면 백업할 때마다 그곳에도 복사합니다.
-                컴퓨터가 고장 나도 데이터를 지킬 수 있습니다.
+                백업을 USB나 클라우드 폴더에도 함께 저장합니다.
               </p>
             </div>
             <div className="flex gap-2 shrink-0">
@@ -376,9 +372,7 @@ export function DatabaseSettings() {
               </p>
               {lastMirror && (
                 <p className={`text-sm ${lastMirror.ok ? "text-success-700 dark:text-success-300" : "text-danger-700 dark:text-danger-300"}`}>
-                  {lastMirror.ok
-                    ? `마지막 복사: ${lastMirror.at}`
-                    : `마지막 복사 실패 (${lastMirror.at}): ${lastMirror.message ?? ""}`}
+                  {lastMirror.ok ? `마지막 저장: ${lastMirror.at}` : `${lastMirror.at} 저장 실패. ${MIRROR_HINT}`}
                 </p>
               )}
             </div>
@@ -391,7 +385,7 @@ export function DatabaseSettings() {
             <div>
               <h4 className="text-sm font-semibold text-on-surface">백업 내역</h4>
               <p className="text-sm text-on-surface-muted mt-1">
-                하루 한 번 자동으로 백업하며, 업데이트·복원·초기화 직전에도 백업을 남깁니다.
+                매일 자동 백업되며, 원하는 시점으로 데이터를 안전하게 복원할 수 있습니다.
               </p>
             </div>
             <button

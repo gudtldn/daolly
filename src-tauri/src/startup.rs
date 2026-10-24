@@ -123,9 +123,9 @@ fn ensure_original_in_place(data_dir: &Path) -> Result<(), DbErr> {
     let before = data_dir.join(BEFORE_RESTORE_FILE);
     if !data_dir.join(DB_FILE_NAME).exists() && before.exists() {
         log::error!("DB 파일이 없고 {}만 남아 있습니다", before.display());
+        // 복구 화면의 '자세한 오류 내용'에 보이는 문장 (안내는 복구 화면 본문에 있음)
         return Err(DbErr::Custom(format!(
-            "데이터 파일을 제자리로 옮기지 못했습니다. 원래 데이터는 {}에 그대로 있습니다. \
-             프로그램을 다시 시작해 보시고, 계속되면 이 화면을 사진으로 찍어 보내 주세요",
+            "데이터 파일을 제자리로 옮기지 못했습니다 (원래 데이터: {})",
             before.display()
         )));
     }
