@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
-import { errorMessage } from "@/utils/errors";
 import { loadRecentCustomers, rememberRecentCustomer } from "@/utils/recentCustomers";
 import { useSearch } from "@/hooks/useSearch";
 import { useListInteraction } from "@/hooks/useListInteraction";
@@ -20,6 +19,7 @@ import { useCartStore, type CartItem, type PaymentMethod } from "@/stores/cartSt
 import { useDialogStore } from "@/stores/dialogStore";
 import { CustomerFormCard } from "@/pages/customers/CustomerFormCard";
 import { PickupDialog, PAYMENT_LABELS } from "@/pages/pos/PickupDialog";
+import { toastError } from "@/utils/notify";
 
 // ============================================================
 // CustomerPanel 전용 상수/헬퍼
@@ -1079,7 +1079,7 @@ export function PosPage() {
       handleSelectCustomer(created);
       toast.success(`${created.name} 고객님이 등록되었습니다.`);
     } catch (e) {
-      toast.error(`고객 등록 실패: ${errorMessage(e)}`);
+      toastError("고객을 등록하지 못했습니다", e);
       throw e; // CustomerFormCard에서 에러 처리를 할 수 있도록 던짐
     }
   };
@@ -1092,7 +1092,7 @@ export function PosPage() {
       setSubmitCount((n) => n + 1);
       toast.success(`${customerName}님 접수 완료`);
     } catch (e) {
-      toast.error(`접수 실패: ${errorMessage(e)}`);
+      toastError("접수하지 못했습니다", e);
     } finally {
       setSubmitting(false);
     }

@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { paymentApi } from "@/bindings";
 import { useDialogStore } from "@/stores/dialogStore";
-import { errorMessage } from "@/utils/errors";
 import type { CreditPayment } from "@/types";
+import { ErrorNotice } from "@/components/ErrorDetails";
 
 /**
  * 예전 버전에서 결제 수단을 '외상'으로 등록한 결제 점검.
@@ -13,7 +13,7 @@ import type { CreditPayment } from "@/types";
  */
 export function CreditPaymentReview() {
   const [items, setItems] = useState<CreditPayment[]>([]);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const { showConfirm } = useDialogStore();
 
@@ -21,7 +21,7 @@ export function CreditPaymentReview() {
     try {
       setItems(await paymentApi.listCredit());
     } catch (e) {
-      setError(errorMessage(e));
+      setError(e);
     }
   };
 
@@ -29,7 +29,7 @@ export function CreditPaymentReview() {
     void load();
   }, []);
 
-  if (items.length === 0 && !error) return null;
+  if (items.length === 0 && error == null) return null;
 
   const handleRemove = async (p: CreditPayment) => {
     const ok = await showConfirm({
@@ -40,12 +40,12 @@ export function CreditPaymentReview() {
     });
     if (!ok) return;
     setBusy(true);
-    setError("");
+    setError(null);
     try {
       await paymentApi.delete(p.paymentId);
       await load();
     } catch (e) {
-      setError(errorMessage(e));
+      setError(e);
     } finally {
       setBusy(false);
     }
@@ -62,7 +62,7 @@ export function CreditPaymentReview() {
           </p>
         </div>
       </div>
-      {error && <p className="text-sm text-danger-600 dark:text-danger-400 mb-3">{error}</p>}
+      {error != null && <ErrorNotice error={error} className="text-sm text-danger-600 dark:text-danger-400 mb-3" />}
       {items.length > 0 && (
         <div className="border border-border-default rounded-lg overflow-hidden">
           <table className="w-full text-sm">

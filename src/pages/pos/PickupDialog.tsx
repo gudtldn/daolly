@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Banknote, CreditCard, Landmark } from "lucide-react";
 import { workItemApi } from "@/bindings";
-import { errorMessage } from "@/utils/errors";
 import type { PaymentMethod, WorkItem, WorkItemFull } from "@/types";
+import { ErrorNotice } from "@/components/ErrorDetails";
 
 const METHODS: { key: PaymentMethod; label: string; icon: React.ReactNode }[] = [
   { key: "cash", label: "현금", icon: <Banknote className="w-6 h-6" /> },
@@ -26,11 +26,11 @@ interface Props {
  */
 export function PickupDialog({ item, onClose, onPickedUp }: Props) {
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<unknown>(null);
 
   useEffect(() => {
     setPending(false);
-    setError("");
+    setError(null);
   }, [item?.id]);
 
   useEffect(() => {
@@ -48,12 +48,12 @@ export function PickupDialog({ item, onClose, onPickedUp }: Props) {
   const handlePickup = async (method: PaymentMethod | null) => {
     if (pending) return;
     setPending(true);
-    setError("");
+    setError(null);
     try {
       const receipt = await workItemApi.pickup(item.id, method);
       onPickedUp(receipt, balance > 0 ? method : null, method ? balance : 0);
     } catch (e) {
-      setError(errorMessage(e));
+      setError(e);
       setPending(false);
     }
   };
@@ -109,7 +109,7 @@ export function PickupDialog({ item, onClose, onPickedUp }: Props) {
           </button>
         )}
 
-        {error && <p className="text-sm text-danger-600 dark:text-danger-400">{error}</p>}
+        {error != null && <ErrorNotice error={error} className="text-sm text-danger-600 dark:text-danger-400" />}
 
         <div className="flex justify-end">
           <button

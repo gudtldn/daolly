@@ -8,6 +8,8 @@ interface DialogConfig {
   type: DialogType;
   title: string;
   message?: ReactNode;
+  /** 접어 두는 '자세한 내용 (개발자용)' (오류 원문) */
+  detail?: string;
   customContent?: ReactNode;
   confirmText?: string;
   cancelText?: string;

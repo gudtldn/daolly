@@ -39,9 +39,11 @@ export interface BackupSettings {
 /** 기동 중 발생한 알림 */
 export type StartupNotice =
   | { type: "restoreApplied" }
-  | { type: "restoreFailed"; reason: string };
+  /** message: 왜 실패했는지(사용자용), detail: 오류 원문(개발자용) */
+  | { type: "restoreFailed"; message: string; detail: string };
 
 /** 기동 결과. failed이면 DB를 열지 못해 복구 화면을 보여줍니다. */
 export type StartupStatus =
   | { state: "ready" }
-  | { state: "failed"; message: string };
+  /** message: 왜 열지 못했는지(사용자용), detail: 오류 원문(개발자용) */
+  | { state: "failed"; message: string; detail: string };

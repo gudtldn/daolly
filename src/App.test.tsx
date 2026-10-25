@@ -125,7 +125,11 @@ describe("App", () => {
   });
 
   it("DB를 열지 못하면 복구 화면과 백업 목록을 보여준다", async () => {
-    databaseApi.getStartupStatus.mockResolvedValue({ state: "failed", message: "file is not a database" });
+    databaseApi.getStartupStatus.mockResolvedValue({
+      state: "failed",
+      message: "데이터 파일이 손상되어 읽을 수 없습니다.",
+      detail: "file is not a database",
+    });
     databaseApi.listBackups.mockResolvedValue([
       { filename: "daolly_20260420_090000_daily.db", createdAt: "2026.04.20 09:00:00", sizeBytes: 1024, kind: "daily" },
     ]);
@@ -134,7 +138,10 @@ describe("App", () => {
     expect(await screen.findByText("데이터를 열지 못했습니다")).toBeInTheDocument();
     expect(await screen.findByText("2026.04.20 09:00:00")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /이 백업으로 복원/ })).toBeInTheDocument();
-    expect(screen.getByText("file is not a database")).toBeInTheDocument();
+    // 왜 열지 못했는지 알려주고, 원문은 접어 둔 개발자용 칸에
+    expect(screen.getByText(/데이터 파일이 손상되어 읽을 수 없습니다/)).toBeInTheDocument();
+    expect(screen.getByText("file is not a database").closest("details")).not.toBeNull();
+    expect(screen.getByText(/'복원 전' 백업으로 따로 남겨 둡니다/)).toBeInTheDocument();
     // 일반 화면(사이드바/헤더)은 그리지 않음
     expect(screen.queryByRole("banner")).not.toBeInTheDocument();
   });
@@ -145,13 +152,20 @@ describe("App", () => {
     expect(await screen.findByText("복원 완료")).toBeInTheDocument();
   });
 
-  it("백업 복원에 실패해 되돌렸으면 지금 데이터 그대로라고 알려준다", async () => {
-    databaseApi.takeStartupNotices.mockResolvedValue([{ type: "restoreFailed", reason: "file is not a database" }]);
+  it("백업 복원에 실패해 되돌렸으면 이유와 함께 복원 전 데이터로 시작했다고 알려준다", async () => {
+    databaseApi.takeStartupNotices.mockResolvedValue([
+      {
+        type: "restoreFailed",
+        message: "선택한 백업을 열지 못했습니다. 데이터 파일이 손상되어 읽을 수 없습니다.",
+        detail: "file is not a database",
+      },
+    ]);
     render(<App />);
     expect(await screen.findByText("복원하지 못했습니다")).toBeInTheDocument();
-    expect(screen.getByText("현재 데이터는 그대로이니 계속 사용하시면 됩니다.")).toBeInTheDocument();
-    // 기술적인 사유는 화면에 보이지 않음 (로그에 남음)
-    expect(screen.queryByText(/file is not a database/)).not.toBeInTheDocument();
+    // 왜 실패했는지 + 지금 어떤 데이터인지 + 무엇을 하면 되는지
+    expect(screen.getByText(/손상되어 읽을 수 없습니다. 그래서 복원하기 전 데이터로 시작했습니다/)).toBeInTheDocument();
+    // 기술적인 원문은 접어 둔 개발자용 칸에만
+    expect(screen.getByText("file is not a database").closest("details")).not.toBeNull();
   });
 
   it("새 버전을 받아 두면 종료 시 설치된다고 알려준다", async () => {

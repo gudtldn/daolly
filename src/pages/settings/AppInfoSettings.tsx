@@ -6,8 +6,10 @@ import { Info, RefreshCw, Download, CheckCircle, AlertCircle, FileArchive } from
 import { updateApi, isUpdateStatus } from "@/bindings/updates";
 import { databaseApi } from "@/bindings/database";
 import type { UpdateStatus } from "@/types";
-import { errorMessage } from "@/utils/errors";
+import { errorDetail, errorMessage, isRestartDisconnect } from "@/utils/errors";
 import { flushUsage } from "@/utils/usage";
+import { ErrorDetails } from "@/components/ErrorDetails";
+import { toastError } from "@/utils/notify";
 
 function todayStamp(): string {
   const d = new Date();
@@ -18,7 +20,7 @@ export function AppInfoSettings() {
   const [version, setVersion] = useState("...");
   const [status, setStatus] = useState<UpdateStatus>({ state: "idle" });
   const [installing, setInstalling] = useState(false);
-  const [installError, setInstallError] = useState("");
+  const [installError, setInstallError] = useState<unknown>(null);
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
@@ -37,26 +39,23 @@ export function AppInfoSettings() {
   }, []);
 
   const handleCheckUpdate = async () => {
-    setInstallError("");
+    setInstallError(null);
     setStatus({ state: "checking" });
     try {
       setStatus(await updateApi.check());
     } catch (e: unknown) {
-      setStatus({ state: "failed", message: errorMessage(e) });
+      setStatus({ state: "failed", message: errorMessage(e), detail: errorDetail(e) });
     }
   };
 
   const handleInstallNow = async () => {
-    setInstallError("");
+    setInstallError(null);
     setInstalling(true);
     try {
       // 설치 프로그램이 실행되며 앱이 종료되고, 설치가 끝나면 다시 열립니다.
       await updateApi.installNow();
     } catch (e: unknown) {
-      const msg = errorMessage(e);
-      if (!msg.includes("Could not connect") && !msg.includes("Disconnected")) {
-        setInstallError(msg);
-      }
+      if (!isRestartDisconnect(e)) setInstallError(e);
     } finally {
       setInstalling(false);
     }
@@ -74,7 +73,7 @@ export function AppInfoSettings() {
       await databaseApi.exportUsageLogs(path);
       toast.success("기록을 저장했습니다. 이 파일을 보내 주세요.");
     } catch (e: unknown) {
-      toast.error(`기록을 저장하지 못했습니다: ${errorMessage(e)}`);
+      toastError("기록을 저장하지 못했습니다", e);
     } finally {
       setExporting(false);
     }
@@ -172,14 +171,20 @@ export function AppInfoSettings() {
           {status.state === "failed" && (
             <div className="flex items-start gap-2 text-sm text-danger-600 dark:text-danger-400">
               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-              <span>업데이트를 확인하지 못했습니다. 인터넷 연결을 확인해 주세요.</span>
+              <div>
+                <p>{status.message}</p>
+                <ErrorDetails detail={status.detail} className="mt-1" />
+              </div>
             </div>
           )}
 
-          {installError && (
+          {installError != null && (
             <div className="flex items-start gap-2 text-sm text-danger-600 dark:text-danger-400">
               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-              <span>{installError}</span>
+              <div>
+                <p>{errorMessage(installError)}</p>
+                <ErrorDetails detail={errorDetail(installError)} className="mt-1" />
+              </div>
             </div>
           )}
         </section>

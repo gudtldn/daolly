@@ -51,8 +51,10 @@ pub enum UpdateStatus {
         version: String,
         notes: Option<String>,
     },
+    /// `message`: 왜 안 됐는지(사용자용), `detail`: 오류 원문(개발자용)
     Failed {
         message: String,
+        detail: String,
     },
 }
 
@@ -98,7 +100,8 @@ pub async fn check_and_download<R: Runtime>(app: &AppHandle<R>) -> UpdateStatus 
         Err(e) => {
             log::warn!("업데이트 확인/다운로드 실패: {e}");
             UpdateStatus::Failed {
-                message: e.to_string(),
+                message: explain_failure(&e.to_string()).to_owned(),
+                detail: e.to_string(),
             }
         }
     };
@@ -159,6 +162,28 @@ async fn fetch<R: Runtime>(
         .lock()
         .unwrap_or_else(|e| e.into_inner()) = Some((update, bytes));
     Ok(UpdateStatus::Ready { version, notes })
+}
+
+/// 업데이트 확인·다운로드 실패를 사용자가 알 수 있는 문장으로 바꿉니다.
+fn explain_failure(raw: &str) -> &'static str {
+    let raw = raw.to_lowercase();
+    if raw.contains("signature") {
+        "받은 파일이 다올리에서 만든 업데이트인지 확인되지 않아 설치하지 않았습니다. 지금 버전은 그대로 쓸 수 있습니다."
+    } else if [
+        "request",
+        "connect",
+        "dns",
+        "timed out",
+        "timeout",
+        "network",
+    ]
+    .iter()
+    .any(|k| raw.contains(k))
+    {
+        "인터넷에 연결되지 않았거나 업데이트 서버에 닿지 못했습니다. 지금 버전은 그대로 쓸 수 있고, 연결되면 다시 확인합니다."
+    } else {
+        "업데이트를 확인하지 못했습니다. 지금 버전은 그대로 쓸 수 있고, 잠시 뒤 다시 확인합니다."
+    }
 }
 
 /// 앱을 켜 둔 동안 주기적으로 확인합니다. 받아 두었으면 더 확인하지 않습니다.
@@ -336,6 +361,13 @@ mod tests {
         // 더 새 버전을 받으면 그 버전은 다시 한 번 시도
         remember_downloaded(dir, "0.2.10");
         assert!(should_install_early(dir, &v("0.2.8")));
+    }
+
+    #[test]
+    fn explains_update_failure() {
+        assert!(explain_failure("error sending request for url").contains("인터넷"));
+        assert!(explain_failure("Signature verification failed").contains("확인되지 않아"));
+        assert!(explain_failure("??").contains("확인하지 못했습니다"));
     }
 
     #[test]

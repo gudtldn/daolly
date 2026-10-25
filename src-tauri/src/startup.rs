@@ -27,7 +27,20 @@ const RENAME_RETRY_DELAY: std::time::Duration = std::time::Duration::from_millis
 #[serde(tag = "state", rename_all = "camelCase")]
 pub enum StartupStatus {
     Ready,
-    Failed { message: String },
+    /// `message`: 왜 열지 못했는지(사용자용), `detail`: 오류 원문(개발자용)
+    Failed {
+        message: String,
+        detail: String,
+    },
+}
+
+impl StartupStatus {
+    pub fn failed(e: &DbErr) -> Self {
+        StartupStatus::Failed {
+            message: explain(e).to_owned(),
+            detail: describe(e),
+        }
+    }
 }
 
 /// 기동 후 화면에 알릴 내용
@@ -36,8 +49,8 @@ pub enum StartupStatus {
 pub enum StartupNotice {
     /// 예약된 백업으로 복원됨
     RestoreApplied,
-    /// 복원에 실패해 원래 데이터로 되돌림
-    RestoreFailed { reason: String },
+    /// 복원에 실패해 원래 데이터로 되돌림. `message`: 왜 실패했는지(사용자용), `detail`: 원문
+    RestoreFailed { message: String, detail: String },
 }
 
 /// 프론트엔드가 한 번 가져가면 비워지는 기동 알림
@@ -54,7 +67,30 @@ impl StartupNotices {
     }
 }
 
-/// 화면에 보여 줄 오류 문장. 직접 쓴 한국어 문장에는 "Custom Error: " 같은 접두어를 붙이지 않음
+/// 원래 데이터 파일을 제자리에 두지 못했을 때의 오류 문장 (원인 판별에도 씀)
+const ORIGINAL_NOT_IN_PLACE: &str = "데이터 파일을 제자리로 옮기지 못했습니다";
+
+/// DB를 열지 못한 이유를 사용자가 알 수 있는 문장으로 바꿉니다. (원문은 `describe`로 따로 보여 줌)
+pub fn explain(e: &DbErr) -> &'static str {
+    let text = e.to_string();
+    if text.contains(ORIGINAL_NOT_IN_PLACE) {
+        "지난번 복원이 중간에 멈춰 원래 데이터 파일이 다른 이름으로 남아 있습니다. 빈 데이터로 시작하면 그 위에 새 기록이 쌓여 되살리기 어려워지므로 여기서 멈췄습니다."
+    } else if text.contains(db::MIGRATION_BACKUP_FAILED) {
+        "새 버전에 맞게 데이터를 바꾸기 전에 백업을 만들지 못해, 안전을 위해 바꾸지 않고 멈췄습니다. 디스크 공간이 부족할 수 있습니다."
+    } else if matches!(e, DbErr::Migration(_)) {
+        "새 버전에 맞게 데이터를 바꾸던 중 문제가 생겨, 바꾸기 전 상태로 되돌렸습니다."
+    } else if text.contains("database is locked") || text.contains("database is busy") {
+        "다른 프로그램이 데이터 파일을 쓰고 있어 열지 못했습니다."
+    } else if text.contains("file is not a database") || text.contains("malformed") {
+        "데이터 파일이 손상되어 읽을 수 없습니다."
+    } else if text.contains("unable to open database file") {
+        "데이터 파일을 열 수 없습니다. 파일이 옮겨졌거나 접근 권한이 없을 수 있습니다."
+    } else {
+        "데이터 파일을 여는 중 예상하지 못한 문제가 생겼습니다."
+    }
+}
+
+/// 개발자용 오류 원문. 직접 쓴 한국어 문장에는 "Custom Error: " 같은 접두어를 붙이지 않음
 pub fn describe(e: &DbErr) -> String {
     match e {
         DbErr::Custom(message) | DbErr::Migration(message) => message.clone(),
@@ -95,7 +131,8 @@ pub async fn open_database(
                         log::error!("복원 되돌리기 실패: {e}");
                     }
                     notices.push(StartupNotice::RestoreFailed {
-                        reason: describe(&e),
+                        message: format!("선택한 백업을 열지 못했습니다. {}", explain(&e)),
+                        detail: describe(&e),
                     });
                 }
             },
@@ -104,7 +141,11 @@ pub async fn open_database(
                 let _ = remove_with_sidecars(&data_dir.join(FAILED_RESTORE_FILE));
                 let _ = std::fs::rename(&pending, data_dir.join(FAILED_RESTORE_FILE));
                 notices.push(StartupNotice::RestoreFailed {
-                    reason: e.to_string(),
+                    message: format!(
+                        "백업 파일을 데이터 자리로 옮기지 못했습니다. {}",
+                        crate::error::io_reason(&e)
+                    ),
+                    detail: e.to_string(),
                 });
             }
         }
@@ -125,7 +166,7 @@ fn ensure_original_in_place(data_dir: &Path) -> Result<(), DbErr> {
         log::error!("DB 파일이 없고 {}만 남아 있습니다", before.display());
         // 복구 화면의 '자세한 오류 내용'에 보이는 문장 (안내는 복구 화면 본문에 있음)
         return Err(DbErr::Custom(format!(
-            "데이터 파일을 제자리로 옮기지 못했습니다 (원래 데이터: {})",
+            "{ORIGINAL_NOT_IN_PLACE} (원래 데이터: {})",
             before.display()
         )));
     }
@@ -243,6 +284,21 @@ mod tests {
             .into_iter()
             .map(|c| c.name)
             .collect()
+    }
+
+    #[test]
+    fn explains_cause_in_plain_words() {
+        let corrupt =
+            DbErr::Custom("error returned from database: (code: 26) file is not a database".into());
+        assert_eq!(
+            explain(&corrupt),
+            "데이터 파일이 손상되어 읽을 수 없습니다."
+        );
+        let migration = DbErr::Migration("연결이 끊어진 기록이 1건".into());
+        assert!(explain(&migration).contains("바꾸기 전 상태로 되돌렸습니다"));
+        let backup = DbErr::Custom(format!("{}: 디스크 가득 참", db::MIGRATION_BACKUP_FAILED));
+        assert!(explain(&backup).contains("백업을 만들지 못해"));
+        assert!(explain(&DbErr::Custom("??".into())).contains("예상하지 못한"));
     }
 
     #[test]
@@ -382,6 +438,7 @@ mod tests {
 
         let err = ensure_original_in_place(dir.path()).unwrap_err();
         assert!(describe(&err).contains(BEFORE_RESTORE_FILE));
+        assert!(explain(&err).contains("지난번 복원이 중간에 멈춰"));
         assert!(!dir.path().join(DB_FILE_NAME).exists());
 
         // DB가 제자리에 있으면 문제없음

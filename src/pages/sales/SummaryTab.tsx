@@ -25,6 +25,8 @@ import {
   PaymentMethodBadge,
 } from "@/pages/sales/salesUtils";
 import { useUIStore } from "@/stores/uiStore";
+import { ErrorDetails } from "@/components/ErrorDetails";
+import { errorDetail, errorMessage } from "@/utils/errors";
 
 const EMPTY_SUMMARY: RevenueSummary = {
   totalSales: 0,
@@ -66,7 +68,7 @@ export function SummaryTab() {
   const [summary, setSummary] = useState<RevenueSummary>(EMPTY_SUMMARY);
   const [chartData, setChartData] = useState<ChartDay[]>([]);
   const [topItems, setTopItems] = useState<TopItem[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const activeRange = useMemo(() => customRange ?? getDateRange(period), [customRange, period]);
@@ -87,8 +89,7 @@ export function SummaryTab() {
       setSummary(summaryData);
       setTopItems(topItemData);
     } catch (e) {
-      setError("데이터를 불러오는 중 오류가 발생했습니다.");
-      console.error(e);
+      setError(e);
     } finally {
       setIsLoading(false);
     }
@@ -128,9 +129,12 @@ export function SummaryTab() {
   return (
     <div className="h-full flex flex-col gap-4 min-h-0 relative">
       <LoadingOverlay isLoading={isLoading} />
-      {error && (
+      {error != null && (
         <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-2.5 rounded-lg bg-danger-50 border border-danger-200 text-danger-700 text-sm dark:bg-danger-950/30 dark:border-danger-900/40 dark:text-danger-400">
-          <span>{error}</span>
+          <div>
+            <p>매출 자료를 불러오지 못했습니다. {errorMessage(error)}</p>
+            <ErrorDetails detail={errorDetail(error)} className="mt-1" />
+          </div>
           <button
             onClick={loadData}
             className="shrink-0 px-2.5 py-1 text-sm font-medium bg-danger-100 dark:bg-danger-900/40 border border-danger-300 dark:border-danger-700 rounded-lg hover:bg-danger-200 dark:hover:bg-danger-900/60 transition-colors cursor-pointer"

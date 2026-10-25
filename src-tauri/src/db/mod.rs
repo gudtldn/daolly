@@ -42,6 +42,9 @@ pub async fn connect(path: &Path, read_only: bool) -> Result<DatabaseConnection,
     Ok(SqlxSqliteConnector::from_sqlx_sqlite_pool(pool))
 }
 
+/// 업데이트 전 백업에 실패했을 때의 오류 문장 (복구 화면에서 원인 판별에도 씀)
+pub const MIGRATION_BACKUP_FAILED: &str = "업데이트 전 백업에 실패해 DB 구조 변경을 중단했습니다";
+
 /// app_data_dir 아래 daolly.db를 열고(없으면 생성) 마이그레이션을 실행합니다.
 ///
 /// 실패하면 커넥션을 닫은 뒤 에러를 돌려줍니다. (Windows에서 파일 잠금이 남지 않도록)
@@ -84,11 +87,7 @@ pub(crate) async fn run_migrations<M: MigratorTrait>(
     if has_data {
         let outcome = backup::create_backup(db, data_dir, BackupKind::PreMigration)
             .await
-            .map_err(|e| {
-                DbErr::Custom(format!(
-                    "업데이트 전 백업에 실패해 DB 구조 변경을 중단했습니다: {e}"
-                ))
-            })?;
+            .map_err(|e| DbErr::Custom(format!("{MIGRATION_BACKUP_FAILED}: {e}")))?;
         log::info!("업데이트 전 백업: {}", outcome.info.filename);
     }
 
@@ -96,7 +95,11 @@ pub(crate) async fn run_migrations<M: MigratorTrait>(
     db.execute_unprepared("PRAGMA foreign_keys = OFF").await?;
     let result = migrate_in_transaction::<M>(db).await;
     let restored = db.execute_unprepared("PRAGMA foreign_keys = ON").await;
-    result?;
+    // 트랜잭션은 롤백되었으므로, 복구 화면이 '바꾸기 전 상태로 되돌렸다'고 알릴 수 있게 구분
+    result.map_err(|e| match e {
+        DbErr::Migration(_) => e,
+        other => DbErr::Migration(crate::startup::describe(&other)),
+    })?;
     restored?;
 
     log::info!("DB 마이그레이션 완료");

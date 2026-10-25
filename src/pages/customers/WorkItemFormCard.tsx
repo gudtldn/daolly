@@ -2,10 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { X, Plus, Trash2, Pencil, Check } from "lucide-react";
 import type { WorkItemFull, WorkItemStatus, ReceiveOrder, AmendOrder, DetailInput, Payment } from "@/types";
 import { paymentApi } from "@/bindings";
-import { errorMessage } from "@/utils/errors";
 import { useDialogStore } from "@/stores/dialogStore";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { NumberInput } from "@/components/NumberInput";
+import { ErrorNotice } from "@/components/ErrorDetails";
 
 // datetime-local <-> ISO 변환 헬퍼
 function toLocalInput(iso: string | null): string {
@@ -79,7 +79,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
   const [status, setStatus] = useState<WorkItemStatus>("Received");
   const [receivedAt, setReceivedAt] = useState("");
   const [pickedUpAt, setPickedUpAt] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<unknown>(null);
   const [saving, setSaving] = useState(false);
   const descRef = useRef<HTMLInputElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
@@ -157,7 +157,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       setManualPrice(false);
       setPriceInput(0);
     }
-    setError("");
+    setError(null);
     setSaving(false);
     setActiveTab(mode === "edit" && initialTab ? initialTab : "info");
     // 결제 데이터 초기화
@@ -199,7 +199,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       setPayAmount(remaining > 0 ? remaining : 0);
       onPaymentChange?.();
     } catch (e: unknown) {
-      setError(errorMessage(e));
+      setError(e);
     } finally {
       setPayLoading(false);
     }
@@ -232,7 +232,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       setEditingPaymentId(null);
       onPaymentChange?.();
     } catch (e: unknown) {
-      setError(errorMessage(e));
+      setError(e);
     } finally {
       setPayLoading(false);
     }
@@ -270,7 +270,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       setPayAmount(remaining > 0 ? remaining : 0);
       onPaymentChange?.();
     } catch (e: unknown) {
-      setError(errorMessage(e));
+      setError(e);
     } finally {
       setPayLoading(false);
     }
@@ -319,7 +319,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       return;
     }
 
-    setError("");
+    setError(null);
     setSaving(true);
     try {
       const detailInputs: DetailInput[] = validDetails.map((d) => ({
@@ -363,7 +363,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
       }
       onClose();
     } catch (e: unknown) {
-      setError(errorMessage(e));
+      setError(e);
     } finally {
       setSaving(false);
     }
@@ -422,10 +422,11 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
         <div
           className="flex-1 overflow-y-auto px-5 py-4 space-y-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
-          {error && (
-            <div className="text-sm text-danger-600 dark:text-danger-400 bg-danger-50 dark:bg-danger-950 px-3 py-2 rounded-lg">
-              {error}
-            </div>
+          {error != null && (
+            <ErrorNotice
+              error={error}
+              className="text-sm text-danger-600 dark:text-danger-400 bg-danger-50 dark:bg-danger-950 px-3 py-2 rounded-lg"
+            />
           )}
 
           {activeTab === "info" ? (

@@ -24,12 +24,12 @@ import { useCustomerStore } from "@/stores/customerStore";
 import { useWorkItemStore } from "@/stores/workItemStore";
 import { useDialogStore } from "@/stores/dialogStore";
 import { customerApi, workItemApi } from "@/bindings";
-import { errorMessage } from "@/utils/errors";
 
 // 삭제 후 '되돌리기'를 누를 수 있는 시간 (알림 위에 마우스를 올리면 그동안은 사라지지 않음)
 const UNDO_DURATION_MS = 8_000;
 import { CustomerFormCard } from "@/pages/customers/CustomerFormCard";
 import { WorkItemFormCard } from "@/pages/customers/WorkItemFormCard";
+import { toastError } from "@/utils/notify";
 
 // 날짜 포맷 헬퍼
 function formatDateShort(iso: string | null): string {
@@ -760,7 +760,7 @@ export function CustomersPage() {
             loadUnpaid();
             toast.success(`"${deleted.name}" 고객을 되돌렸습니다.`);
           } catch (e) {
-            toast.error(`되돌리지 못했습니다: ${errorMessage(e)}`);
+            toastError("되돌리지 못했습니다", e);
           }
         },
       },
@@ -808,7 +808,7 @@ export function CustomersPage() {
             loadUnpaid();
             toast.success(`"${item.description}" 작업을 되돌렸습니다.`);
           } catch (e) {
-            toast.error(`되돌리지 못했습니다: ${errorMessage(e)}`);
+            toastError("되돌리지 못했습니다", e);
           }
         },
       },

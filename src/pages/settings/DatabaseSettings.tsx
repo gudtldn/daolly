@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { databaseApi } from "@/bindings";
 import type { BackupInfo, BackupKind, BackupSettings } from "@/types";
-import { errorMessage } from "@/utils/errors";
+import { isRestartDisconnect } from "@/utils/errors";
+import { ErrorNotice } from "@/components/ErrorDetails";
 import { CreditPaymentReview } from "@/pages/settings/CreditPaymentReview";
 
 function formatBytes(bytes: number): string {
@@ -38,7 +39,7 @@ export function DatabaseSettings() {
   const [restoreLoading, setRestoreLoading] = useState(false);
   const [migrationLoading, setMigrationLoading] = useState(false);
   const [clearLoading, setClearLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<unknown>(null);
   const [success, setSuccess] = useState("");
   const { showCustom } = useDialogStore();
 
@@ -61,7 +62,7 @@ export function DatabaseSettings() {
     try {
       setBackups(await databaseApi.listBackups());
     } catch (e: unknown) {
-      setError(errorMessage(e));
+      setError(e);
     } finally {
       setLoading(false);
     }
@@ -71,7 +72,7 @@ export function DatabaseSettings() {
     try {
       setBackupSettings(await databaseApi.getBackupSettings());
     } catch (e: unknown) {
-      setError(errorMessage(e));
+      setError(e);
     }
   };
 
@@ -79,13 +80,13 @@ export function DatabaseSettings() {
     try {
       await databaseApi.openDbFolder();
     } catch (e: unknown) {
-      setError(errorMessage(e));
+      setError(e);
     }
   };
 
   const handleBackup = async () => {
     setBackupLoading(true);
-    setError("");
+    setError(null);
     setSuccess("");
     try {
       const outcome = await databaseApi.backup();
@@ -93,7 +94,7 @@ export function DatabaseSettings() {
       if (outcome.mirror && !outcome.mirror.ok) setError(MIRROR_FAILED);
       await Promise.all([loadBackups(), loadBackupSettings()]);
     } catch (e: unknown) {
-      setError(errorMessage(e));
+      setError(e);
     } finally {
       setBackupLoading(false);
     }
@@ -108,7 +109,7 @@ export function DatabaseSettings() {
     if (!selected) return;
 
     setMirrorLoading(true);
-    setError("");
+    setError(null);
     setSuccess("");
     try {
       const outcome = await databaseApi.setBackupMirrorDir(selected);
@@ -119,20 +120,20 @@ export function DatabaseSettings() {
       }
       await Promise.all([loadBackups(), loadBackupSettings()]);
     } catch (e: unknown) {
-      setError(errorMessage(e));
+      setError(e);
     } finally {
       setMirrorLoading(false);
     }
   };
 
   const handleClearMirror = async () => {
-    setError("");
+    setError(null);
     try {
       await databaseApi.setBackupMirrorDir(null);
       await loadBackupSettings();
       setSuccess("추가 백업 폴더를 해제했습니다.");
     } catch (e: unknown) {
-      setError(errorMessage(e));
+      setError(e);
     }
   };
 
@@ -158,16 +159,13 @@ export function DatabaseSettings() {
       ),
     });
     if (!confirmed) return;
-    setError("");
+    setError(null);
     setRestoreLoading(true);
     try {
       await databaseApi.restore(backup.filename);
     } catch (e: unknown) {
-      const msg = errorMessage(e);
       // 재시작으로 인한 연결 끊김은 에러로 처리하지 않음
-      if (!msg.includes("Could not connect") && !msg.includes("Disconnected")) {
-        setError(msg);
-      }
+      if (!isRestartDisconnect(e)) setError(e);
     } finally {
       setRestoreLoading(false);
     }
@@ -208,21 +206,17 @@ export function DatabaseSettings() {
       if (!confirmed) return;
 
       setMigrationLoading(true);
-      setError("");
+      setError(null);
       try {
         await databaseApi.migrateFromLegacy(selected);
       } catch (e: unknown) {
-        const msg = errorMessage(e);
         // 자동 재시작으로 인한 연결 끊김은 에러로 처리하지 않음
-        if (!msg.includes("Could not connect") && !msg.includes("Disconnected")) {
-          throw e;
-        }
+        if (!isRestartDisconnect(e)) throw e;
       }
       toast.success("데이터 이관 완료. 앱을 재시작합니다.");
       await loadBackups();
     } catch (e: unknown) {
-      setError(errorMessage(e));
-      toast.error("마이그레이션 실패");
+      setError(e);
     } finally {
       setMigrationLoading(false);
     }
@@ -255,7 +249,7 @@ export function DatabaseSettings() {
     if (!confirmed) return;
 
     setClearLoading(true);
-    setError("");
+    setError(null);
     setSuccess("");
     try {
       await databaseApi.clearAllData();
@@ -263,8 +257,7 @@ export function DatabaseSettings() {
       await loadBackups();
       toast.success("초기화 완료");
     } catch (e: unknown) {
-      setError(errorMessage(e));
-      toast.error("데이터 삭제 실패");
+      setError(e);
     } finally {
       setClearLoading(false);
     }
@@ -284,10 +277,11 @@ export function DatabaseSettings() {
         <h3 className="text-lg font-bold text-on-surface">데이터 관리</h3>
       </div>
 
-      {error && (
-        <div className="mb-4 px-4 py-3 bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 rounded-lg text-sm text-danger-700 dark:text-danger-300">
-          {error}
-        </div>
+      {error != null && (
+        <ErrorNotice
+          error={error}
+          className="mb-4 px-4 py-3 bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 rounded-lg text-sm text-danger-700 dark:text-danger-300"
+        />
       )}
       {success && (
         <div className="mb-4 px-4 py-3 bg-success-50 dark:bg-success-950 border border-success-200 dark:border-success-800 rounded-lg text-sm text-success-700 dark:text-success-300">

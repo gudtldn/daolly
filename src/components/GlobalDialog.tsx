@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useDialogStore } from "@/stores/dialogStore";
 import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
+import { ErrorDetails } from "@/components/ErrorDetails";
 
 export function GlobalDialog() {
   const { isOpen, config, close } = useDialogStore();
@@ -85,6 +86,7 @@ export function GlobalDialog() {
         {/* body */}
         <div className="px-6 py-4 text-on-surface-muted">
           {config?.type === "custom" ? config.customContent : <p>{config?.message}</p>}
+          <ErrorDetails detail={config?.detail} className="mt-3" />
         </div>
 
         {/* footer - hideFooter: true 이면 렌더링 생략 */}

@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { Tag, Plus, Pen, Trash2, GripVertical, FileUp, FileDown } from "lucide-react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
-import { errorMessage } from "@/utils/errors";
 import { particle } from "@/utils/korean";
 import {
   DndContext,
@@ -26,6 +25,7 @@ import { usePriceStore } from "@/stores/priceStore";
 import { useDialogStore } from "@/stores/dialogStore";
 import type { Category, PriceItem } from "@/types";
 import { CurrencyInput } from "@/components/CurrencyInput";
+import { toastError } from "@/utils/notify";
 
 // ============================================================
 // Form components rendered inside GlobalDialog customContent
@@ -458,7 +458,7 @@ export function PriceSettings() {
       await exportSettings(path);
       toast.success("단가표를 내보냈습니다.");
     } catch (e) {
-      toast.error(`내보내기 실패: ${errorMessage(e)}`);
+      toastError("단가표를 내보내지 못했습니다", e);
     }
   };
 
@@ -481,7 +481,7 @@ export function PriceSettings() {
       await importSettings(path);
       toast.success("단가표를 가져왔습니다.");
     } catch (e) {
-      toast.error(`가져오기 실패: ${errorMessage(e)}`);
+      toastError("단가표를 가져오지 못했습니다", e);
     }
   };
 

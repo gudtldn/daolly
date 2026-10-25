@@ -60,10 +60,14 @@ describe("AppInfoSettings", () => {
     expect(await screen.findByText("최신 버전입니다.")).toBeInTheDocument();
   });
 
-  it("확인에 실패하면 인터넷 연결 확인을 안내한다", async () => {
-    renderWithStatus({ state: "failed", message: "network error" });
-    expect(await screen.findByText(/인터넷 연결을 확인해 주세요/)).toBeInTheDocument();
-    expect(screen.queryByText(/network error/)).not.toBeInTheDocument();
+  it("확인에 실패하면 이유를 알려주고 원문은 개발자용 칸에 둔다", async () => {
+    renderWithStatus({
+      state: "failed",
+      message: "인터넷에 연결되지 않았거나 업데이트 서버에 닿지 못했습니다.",
+      detail: "error sending request",
+    });
+    expect(await screen.findByText(/인터넷에 연결되지 않았거나/)).toBeInTheDocument();
+    expect(screen.getByText("error sending request").closest("details")).not.toBeNull();
   });
 
   it("백그라운드 상태 변경 이벤트를 반영한다", async () => {

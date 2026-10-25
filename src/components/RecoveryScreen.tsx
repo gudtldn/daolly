@@ -5,7 +5,8 @@ import { databaseApi } from "@/bindings/database";
 import { updateApi, isUpdateStatus } from "@/bindings/updates";
 import { useDialogStore } from "@/stores/dialogStore";
 import { reportError } from "@/utils/logging";
-import { errorMessage } from "@/utils/errors";
+import { isRestartDisconnect } from "@/utils/errors";
+import { ErrorDetails, ErrorNotice } from "@/components/ErrorDetails";
 import type { BackupInfo, BackupKind, UpdateStatus } from "@/types";
 
 const KIND_LABELS: Record<BackupKind, string> = {
@@ -22,11 +23,11 @@ const KIND_LABELS: Record<BackupKind, string> = {
  * DB를 열지 못했을 때(손상, 업데이트 실패 등) 앱을 종료하는 대신 보여주는 화면.
  * 백업으로 복원하거나, 로그 폴더를 열어 개발자에게 보낼 수 있습니다.
  */
-export function RecoveryScreen({ message }: { message: string }) {
+export function RecoveryScreen({ message, detail }: { message: string; detail: string }) {
   const [backups, setBackups] = useState<BackupInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [restoring, setRestoring] = useState<string | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<unknown>(null);
   const [update, setUpdate] = useState<UpdateStatus>({ state: "idle" });
   const [installing, setInstalling] = useState(false);
   const { showConfirm } = useDialogStore();
@@ -35,7 +36,7 @@ export function RecoveryScreen({ message }: { message: string }) {
     databaseApi
       .listBackups()
       .then(setBackups)
-      .catch((e) => setError(errorMessage(e)))
+      .catch((e: unknown) => setError(e))
       .finally(() => setLoading(false));
 
     // 문제를 고친 새 버전이 있으면 바로 설치할 수 있게 함
@@ -52,14 +53,13 @@ export function RecoveryScreen({ message }: { message: string }) {
   }, []);
 
   const handleInstallUpdate = async () => {
-    setError("");
+    setError(null);
     setInstalling(true);
     try {
       await updateApi.installNow();
     } catch (e) {
-      const msg = errorMessage(e);
-      if (!msg.includes("Could not connect") && !msg.includes("Disconnected")) {
-        setError(msg);
+      if (!isRestartDisconnect(e)) {
+        setError(e);
         reportError("RecoveryScreen.installUpdate", e);
       }
     } finally {
@@ -75,15 +75,14 @@ export function RecoveryScreen({ message }: { message: string }) {
     });
     if (!confirmed) return;
 
-    setError("");
+    setError(null);
     setRestoring(backup.filename);
     try {
       await databaseApi.restore(backup.filename);
     } catch (e) {
-      const msg = errorMessage(e);
       // 재시작으로 인한 연결 끊김은 에러로 처리하지 않음
-      if (!msg.includes("Could not connect") && !msg.includes("Disconnected")) {
-        setError(msg);
+      if (!isRestartDisconnect(e)) {
+        setError(e);
         reportError("RecoveryScreen.restore", e);
       }
     } finally {
@@ -95,7 +94,7 @@ export function RecoveryScreen({ message }: { message: string }) {
     try {
       await databaseApi.openLogFolder();
     } catch (e) {
-      setError(errorMessage(e));
+      setError(e);
     }
   };
 
@@ -109,7 +108,7 @@ export function RecoveryScreen({ message }: { message: string }) {
           <div className="space-y-2">
             <h1 className="text-2xl font-bold">데이터를 열지 못했습니다</h1>
             <p className="text-base text-on-surface-muted leading-relaxed">
-              데이터는 그대로 있습니다. 다시 시작해 보시고, 계속되면 백업으로 복원해 주세요.
+              {message} 다시 시작해도 이 화면이 나오면 아래 백업으로 복원하세요.
             </p>
           </div>
         </div>
@@ -135,14 +134,18 @@ export function RecoveryScreen({ message }: { message: string }) {
           </p>
         )}
 
-        {error && (
-          <div className="px-4 py-3 bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 rounded-lg text-base text-danger-700 dark:text-danger-300">
-            {error}
-          </div>
+        {error != null && (
+          <ErrorNotice
+            error={error}
+            className="px-4 py-3 bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 rounded-lg text-base text-danger-700 dark:text-danger-300"
+          />
         )}
 
         <section className="space-y-3">
-          <h2 className="text-lg font-semibold">백업으로 복원</h2>
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold">백업으로 복원</h2>
+            <p className="text-sm text-on-surface-muted">지금 파일은 '복원 전' 백업으로 따로 남겨 둡니다.</p>
+          </div>
           {loading ? (
             <p className="text-base text-on-surface-muted">백업 목록을 불러오는 중...</p>
           ) : backups.length === 0 ? (
@@ -189,10 +192,7 @@ export function RecoveryScreen({ message }: { message: string }) {
           </button>
         </div>
 
-        <details className="text-sm text-on-surface-muted">
-          <summary className="cursor-pointer select-none">자세한 오류 내용 (개발자용)</summary>
-          <pre className="mt-2 p-3 bg-surface-elevated rounded-lg whitespace-pre-wrap break-all font-mono">{message}</pre>
-        </details>
+        <ErrorDetails detail={detail} />
       </div>
     </div>
   );

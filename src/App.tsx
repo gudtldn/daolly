@@ -114,10 +114,10 @@ function App() {
           if (notice.type === "restoreApplied") {
             toast.success("복원 완료");
           } else {
-            // 사유는 로그 파일에 남음 (startup::open_database)
             void useDialogStore.getState().showAlert({
               title: "복원하지 못했습니다",
-              message: "현재 데이터는 그대로이니 계속 사용하시면 됩니다.",
+              message: `${notice.message} 그래서 복원하기 전 데이터로 시작했습니다. 다른 백업으로 복원하려면 환경 설정 > 데이터 관리를 이용하세요.`,
+              detail: notice.detail,
             });
           }
         }
@@ -131,7 +131,7 @@ function App() {
       {/* 본문은 항상 뒤에 렌더링해두어 페이드아웃 시 자연스럽게 보이게 함 */}
       <div className={`h-full bg-surface transition-opacity duration-700 ${isClosing ? "opacity-100" : "opacity-0"}`}>
         {startup?.state === "failed" ? (
-          <RecoveryScreen message={startup.message} />
+          <RecoveryScreen message={startup.message} detail={startup.detail} />
         ) : startup?.state === "ready" ? (
           <AppContent />
         ) : null}
