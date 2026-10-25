@@ -31,9 +31,12 @@ pub fn normalize_method(method: Option<&str>) -> Result<&'static str, AppError> 
     }
 }
 
-/// 받은 금액 합계가 청구 금액을 넘지 않는지 확인합니다.
-pub fn check_not_overpaid(price: i64, paid_after: i64) -> Result<(), AppError> {
-    if paid_after > price {
+/// 받은 금액 합계가 청구 금액을 넘게 되는 변경을 막습니다.
+///
+/// 예전 버전에서 이미 청구 금액보다 더 받은 접수는 결제 수단 정정이나 금액 줄이기처럼
+/// 받은 금액이 늘지 않는 변경은 허용하고, 더 받게 되는 변경만 막습니다.
+pub fn check_not_overpaid(price: i64, paid_before: i64, paid_after: i64) -> Result<(), AppError> {
+    if paid_after > price && paid_after > paid_before {
         return Err(AppError::Validation(format!(
             "받은 금액이 청구 금액({})보다 많아집니다.",
             won(price)
@@ -53,7 +56,7 @@ pub async fn create(
     let method = normalize_method(method.as_deref())?;
     let tx = db.begin().await?;
     let wi = find_work_item(&tx, work_item_id).await?;
-    check_not_overpaid(wi.price, wi.paid_amount + amount)?;
+    check_not_overpaid(wi.price, wi.paid_amount, wi.paid_amount + amount)?;
 
     let inserted = insert(&tx, work_item_id, amount, method, paid_at).await?;
     tx.commit().await?;
@@ -99,7 +102,11 @@ pub async fn update(
 
     let before = find_active(&tx, id).await?;
     let wi = find_work_item(&tx, before.work_item_id).await?;
-    check_not_overpaid(wi.price, wi.paid_amount - before.amount + amount)?;
+    check_not_overpaid(
+        wi.price,
+        wi.paid_amount,
+        wi.paid_amount - before.amount + amount,
+    )?;
 
     void(&tx, &before, &timestamp::now()).await?;
     let paid_at = paid_at.unwrap_or_else(|| before.paid_at.clone());

@@ -239,12 +239,16 @@ function CustomerListPanel({
         <button
           onClick={onEdit}
           disabled={selectedId === null}
+          title="고객 정보 수정"
+          aria-label="고객 정보 수정"
           className="p-2 border border-border-default rounded-lg text-on-surface-muted hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
           <Pencil className="w-4 h-4" />
         </button>
         <button
           onClick={onDelete}
           disabled={selectedId === null}
+          title="고객 삭제"
+          aria-label="고객 삭제"
           className="p-2 border border-danger-200 dark:border-danger-800 rounded-lg text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
           <Trash2 className="w-4 h-4" />
         </button>
@@ -525,7 +529,9 @@ function WorkItemListPanel({
   }
 
   const totalAmount = workItems.reduce((sum, item) => sum + item.price, 0);
-  const totalUnpaid = workItems.reduce((sum, item) => sum + (item.price - item.paidAmount), 0);
+  // 더 받은 접수가 다른 접수의 미수금을 가리지 않도록 따로 셈 (서버의 미수금 집계와 같은 방식)
+  const totalUnpaid = workItems.reduce((sum, item) => sum + Math.max(item.price - item.paidAmount, 0), 0);
+  const totalOverpaid = workItems.reduce((sum, item) => sum + Math.max(item.paidAmount - item.price, 0), 0);
 
   return (
     <div className="flex-1 bg-surface-card rounded-lg shadow-sm flex flex-col overflow-hidden border border-border-default transition-colors">
@@ -547,15 +553,21 @@ function WorkItemListPanel({
             미수금:{" "}
             <strong className="text-danger-600 text-base ml-1">{totalUnpaid.toLocaleString()}원</strong>
           </span>
+          {totalOverpaid > 0 && (
+            <span className="text-on-surface-muted" title="청구 금액보다 더 받은 접수가 있습니다. 작업을 열어 가격이나 결제를 확인해 주세요.">
+              더 받은 금액:{" "}
+              <strong className="text-warning-600 text-base ml-1">{totalOverpaid.toLocaleString()}원</strong>
+            </span>
+          )}
         </div>
         <div className="flex space-x-2">
           <button onClick={onAdd} className="flex items-center px-3 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors cursor-pointer">
             <Plus className="w-4 h-4 mr-1" /> 추가
           </button>
-          <button onClick={() => activeWorkItemId && onEdit(activeWorkItemId)} disabled={!activeWorkItemId} className="p-2 border border-border-default rounded-lg text-on-surface-muted hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+          <button onClick={() => activeWorkItemId && onEdit(activeWorkItemId)} disabled={!activeWorkItemId} title="작업 수정 (작업을 먼저 고르세요)" aria-label="작업 수정" className="p-2 border border-border-default rounded-lg text-on-surface-muted hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
             <Pencil className="w-4 h-4" />
           </button>
-          <button onClick={() => activeWorkItemId && onDelete(activeWorkItemId)} disabled={!activeWorkItemId} className="p-2 border border-danger-200 dark:border-danger-800 rounded-lg text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+          <button onClick={() => activeWorkItemId && onDelete(activeWorkItemId)} disabled={!activeWorkItemId} title="작업 삭제 (작업을 먼저 고르세요)" aria-label="작업 삭제" className="p-2 border border-danger-200 dark:border-danger-800 rounded-lg text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
@@ -567,7 +579,7 @@ function WorkItemListPanel({
             <tr>
               {(["status", "receivedAt", "pickedUpAt", "description", "price"] as const).map((col) => {
                 const labels: Record<string, string> = { status: "상태", receivedAt: "접수", pickedUpAt: "수령", description: "작업내용", price: "금액" };
-                const widths: Record<string, string> = { status: "px-2 py-3 text-center w-24", receivedAt: "px-2 py-3 w-12 whitespace-nowrap", pickedUpAt: "px-2 py-3 w-12 whitespace-nowrap", description: "px-3 py-3", price: "px-3 py-3 w-24" };
+                const widths: Record<string, string> = { status: "px-2 py-3 text-center w-24", receivedAt: "px-2 py-3 w-12 whitespace-nowrap", pickedUpAt: "px-2 py-3 w-12 whitespace-nowrap", description: "px-3 py-3", price: "px-3 py-3 w-28 whitespace-nowrap" };
                 const isSortActive = sortConfig.key === col;
                 return (
                   <th key={col} onClick={() => requestSort(col)} className={`${widths[col]} font-medium cursor-pointer select-none hover:text-on-surface transition-colors group`}>
@@ -611,7 +623,7 @@ function WorkItemListPanel({
                     <td className="px-3 py-3 font-bold text-on-surface">{item.description}</td>
                     <td className="px-3 py-3">
                       <div className="flex flex-col items-start gap-1">
-                        <span className="text-base font-bold text-on-surface leading-none">{item.price.toLocaleString()}원</span>
+                        <span className="text-base font-bold text-on-surface leading-none whitespace-nowrap">{item.price.toLocaleString()}원</span>
                         {isUnpaid ? (
                           <button onClick={(e) => { e.stopPropagation(); onPayment(item.id); }} className="px-2 py-1 bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 text-danger-600 dark:text-danger-400 rounded-lg text-sm font-bold whitespace-nowrap leading-none cursor-pointer hover:bg-danger-100 dark:hover:bg-danger-900 transition-colors">
                             미수금 {(item.price - item.paidAmount).toLocaleString()}원

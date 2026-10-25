@@ -200,7 +200,9 @@ where
         (Some(lines), None) => lines_total(lines)?,
         (None, None) => current.price,
     };
-    if price < current.paid_amount {
+    // 받은 금액보다 낮은 가격은 막되, 예전 버전에서 이미 더 받은 접수는 가격을 더 낮추는 경우만 막음
+    // (메모만 고치는 등 금액과 무관한 수정까지 막히지 않도록)
+    if price < current.paid_amount && price < current.price {
         return Err(invalid(format!(
             "받은 금액({})보다 낮은 가격으로 바꿀 수 없습니다.",
             won(current.paid_amount)
@@ -462,7 +464,7 @@ fn prepayment(payment: &Prepayment, price: i64) -> Result<Option<(&'static str, 
         }
         Some(amount) => amount,
     };
-    payments::check_not_overpaid(price, amount)?;
+    payments::check_not_overpaid(price, 0, amount)?;
     Ok(Some((method, amount)))
 }
 
@@ -800,6 +802,76 @@ mod tests {
         assert_eq!(same.price, 10000);
         assert_eq!(same.note, None);
         assert_eq!(details.len(), 2);
+    }
+
+    /// 예전 버전에서 청구 금액보다 더 받은 접수 (10,000원 받았는데 가격이 8,000원)
+    async fn overpaid(db: &DatabaseConnection, cid: i32) -> work_item::Model {
+        let wi = received(db, cid, true).await;
+        db.execute_unprepared(&format!(
+            "UPDATE work_items SET price = 8000 WHERE id = {}",
+            wi.id
+        ))
+        .await
+        .unwrap();
+        find_order(db, wi.id).await.unwrap()
+    }
+
+    /// 이미 더 받은 접수도 메모처럼 금액과 무관한 수정은 저장되고, 가격을 올리는 것도 됨
+    #[tokio::test]
+    async fn amend_allows_overpaid_order_when_not_worse() {
+        let (db, cid) = setup().await;
+        let wi = overpaid(&db, cid).await;
+
+        let mut note_only = amendment();
+        note_only.note = Some("메모만 고침".into());
+        amend(&db, wi.id, note_only).await.unwrap();
+
+        let mut raise = amendment();
+        raise.price_override = Some(9000);
+        amend(&db, wi.id, raise).await.unwrap();
+        assert_eq!(find_order(&db, wi.id).await.unwrap().price, 9000);
+
+        // 초과분이 늘어나는 변경(가격을 더 낮춤)은 여전히 막음
+        let mut lower = amendment();
+        lower.price_override = Some(7000);
+        assert!(amend(&db, wi.id, lower).await.is_err());
+        assert_eq!(find_order(&db, wi.id).await.unwrap().price, 9000);
+    }
+
+    /// 이미 더 받은 접수의 결제도 수단 정정·금액 줄이기는 되고, 더 받게 되는 변경만 막음
+    #[tokio::test]
+    async fn payment_correction_allowed_on_overpaid_order() {
+        let (db, cid) = setup().await;
+        let wi = overpaid(&db, cid).await;
+        let paid = payments::list(&db, wi.id).await.unwrap();
+        let p = &paid[0];
+
+        let fixed = payments::update(&db, p.id, p.amount, Some("transfer".into()), None)
+            .await
+            .unwrap();
+        assert_eq!(fixed.method.as_deref(), Some("transfer"));
+
+        assert!(
+            payments::update(
+                &db,
+                fixed.id,
+                p.amount + 1000,
+                Some("transfer".into()),
+                None
+            )
+            .await
+            .is_err()
+        );
+        assert!(
+            payments::create(&db, wi.id, 1000, Some("cash".into()), None)
+                .await
+                .is_err()
+        );
+
+        let lowered = payments::update(&db, fixed.id, 9000, Some("transfer".into()), None)
+            .await
+            .unwrap();
+        assert_eq!(lowered.amount, 9000);
     }
 
     /// 품목 저장이 실패하면 가격·메모도 바뀌지 않음 (예전에는 따로 저장해 가격과 품목이 어긋남)

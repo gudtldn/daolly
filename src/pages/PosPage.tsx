@@ -424,7 +424,7 @@ function CustomerPanel({
           <div className="h-full flex flex-col p-2">
             <div className="flex flex-col items-center justify-center text-center text-on-surface-muted gap-3 py-10">
               <User className="w-10 h-10 opacity-20" />
-              <p className="text-sm">위 검색창에서 고객을 선택해 주세요.</p>
+              <p className="text-sm break-keep">이름이나 전화번호 뒷자리로 고객을 찾아 주세요.</p>
             </div>
             
             {recentCustomers.length > 0 && (
@@ -794,11 +794,12 @@ function OrderPanel({
         <table className="w-full text-sm text-left">
           <thead className="bg-surface sticky top-0 border-b border-border-default text-on-surface-muted z-10">
             <tr>
-              <th className="px-4 py-3 font-medium">품목명 / 메모</th>
-              <th className="px-4 py-3 font-medium text-center w-28">수량</th>
-              <th className="px-4 py-3 font-medium text-right w-32">단가</th>
-              <th className="px-4 py-3 font-medium text-right w-32">금액</th>
-              <th className="px-4 py-3 font-medium text-center w-20">수정</th>
+              {/* 숫자 칸은 좁게 두고 남는 폭을 품목명에 줌 (좁은 화면에서 품목명이 세로로 쪼개지지 않도록) */}
+              <th className="px-4 py-3 font-medium whitespace-nowrap">품목명 / 메모</th>
+              <th className="px-2 py-3 font-medium text-center whitespace-nowrap w-28">수량</th>
+              <th className="px-2 py-3 font-medium text-right whitespace-nowrap w-24">단가</th>
+              <th className="px-2 py-3 font-medium text-right whitespace-nowrap w-24">금액</th>
+              <th className="px-2 py-3 font-medium text-center whitespace-nowrap w-16">수정</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border-default">
@@ -822,14 +823,14 @@ function OrderPanel({
                   ) : (
                     <div
                       onClick={() => setEditingMemoIdx(index)}
-                      className="text-sm text-on-surface-muted mt-0.5 cursor-pointer hover:text-primary-500 transition-colors inline-block"
+                      className="text-sm text-on-surface-muted mt-0.5 cursor-pointer hover:text-primary-500 transition-colors inline-block whitespace-nowrap"
                       title="메모 수정"
                     >
                       {item.optionsMemo ? `↳ ${item.optionsMemo}` : <span className="opacity-50">↳ 메모 추가...</span>}
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-2 py-3">
                   <div className="flex items-center justify-center gap-1.5 bg-surface border border-border-default rounded-lg p-1">
                     <button
                       onClick={() => onUpdateQty(index, Math.max(1, item.quantity - 1))}
@@ -846,7 +847,7 @@ function OrderPanel({
                     </button>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-right">
+                <td className="px-2 py-3 text-right">
                   {editingPriceIdx === index ? (
                     <CurrencyInput
                       autoFocus
@@ -868,10 +869,10 @@ function OrderPanel({
                     </button>
                   )}
                 </td>
-                <td className="px-4 py-3 text-right font-bold text-on-surface">
+                <td className="px-2 py-3 text-right font-bold text-on-surface">
                   {(item.unitPrice * item.quantity).toLocaleString()}
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-2 py-3">
                   <div className="flex items-center justify-center gap-1">
                     <button
                       onClick={() => openFullEdit(index)}
@@ -996,10 +997,9 @@ function PaymentPanel({
       </div>
 
       <div className="p-4 border-t border-border-default bg-surface-elevated shrink-0">
-        {(noCustomer || noMethod) && (
-          <p className="text-sm text-warning-600 text-center mb-3">
-            {noCustomer ? "고객을 먼저 선택해 주세요." : "결제 수단을 선택해 주세요."}
-          </p>
+        {/* 고객을 고르기 전에는 가운데 덮개가 안내하므로 여기서는 결제 수단만 알림 */}
+        {!noCustomer && noMethod && (
+          <p className="text-sm text-warning-600 text-center mb-3">결제 수단을 선택해 주세요.</p>
         )}
         <button
           onClick={() => method && onSubmit(method, note)}
@@ -1115,7 +1115,7 @@ export function PosPage() {
           <div className="absolute inset-0 z-50 bg-surface/90 flex items-center justify-center rounded-xl">
             <div className="flex flex-col items-center gap-3 bg-surface-card border border-border-default rounded-lg px-8 py-6 shadow-xl">
               <User className="w-10 h-10 text-on-surface-muted opacity-40" />
-              <p className="text-sm font-semibold text-on-surface">왼쪽 검색에서 고객을 먼저 선택해 주세요.</p>
+              <p className="text-sm font-semibold text-on-surface">고객을 고르면 품목을 담고 결제할 수 있습니다.</p>
             </div>
           </div>
         )}
