@@ -308,14 +308,14 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
     if (saving) return;
     const trimmedDesc = description.trim();
     if (!trimmedDesc) {
-      setError("작업내용을 입력해주세요.");
+      setError("작업내용을 입력해 주세요.");
       descRef.current?.focus();
       return;
     }
     // 품목 유효성: 빈 행 제거 후 검증
     const validDetails = details.filter((d) => d.itemName.trim());
     if (validDetails.length === 0 && !manualPrice) {
-      setError("품목을 하나 이상 입력하거나 가격을 직접 입력해주세요.");
+      setError("품목을 하나 이상 입력하거나 가격을 직접 입력해 주세요.");
       return;
     }
 

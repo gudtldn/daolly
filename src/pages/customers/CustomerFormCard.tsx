@@ -104,7 +104,7 @@ export function CustomerFormCard({ open, mode, customer, onSave, onClose }: Prop
   const handleSubmit = async () => {
     const trimmed = name.trim();
     if (!trimmed) {
-      setError("이름을 입력해주세요.");
+      setError("이름을 입력해 주세요.");
       nameRef.current?.focus();
       return;
     }

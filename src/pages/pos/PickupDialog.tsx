@@ -77,7 +77,7 @@ export function PickupDialog({ item, onClose, onPickedUp }: Props) {
               <span className="text-base font-medium text-warning-700 dark:text-warning-300">남은 금액</span>
               <span className="text-2xl font-bold text-warning-700 dark:text-warning-300">{balance.toLocaleString()}원</span>
             </div>
-            <p className="text-sm text-on-surface-muted">결제 방법을 선택하세요.</p>
+            <p className="text-sm text-on-surface-muted">받은 결제 수단을 고르면 바로 출고됩니다.</p>
             <div className="grid grid-cols-3 gap-2">
               {METHODS.map((m) => (
                 <button
@@ -97,6 +97,9 @@ export function PickupDialog({ item, onClose, onPickedUp }: Props) {
               className="w-full py-3 rounded-lg border border-border-default text-sm font-medium text-on-surface-muted hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-50"
             >
               외상으로 출고
+              <span className="block text-xs font-normal mt-0.5">
+                {balance.toLocaleString()}원은 미수금으로 남습니다.
+              </span>
             </button>
           </>
         ) : (

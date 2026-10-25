@@ -50,10 +50,12 @@ pub enum BackupError {
     InvalidName,
     #[error("백업 파일을 찾을 수 없습니다")]
     NotFound,
-    #[error("백업 파일이 손상되어 복원할 수 없습니다")]
-    Corrupted,
-    #[error("다올리 백업 파일이 아닙니다")]
-    NotDaollyBackup,
+    /// 값은 원인 (SQLite 오류 원문 등)
+    #[error("백업 파일이 손상되어 복원할 수 없습니다: {0}")]
+    Corrupted(String),
+    /// 값은 원인 (SQLite 오류 원문 등)
+    #[error("다올리 백업 파일이 아닙니다: {0}")]
+    NotDaollyBackup(String),
     #[error("더 새로운 버전의 다올리에서 만든 백업입니다. 앱을 먼저 업데이트해 주세요")]
     NewerVersion,
     #[error("추가 백업 폴더를 사용할 수 없습니다: {0}")]
@@ -526,7 +528,7 @@ fn copy_to_mirror(root: &Path, file: &Path) -> Result<(), BackupError> {
 pub async fn validate_backup(path: &Path) -> Result<(), BackupError> {
     let conn = db::connect(path, true)
         .await
-        .map_err(|_| BackupError::Corrupted)?;
+        .map_err(|e| BackupError::Corrupted(e.to_string()))?;
     let result = validate_connection(&conn).await;
     let _ = conn.close_by_ref().await;
     result
@@ -539,13 +541,16 @@ async fn validate_connection(conn: &DatabaseConnection) -> Result<(), BackupErro
             "PRAGMA integrity_check",
         ))
         .await
-        .map_err(|_| BackupError::Corrupted)?;
-    let ok = rows.len() == 1
-        && rows[0]
-            .try_get_by_index::<String>(0)
-            .is_ok_and(|s| s == "ok");
-    if !ok {
-        return Err(BackupError::Corrupted);
+        .map_err(|e| BackupError::Corrupted(e.to_string()))?;
+    let result: Vec<String> = rows
+        .iter()
+        .filter_map(|r| r.try_get_by_index::<String>(0).ok())
+        .collect();
+    if result != ["ok"] {
+        return Err(BackupError::Corrupted(format!(
+            "integrity_check: {}",
+            result.join("; ")
+        )));
     }
 
     let rows = conn
@@ -554,7 +559,7 @@ async fn validate_connection(conn: &DatabaseConnection) -> Result<(), BackupErro
             "SELECT version FROM seaql_migrations",
         ))
         .await
-        .map_err(|_| BackupError::NotDaollyBackup)?;
+        .map_err(|e| BackupError::NotDaollyBackup(e.to_string()))?;
     let known: HashSet<String> = Migrator::migrations()
         .iter()
         .map(|m| m.name().to_owned())
@@ -562,7 +567,7 @@ async fn validate_connection(conn: &DatabaseConnection) -> Result<(), BackupErro
     for row in rows {
         let version: String = row
             .try_get_by_index(0)
-            .map_err(|_| BackupError::NotDaollyBackup)?;
+            .map_err(|e| BackupError::NotDaollyBackup(e.to_string()))?;
         if !known.contains(&version) {
             return Err(BackupError::NewerVersion);
         }
@@ -858,7 +863,7 @@ mod tests {
         std::fs::write(&garbage, b"this is not a sqlite database at all, just text").unwrap();
         assert!(matches!(
             validate_backup(&garbage).await,
-            Err(BackupError::Corrupted)
+            Err(BackupError::Corrupted(_))
         ));
 
         let foreign = dir.path().join("foreign.db");
@@ -869,7 +874,7 @@ mod tests {
         conn.close().await.unwrap();
         assert!(matches!(
             validate_backup(&foreign).await,
-            Err(BackupError::NotDaollyBackup)
+            Err(BackupError::NotDaollyBackup(_))
         ));
 
         let (data, db) = setup().await;

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { errorDetail, errorMessage } from "@/utils/errors";
 
 /** 오류 원문을 접어 두는 '자세한 내용 (개발자용)'. 원문이 없으면 그리지 않습니다. */
@@ -20,10 +21,14 @@ interface ErrorNoticeProps {
   className: string;
 }
 
-/** 오류 문장 + 접어 둔 개발자용 원문 */
+/** 오류 문장 + 접어 둔 개발자용 원문. 나타나면 화면 안으로 스크롤합니다. (버튼과 멀리 떨어진 곳에 생겨도 보이도록) */
 export function ErrorNotice({ error, className }: ErrorNoticeProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ref.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+  }, [error]);
   return (
-    <div role="alert" className={className}>
+    <div ref={ref} role="alert" className={className}>
       <p>{errorMessage(error)}</p>
       <ErrorDetails detail={errorDetail(error)} className="mt-2" />
     </div>

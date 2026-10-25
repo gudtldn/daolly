@@ -519,7 +519,7 @@ function WorkItemListPanel({
     return (
       <div className="flex-1 bg-surface-card rounded-lg shadow-sm border border-border-default flex flex-col items-center justify-center text-on-surface-muted">
         <ClipboardList className="w-16 h-16 mb-4 opacity-20" />
-        <h3 className="text-lg font-medium">고객을 선택해주세요</h3>
+        <h3 className="text-lg font-medium">고객을 선택해 주세요</h3>
       </div>
     );
   }

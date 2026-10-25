@@ -131,10 +131,10 @@ impl From<BackupError> for AppError {
             BackupError::InvalidName | BackupError::NotFound => {
                 "선택한 백업 파일이 없습니다. 다른 곳으로 옮겨졌거나 지워졌을 수 있습니다.".to_owned()
             }
-            BackupError::Corrupted => {
+            BackupError::Corrupted(_) => {
                 "이 백업 파일은 손상되어 열 수 없습니다. 다른 백업을 선택해 주세요.".to_owned()
             }
-            BackupError::NotDaollyBackup => {
+            BackupError::NotDaollyBackup(_) => {
                 "다올리에서 만든 백업 파일이 아니라 복원할 수 없습니다.".to_owned()
             }
             BackupError::NewerVersion => {
@@ -251,9 +251,11 @@ mod tests {
         let busy = std::io::Error::from_raw_os_error(32);
         assert!(io_reason(&busy).contains("다른 프로그램"));
 
-        let e = AppError::from(BackupError::Corrupted);
+        let e = AppError::from(BackupError::Corrupted("file is not a database".into()));
         assert_eq!(e.code(), ErrorCode::File);
         assert!(e.message().contains("손상"));
+        // 개발자용 원문에는 실제 원인이 남음
+        assert!(e.detail().unwrap().contains("file is not a database"));
         let json = serde_json::to_value(&e).unwrap();
         assert!(json.get("detail").is_some());
         // 검증 오류에는 detail이 없음

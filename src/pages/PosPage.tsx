@@ -424,7 +424,7 @@ function CustomerPanel({
           <div className="h-full flex flex-col p-2">
             <div className="flex flex-col items-center justify-center text-center text-on-surface-muted gap-3 py-10">
               <User className="w-10 h-10 opacity-20" />
-              <p className="text-sm">위 검색창에서 고객을 선택해주세요.</p>
+              <p className="text-sm">위 검색창에서 고객을 선택해 주세요.</p>
             </div>
             
             {recentCustomers.length > 0 && (
@@ -710,7 +710,7 @@ function OrderPanel({
           ))}
           {categories.length === 0 && (
             <div className="flex-1 px-4 py-3.5 text-sm text-on-surface-muted text-center">
-              단가표에서 카테고리를 먼저 설정해주세요.
+              단가표에서 카테고리를 먼저 설정해 주세요.
             </div>
           )}
         </div>
@@ -895,7 +895,7 @@ function OrderPanel({
               <tr>
                 <td colSpan={5} className="p-12 text-center text-on-surface-muted">
                   <Shirt className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                  위 버튼을 클릭하여 품목을 추가해주세요.
+                  위 버튼을 클릭하여 품목을 추가해 주세요.
                 </td>
               </tr>
             )}
@@ -998,7 +998,7 @@ function PaymentPanel({
       <div className="p-4 border-t border-border-default bg-surface-elevated shrink-0">
         {(noCustomer || noMethod) && (
           <p className="text-sm text-warning-600 text-center mb-3">
-            {noCustomer ? "고객을 먼저 선택해주세요." : "결제 수단을 선택해주세요."}
+            {noCustomer ? "고객을 먼저 선택해 주세요." : "결제 수단을 선택해 주세요."}
           </p>
         )}
         <button
@@ -1115,7 +1115,7 @@ export function PosPage() {
           <div className="absolute inset-0 z-50 bg-surface/90 flex items-center justify-center rounded-xl">
             <div className="flex flex-col items-center gap-3 bg-surface-card border border-border-default rounded-lg px-8 py-6 shadow-xl">
               <User className="w-10 h-10 text-on-surface-muted opacity-40" />
-              <p className="text-sm font-semibold text-on-surface">왼쪽 검색에서 고객을 먼저 선택해주세요.</p>
+              <p className="text-sm font-semibold text-on-surface">왼쪽 검색에서 고객을 먼저 선택해 주세요.</p>
             </div>
           </div>
         )}

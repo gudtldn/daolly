@@ -621,7 +621,7 @@ export function PriceSettings() {
                             <td colSpan={4} className="p-10 text-center text-sm text-on-surface-muted">
                               {selectedCategoryId
                                 ? "등록된 품목이 없습니다."
-                                : "카테고리를 먼저 선택해주세요."}
+                                : "카테고리를 먼저 선택해 주세요."}
                             </td>
                           </tr>
                         )}

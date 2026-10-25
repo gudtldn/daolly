@@ -209,7 +209,7 @@ export function SummaryTab() {
           <div className="mt-3 w-full bg-secondary-100 rounded-full h-1.5 dark:bg-secondary-800">
             <div className="bg-primary-500 h-1.5 rounded-full" style={{ width: `${cardPct}%` }} />
           </div>
-          <p className="text-xs text-on-surface-muted mt-1.5 text-right font-medium">수입의 {cardPct}%</p>
+          <p className="text-xs text-on-surface-muted mt-1.5 text-right font-medium">입금액의 {cardPct}%</p>
         </div>
 
         {/* 현금 / 이체 합계 */}
@@ -225,7 +225,7 @@ export function SummaryTab() {
           <div className="mt-3 w-full bg-secondary-100 rounded-full h-1.5 dark:bg-secondary-800">
             <div className="bg-success-500 h-1.5 rounded-full" style={{ width: `${cashTransferPct}%` }} />
           </div>
-          <p className="text-xs text-on-surface-muted mt-1.5 text-right font-medium">수입의 {cashTransferPct}%</p>
+          <p className="text-xs text-on-surface-muted mt-1.5 text-right font-medium">입금액의 {cashTransferPct}%</p>
         </div>
 
         {/* 오늘 접수한 금액 */}

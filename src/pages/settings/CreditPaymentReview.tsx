@@ -58,7 +58,8 @@ export function CreditPaymentReview() {
         <div>
           <h4 className="text-sm font-semibold text-on-surface">외상으로 기록된 결제 {items.length}건</h4>
           <p className="text-sm text-on-surface-muted mt-1">
-            실제로 받지 않은 금액이라면 '결제에서 빼기'를 눌러 미수금으로 돌려 주세요.
+            예전 버전에서 외상을 결제처럼 저장한 기록입니다. 이대로 두면 받지 않은 돈이 입금으로 잡혀 매출과
+            미수금이 실제와 달라집니다. 실제로 받지 않은 금액이라면 '결제에서 빼기'를 눌러 미수금으로 돌려 주세요.
           </p>
         </div>
       </div>

@@ -316,7 +316,7 @@ export function DatabaseSettings() {
             <div>
               <h4 className="text-sm font-semibold text-on-surface">이전 버전 데이터 가져오기</h4>
               <p className="text-sm text-on-surface-muted mt-1">
-                WinForms 버전의 customer.db 파일을 선택하여 손님 및 작업 내역을 가져옵니다.
+                예전에 쓰던 고객관리 프로그램의 데이터 파일(customer.db)을 골라 손님과 작업 내역을 가져옵니다.
               </p>
             </div>
             <button
