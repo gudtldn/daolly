@@ -1,25 +1,46 @@
-use chrono::{DateTime, Datelike, Duration, Local, NaiveDate};
+//! 매출 조회
+//!
+//! 기간은 가게 날짜(`NaiveDate`, 양끝 포함)로 받아 `timestamp::day_bounds`로 저장 형식의
+//! UTC 경계 `[start, end)`로 바꾼 뒤 비교합니다. 시각은 고정 형식 UTC로 저장되므로
+//! 문자열 비교가 곧 시간 비교입니다.
+//!
+//! 취소한 접수와 결제는 매출에서 빼고, 삭제한 고객의 지난 접수·결제는 매출에 남깁니다.
+
+use chrono::{Datelike, Duration, NaiveDate, TimeZone};
 use sea_orm::prelude::Expr;
+use sea_orm::sea_query::Query;
 use sea_orm::*;
 use serde::Serialize;
 use std::collections::HashMap;
 
 use crate::db::entities::{customer, payment, work_item, work_item_detail};
+use crate::timestamp;
 
-/// Parses date string and converts to local date.
-/// Supports RFC3339 and fallback to simple YYYY-MM-DD format.
-fn parse_to_local_date(iso: &str) -> Option<NaiveDate> {
-    // 1. Try strict RFC3339 (standard for this app now)
-    if let Ok(dt) = DateTime::parse_from_rfc3339(iso) {
-        return Some(dt.with_timezone(&Local).date_naive());
+/// 기간 조회 경계 (저장 형식 UTC, 반개구간)
+struct Bounds {
+    start: Option<String>,
+    end: Option<String>,
+}
+
+impl Bounds {
+    fn new<Tz: TimeZone>(from: Option<NaiveDate>, to: Option<NaiveDate>, tz: &Tz) -> Self {
+        let (start, end) = timestamp::day_bounds(from, to, tz);
+        Self { start, end }
     }
 
-    // 2. Try simple date prefix (common for migrated or raw string data)
-    if iso.len() >= 10 {
-        return NaiveDate::parse_from_str(&iso[..10], "%Y-%m-%d").ok();
+    fn apply<Q: QueryFilter, C: ColumnTrait>(&self, mut query: Q, column: C) -> Q {
+        if let Some(start) = &self.start {
+            query = query.filter(column.gte(start.as_str()));
+        }
+        if let Some(end) = &self.end {
+            query = query.filter(column.lt(end.as_str()));
+        }
+        query
     }
 
-    None
+    fn values(&self) -> [Value; 2] {
+        [self.start.clone().into(), self.end.clone().into()]
+    }
 }
 
 /// Sales record for one work_item (includes customer name and payment method).
@@ -53,14 +74,24 @@ pub struct UnpaidRecord {
     pub received_at: String,
 }
 
-/// Summary of revenue for a given period.
-#[derive(Serialize)]
+/// 기간 매출 요약
+#[derive(Debug, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RevenueSummary {
-    /// Total price of work items received during the period (Accrual basis)
+    /// 기간 중 접수 금액 합계 (발생주의)
     pub total_sales: i64,
-    /// Total amount actually paid during the period (Cash basis)
+    /// 기간 중 입금 합계 (현금주의)
     pub actual_income: i64,
+    /// 입금 중 카드
+    pub card_income: i64,
+    /// 입금 중 현금
+    pub cash_income: i64,
+    /// 입금 중 계좌이체
+    pub transfer_income: i64,
+    /// 입금 중 그 밖의 수단 (예전에 '외상'으로 잘못 기록된 결제 등)
+    pub other_income: i64,
+    /// 입금 중 기간 이전에 접수된 건의 잔금 (미수 수납)
+    pub back_payment_income: i64,
 }
 
 /// Detailed payment record for the summary view.
@@ -75,42 +106,24 @@ pub struct PaymentRecord {
     pub amount: i64,
     pub method: Option<String>,
     pub paid_at: String,
-    /// Whether this payment is for a work_item received in the same period.
-    /// If false, it's a back-payment (미수금 수령).
+    /// 기간 이전에 접수된 건에 대한 입금인지 (미수 수납)
     pub is_back_payment: bool,
 }
 
-/// Returns work_items received in the given date range with customer name and payment method.
-///
-/// `from` / `to` are optional "YYYY-MM-DD" strings. Credit items have payment_method = None.
-pub async fn list_sales_records(
+/// 기간 중 접수된 건 (고객명, 결제 수단 포함). 결제가 없으면 payment_method = None.
+pub async fn list_sales_records<Tz: TimeZone>(
     db: &DatabaseConnection,
-    from: Option<&str>,
-    to: Option<&str>,
+    from: Option<NaiveDate>,
+    to: Option<NaiveDate>,
+    tz: &Tz,
 ) -> Result<Vec<SalesRecord>, DbErr> {
-    let mut query = work_item::Entity::find()
+    let bounds = Bounds::new(from, to, tz);
+    let query = work_item::Entity::find()
+        .filter(work_item::Column::DeletedAt.is_null())
         .join(JoinType::LeftJoin, work_item::Relation::Customer.def())
         .select_also(customer::Entity);
-
-    if let Some(f) = from {
-        query = query.filter(work_item::Column::ReceivedAt.gte(f));
-    }
-    if let Some(t) = to {
-        // To include the entire 'to' day, we find everything strictly less than the next day.
-        if t.len() >= 10 {
-            if let Ok(date) = NaiveDate::parse_from_str(&t[..10], "%Y-%m-%d") {
-                let next_day = date + Duration::days(1);
-                let next_day_str = next_day.format("%Y-%m-%d").to_string();
-                query = query.filter(work_item::Column::ReceivedAt.lt(next_day_str));
-            } else {
-                query = query.filter(work_item::Column::ReceivedAt.lte(t));
-            }
-        } else {
-            query = query.filter(work_item::Column::ReceivedAt.lte(t));
-        }
-    }
-
-    let results: Vec<(work_item::Model, Option<customer::Model>)> = query
+    let results: Vec<(work_item::Model, Option<customer::Model>)> = bounds
+        .apply(query, work_item::Column::ReceivedAt)
         .order_by_desc(work_item::Column::ReceivedAt)
         .all(db)
         .await?;
@@ -119,11 +132,21 @@ pub async fn list_sales_records(
         return Ok(vec![]);
     }
 
-    let work_item_ids: Vec<i32> = results.iter().map(|(wi, _)| wi.id).collect();
-
-    // Fetch all payments per work_item for payment_method mapping.
+    // 결제 수단 표시용. 접수 id 목록을 IN (?, ?, ...)로 넘기면 3만여 건부터 SQLite 변수 한도를
+    // 넘어 실패하므로 같은 기간 조건의 서브쿼리로 조회
+    let mut in_range = Query::select();
+    in_range
+        .column(work_item::Column::Id)
+        .from(work_item::Entity);
+    if let Some(start) = &bounds.start {
+        in_range.and_where(Expr::col(work_item::Column::ReceivedAt).gte(start.as_str()));
+    }
+    if let Some(end) = &bounds.end {
+        in_range.and_where(Expr::col(work_item::Column::ReceivedAt).lt(end.as_str()));
+    }
     let payments = payment::Entity::find()
-        .filter(payment::Column::WorkItemId.is_in(work_item_ids))
+        .filter(payment::Column::WorkItemId.in_subquery(in_range.to_owned()))
+        .filter(payment::Column::VoidedAt.is_null())
         .order_by_asc(payment::Column::PaidAt)
         .all(db)
         .await?;
@@ -165,15 +188,13 @@ pub async fn list_sales_records(
 pub async fn list_unpaid_records(db: &DatabaseConnection) -> Result<Vec<UnpaidRecord>, DbErr> {
     let results: Vec<(work_item::Model, Option<customer::Model>)> = work_item::Entity::find()
         .filter(Expr::col(work_item::Column::PaidAmount).lt(Expr::col(work_item::Column::Price)))
+        .filter(work_item::Column::DeletedAt.is_null())
         .join(JoinType::LeftJoin, work_item::Relation::Customer.def())
+        .filter(customer::Column::DeletedAt.is_null())
         .select_also(customer::Entity)
         .order_by_desc(work_item::Column::ReceivedAt)
         .all(db)
         .await?;
-
-    if results.is_empty() {
-        return Ok(vec![]);
-    }
 
     let records = results
         .into_iter()
@@ -208,45 +229,38 @@ pub struct ChartDay {
     pub total: i64,
 }
 
-/// Returns the last 7 days (inclusive of today) as chart data, ordered oldest -> newest.
-///
-/// Groups work_items by the Local date portion of `received_at` and sums their `price`.
-pub async fn list_weekly_chart(db: &DatabaseConnection) -> Result<Vec<ChartDay>, DbErr> {
-    let now_local = Local::now();
-    let today = now_local.date_naive();
-    let from_local = today - Duration::days(6);
-    let next_day = today + Duration::days(1);
-
-    // Filter using simple date strings to support various storage formats (RFC3339 or raw).
-    // range: [from_local, next_day)
-    let from_str = from_local.format("%Y-%m-%d").to_string();
-    let next_day_str = next_day.format("%Y-%m-%d").to_string();
-
-    let items = work_item::Entity::find()
-        .filter(work_item::Column::ReceivedAt.gte(&from_str))
-        .filter(work_item::Column::ReceivedAt.lt(&next_day_str))
+/// 오늘을 포함한 최근 7일의 날짜별 접수 금액 (오래된 날부터)
+pub async fn list_weekly_chart<Tz: TimeZone>(
+    db: &DatabaseConnection,
+    tz: &Tz,
+) -> Result<Vec<ChartDay>, DbErr> {
+    let today = timestamp::today(tz);
+    let first = today - Duration::days(6);
+    let bounds = Bounds::new(Some(first), Some(today), tz);
+    let items = bounds
+        .apply(
+            work_item::Entity::find().filter(work_item::Column::DeletedAt.is_null()),
+            work_item::Column::ReceivedAt,
+        )
         .all(db)
         .await?;
 
-    // Sum price per Local date.
     let mut totals: HashMap<NaiveDate, i64> = HashMap::new();
     for item in items {
-        if let Some(date) = parse_to_local_date(&item.received_at) {
+        if let Some(date) = timestamp::local_date(&item.received_at, tz) {
             *totals.entry(date).or_insert(0) += item.price;
         }
     }
 
     let weekday_labels = ["월", "화", "수", "목", "금", "토", "일"];
-
     let mut days: Vec<ChartDay> = (0..7)
         .map(|i| {
-            let date = from_local + Duration::days(i as i64);
-            let total = totals.get(&date).copied().unwrap_or(0);
+            let date = first + Duration::days(i);
             let wd = date.weekday().num_days_from_monday() as usize;
             ChartDay {
                 date: date.format("%Y-%m-%d").to_string(),
                 label: weekday_labels[wd].to_string(),
-                total,
+                total: totals.get(&date).copied().unwrap_or(0),
             }
         })
         .collect();
@@ -267,54 +281,33 @@ pub struct TopItem {
     pub total_quantity: i64,
 }
 
-/// Returns the top `limit` most frequently received items in the given date range.
-///
-/// Groups `work_item_details` by `item_name` and sums `quantity`.
-/// `from` / `to` filter the parent `work_item.received_at`.
-pub async fn list_top_items(
+/// 기간 중 접수된 품목을 수량 순으로 `limit`개
+pub async fn list_top_items<Tz: TimeZone>(
     db: &DatabaseConnection,
-    from: Option<&str>,
-    to: Option<&str>,
+    from: Option<NaiveDate>,
+    to: Option<NaiveDate>,
+    tz: &Tz,
     limit: usize,
 ) -> Result<Vec<TopItem>, DbErr> {
-    let mut query = work_item_detail::Entity::find()
+    let bounds = Bounds::new(from, to, tz);
+    let query = work_item_detail::Entity::find()
         .select_only()
         .column(work_item_detail::Column::ItemName)
         .column_as(
             Expr::col(work_item_detail::Column::Quantity).sum(),
             "total_quantity",
         )
-        .group_by(work_item_detail::Column::ItemName)
-        .order_by_desc(Expr::cust("total_quantity"));
-
-    // If date filters are provided, they are expected to be UTC strings from FE.
-    if from.is_some() || to.is_some() {
-        query = query.join_rev(
+        .join_rev(
             JoinType::InnerJoin,
             work_item::Entity::belongs_to(work_item_detail::Entity)
                 .from(work_item::Column::Id)
                 .to(work_item_detail::Column::WorkItemId)
                 .into(),
-        );
-
-        if let Some(f) = from {
-            query = query.filter(work_item::Column::ReceivedAt.gte(f));
-        }
-        if let Some(t) = to {
-            if t.len() >= 10 {
-                if let Ok(d) = NaiveDate::parse_from_str(&t[..10], "%Y-%m-%d") {
-                    let next = d + Duration::days(1);
-                    query = query.filter(
-                        work_item::Column::ReceivedAt.lt(next.format("%Y-%m-%d").to_string()),
-                    );
-                } else {
-                    query = query.filter(work_item::Column::ReceivedAt.lte(t));
-                }
-            } else {
-                query = query.filter(work_item::Column::ReceivedAt.lte(t));
-            }
-        }
-    }
+        )
+        .filter(work_item::Column::DeletedAt.is_null())
+        .group_by(work_item_detail::Column::ItemName)
+        .order_by_desc(Expr::cust("total_quantity"))
+        .limit(limit as u64);
 
     #[derive(FromQueryResult)]
     struct TopItemRow {
@@ -322,122 +315,104 @@ pub async fn list_top_items(
         total_quantity: i64,
     }
 
-    let rows = query.into_model::<TopItemRow>().all(db).await?;
+    let rows = bounds
+        .apply(query, work_item::Column::ReceivedAt)
+        .into_model::<TopItemRow>()
+        .all(db)
+        .await?;
 
-    let items = rows
+    Ok(rows
         .into_iter()
-        .take(limit)
         .enumerate()
         .map(|(i, r)| TopItem {
             rank: i + 1,
             item_name: r.item_name,
             total_quantity: r.total_quantity,
         })
-        .collect();
-
-    Ok(items)
+        .collect())
 }
 
-/// Calculates summary of total sales and actual income for the given date range.
-/// `from` / `to` are optional UTC ISO strings.
-pub async fn get_revenue_summary(
+/// 기간 매출 요약: 접수 금액, 입금 합계와 수단별·미수 수납 내역
+pub async fn get_revenue_summary<Tz: TimeZone>(
     db: &DatabaseConnection,
-    from: Option<&str>,
-    to: Option<&str>,
+    from: Option<NaiveDate>,
+    to: Option<NaiveDate>,
+    tz: &Tz,
 ) -> Result<RevenueSummary, DbErr> {
-    // 1. Total Sales (Accrual Basis): Sum of work_item prices received in the range
-    let mut sales_query = work_item::Entity::find()
-        .select_only()
-        .column_as(work_item::Column::Price.sum(), "sum");
-    if let Some(f) = from {
-        sales_query = sales_query.filter(work_item::Column::ReceivedAt.gte(f));
-    }
-    if let Some(t) = to {
-        // to가 "YYYY-MM-DD..." 형식이면 다음날 00시 미만으로 필터링
-        if t.len() >= 10 {
-            if let Ok(d) = NaiveDate::parse_from_str(&t[..10], "%Y-%m-%d") {
-                let next = d + Duration::days(1);
-                sales_query = sales_query
-                    .filter(work_item::Column::ReceivedAt.lt(next.format("%Y-%m-%d").to_string()));
-            } else {
-                sales_query = sales_query.filter(work_item::Column::ReceivedAt.lte(t));
-            }
-        } else {
-            sales_query = sales_query.filter(work_item::Column::ReceivedAt.lte(t));
-        }
-    }
+    let bounds = Bounds::new(from, to, tz);
 
-    #[derive(FromQueryResult)]
-    struct SumRow {
-        sum: Option<i64>,
-    }
-    let sales_res = sales_query.into_model::<SumRow>().one(db).await?;
-    let total_sales = sales_res.and_then(|r| r.sum).unwrap_or(0);
+    let sales = db
+        .query_one(Statement::from_sql_and_values(
+            DbBackend::Sqlite,
+            "SELECT COALESCE(SUM(price), 0) FROM work_items
+             WHERE deleted_at IS NULL
+               AND (?1 IS NULL OR received_at >= ?1) AND (?2 IS NULL OR received_at < ?2)",
+            bounds.values(),
+        ))
+        .await?;
+    let total_sales: i64 = match sales {
+        Some(row) => row.try_get_by_index(0)?,
+        None => 0,
+    };
 
-    // 2. Actual Income (Cash Basis): Sum of payments made in the range
-    let mut income_query = payment::Entity::find()
-        .select_only()
-        .column_as(payment::Column::Amount.sum(), "sum");
-    if let Some(f) = from {
-        income_query = income_query.filter(payment::Column::PaidAt.gte(f));
-    }
-    if let Some(t) = to {
-        if t.len() >= 10 {
-            if let Ok(d) = NaiveDate::parse_from_str(&t[..10], "%Y-%m-%d") {
-                let next = d + Duration::days(1);
-                income_query = income_query
-                    .filter(payment::Column::PaidAt.lt(next.format("%Y-%m-%d").to_string()));
-            } else {
-                income_query = income_query.filter(payment::Column::PaidAt.lte(t));
-            }
-        } else {
-            income_query = income_query.filter(payment::Column::PaidAt.lte(t));
-        }
-    }
+    // 결제 수단 값은 영문 코드가 기준이고, 예전 버전의 한글 값도 함께 집계
+    let income = db
+        .query_one(Statement::from_sql_and_values(
+            DbBackend::Sqlite,
+            "SELECT
+                COALESCE(SUM(p.amount), 0),
+                COALESCE(SUM(CASE WHEN p.method IN ('card', '카드') THEN p.amount END), 0),
+                COALESCE(SUM(CASE WHEN p.method IN ('cash', '현금') THEN p.amount END), 0),
+                COALESCE(SUM(CASE WHEN p.method IN ('transfer', '계좌이체', '이체') THEN p.amount END), 0),
+                COALESCE(SUM(CASE WHEN w.received_at < ?1 THEN p.amount END), 0)
+             FROM payments p JOIN work_items w ON w.id = p.work_item_id
+             WHERE p.voided_at IS NULL AND w.deleted_at IS NULL
+               AND (?1 IS NULL OR p.paid_at >= ?1) AND (?2 IS NULL OR p.paid_at < ?2)",
+            bounds.values(),
+        ))
+        .await?;
 
-    let income_res = income_query.into_model::<SumRow>().one(db).await?;
-    let actual_income = income_res.and_then(|r| r.sum).unwrap_or(0);
-
-    Ok(RevenueSummary {
+    let mut summary = RevenueSummary {
         total_sales,
-        actual_income,
-    })
+        ..Default::default()
+    };
+    if let Some(row) = income {
+        summary.actual_income = row.try_get_by_index(0)?;
+        summary.card_income = row.try_get_by_index(1)?;
+        summary.cash_income = row.try_get_by_index(2)?;
+        summary.transfer_income = row.try_get_by_index(3)?;
+        summary.back_payment_income = row.try_get_by_index(4)?;
+    }
+    summary.other_income =
+        summary.actual_income - summary.card_income - summary.cash_income - summary.transfer_income;
+    Ok(summary)
 }
 
-/// Returns all payments made in the given date range, with customer and work_item info.
-pub async fn list_payment_records(
+/// 기간 중 입금 내역 (고객명, 접수 내용 포함)
+pub async fn list_payment_records<Tz: TimeZone>(
     db: &DatabaseConnection,
-    from: Option<&str>,
-    to: Option<&str>,
+    from: Option<NaiveDate>,
+    to: Option<NaiveDate>,
+    tz: &Tz,
 ) -> Result<Vec<PaymentRecord>, DbErr> {
-    let mut query = payment::Entity::find()
+    let bounds = Bounds::new(from, to, tz);
+    let query = payment::Entity::find()
+        .filter(payment::Column::VoidedAt.is_null())
         .join(JoinType::InnerJoin, payment::Relation::WorkItem.def())
+        .filter(work_item::Column::DeletedAt.is_null())
         .join(JoinType::InnerJoin, work_item::Relation::Customer.def())
         .select_also(work_item::Entity)
         .select_also(customer::Entity);
-
-    if let Some(f) = from {
-        query = query.filter(payment::Column::PaidAt.gte(f));
-    }
-    if let Some(t) = to {
-        if t.len() >= 10 {
-            if let Ok(d) = NaiveDate::parse_from_str(&t[..10], "%Y-%m-%d") {
-                let next = d + Duration::days(1);
-                query =
-                    query.filter(payment::Column::PaidAt.lt(next.format("%Y-%m-%d").to_string()));
-            } else {
-                query = query.filter(payment::Column::PaidAt.lte(t));
-            }
-        } else {
-            query = query.filter(payment::Column::PaidAt.lte(t));
-        }
-    }
 
     let results: Vec<(
         payment::Model,
         Option<work_item::Model>,
         Option<customer::Model>,
-    )> = query.order_by_desc(payment::Column::PaidAt).all(db).await?;
+    )> = bounds
+        .apply(query, payment::Column::PaidAt)
+        .order_by_desc(payment::Column::PaidAt)
+        .all(db)
+        .await?;
 
     let records = results
         .into_iter()
@@ -445,13 +420,10 @@ pub async fn list_payment_records(
             let customer_name = cust.map(|c| c.name).unwrap_or_default();
             let customer_id = wi.as_ref().map(|w| w.customer_id).unwrap_or(0);
             let description = wi.as_ref().and_then(|w| w.description.clone());
-
-            // 이 결제가 이번 기간(from~to)에 접수된 건에 대한 것인지 확인
-            // (간단하게 received_at이 from보다 이전이면 back_payment로 간주)
-            let is_back_payment = if let (Some(f), Some(w)) = (from, wi) {
-                w.received_at.as_str() < f
-            } else {
-                false
+            // 기간 시작 전에 접수된 건에 대한 입금이면 미수 수납
+            let is_back_payment = match (&bounds.start, &wi) {
+                (Some(start), Some(w)) => w.received_at.as_str() < start.as_str(),
+                _ => false,
             };
 
             PaymentRecord {
@@ -460,7 +432,6 @@ pub async fn list_payment_records(
                 customer_id,
                 customer_name,
                 description,
-
                 amount: p.amount,
                 method: p.method,
                 paid_at: p.paid_at,
@@ -470,4 +441,252 @@ pub async fn list_payment_records(
         .collect();
 
     Ok(records)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::services::{customers, payments, work_items};
+    use crate::test_helpers::setup_test_db;
+    use chrono::FixedOffset;
+
+    fn kst() -> FixedOffset {
+        FixedOffset::east_opt(9 * 3600).unwrap()
+    }
+
+    fn day(d: u32) -> Option<NaiveDate> {
+        NaiveDate::from_ymd_opt(2026, 9, d)
+    }
+
+    /// 한국 시각 "9/d HH:MM"을 저장 형식으로
+    fn kst_at(d: u32, h: u32, m: u32) -> String {
+        let local = day(d).unwrap().and_hms_opt(h, m, 0).unwrap();
+        timestamp::format(
+            kst()
+                .from_local_datetime(&local)
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+        )
+    }
+
+    async fn item(db: &DatabaseConnection, cid: i32, price: i64, received_at: String) -> i32 {
+        work_items::create(
+            db,
+            cid,
+            Some("접수".into()),
+            price,
+            None,
+            Some(received_at),
+            vec![],
+        )
+        .await
+        .unwrap()
+        .id
+    }
+
+    /// V1~V3: 이른 아침/늦은 밤 접수도 가게 날짜에 정확히 집계되고, 프리셋과 사용자 지정 기간이 같음
+    #[tokio::test]
+    async fn daily_totals_follow_local_calendar_day() {
+        let db = setup_test_db().await.unwrap();
+        let cid = customers::create(&db, "고객".into(), None, None)
+            .await
+            .unwrap()
+            .id;
+        item(&db, cid, 1000, kst_at(24, 8, 0)).await; // 9/24 오전 8시
+        item(&db, cid, 2000, kst_at(24, 20, 0)).await; // 9/24 오후 8시
+        item(&db, cid, 4000, kst_at(23, 23, 0)).await; // 9/23 밤 11시
+        item(&db, cid, 8000, kst_at(23, 14, 0)).await; // 9/23 오후 2시
+
+        let s24 = get_revenue_summary(&db, day(24), day(24), &kst())
+            .await
+            .unwrap();
+        let s23 = get_revenue_summary(&db, day(23), day(23), &kst())
+            .await
+            .unwrap();
+        assert_eq!(s24.total_sales, 3000);
+        assert_eq!(s23.total_sales, 12000);
+
+        let week = get_revenue_summary(&db, day(21), day(27), &kst())
+            .await
+            .unwrap();
+        assert_eq!(week.total_sales, 15000);
+        assert_eq!(
+            list_sales_records(&db, day(24), day(24), &kst())
+                .await
+                .unwrap()
+                .len(),
+            2
+        );
+    }
+
+    /// V4: 저녁에 결제관리 탭에서 받은 잔금은 그날 하루에만 잡힘 + 미수 수납/수단별 합계
+    #[tokio::test]
+    async fn evening_payment_counted_once_with_breakdown() {
+        let db = setup_test_db().await.unwrap();
+        let cid = customers::create(&db, "고객".into(), None, None)
+            .await
+            .unwrap()
+            .id;
+        let old = item(&db, cid, 15000, kst_at(20, 10, 0)).await;
+        payments::create(
+            &db,
+            old,
+            15000,
+            Some("cash".into()),
+            Some(kst_at(23, 20, 0)),
+        )
+        .await
+        .unwrap();
+        let new = item(&db, cid, 7000, kst_at(23, 9, 0)).await;
+        payments::create(&db, new, 5000, Some("card".into()), Some(kst_at(23, 9, 5)))
+            .await
+            .unwrap();
+        payments::create(
+            &db,
+            new,
+            2000,
+            Some("계좌이체".into()),
+            Some(kst_at(23, 18, 0)),
+        )
+        .await
+        .unwrap();
+
+        let s23 = get_revenue_summary(&db, day(23), day(23), &kst())
+            .await
+            .unwrap();
+        let s24 = get_revenue_summary(&db, day(24), day(24), &kst())
+            .await
+            .unwrap();
+        assert_eq!(
+            s23,
+            RevenueSummary {
+                total_sales: 7000,
+                actual_income: 22000,
+                card_income: 5000,
+                cash_income: 15000,
+                transfer_income: 2000,
+                other_income: 0,
+                back_payment_income: 15000,
+            }
+        );
+        assert_eq!(s24.actual_income, 0);
+
+        let records = list_payment_records(&db, day(23), day(23), &kst())
+            .await
+            .unwrap();
+        assert_eq!(records.len(), 3);
+        assert_eq!(records.iter().filter(|r| r.is_back_payment).count(), 1);
+    }
+
+    /// V10: 기간 안의 접수가 3만 건을 넘어도 조회됨 (IN 절 변수 한도)
+    #[tokio::test]
+    async fn sales_records_beyond_sqlite_variable_limit() {
+        let db = setup_test_db().await.unwrap();
+        let cid = customers::create(&db, "고객".into(), None, None)
+            .await
+            .unwrap()
+            .id;
+        let received = kst_at(10, 12, 0);
+        db.execute_unprepared(&format!(
+            "INSERT INTO work_items (customer_id, status, description, price, paid_amount, received_at, created_at, last_modified_at)
+             WITH RECURSIVE seq(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM seq WHERE x < 40000)
+             SELECT {cid}, 'Received', 'x', 1000, 0, '{received}', '{received}', '{received}' FROM seq"
+        ))
+        .await
+        .unwrap();
+
+        let records = list_sales_records(&db, day(1), day(30), &kst())
+            .await
+            .unwrap();
+        assert_eq!(records.len(), 40000);
+    }
+
+    #[tokio::test]
+    async fn weekly_chart_has_seven_days_ending_today() {
+        let db = setup_test_db().await.unwrap();
+        let days = list_weekly_chart(&db, &kst()).await.unwrap();
+        assert_eq!(days.len(), 7);
+        assert_eq!(days[6].label, "오늘");
+        assert_eq!(
+            days[6].date,
+            timestamp::today(&kst()).format("%Y-%m-%d").to_string()
+        );
+    }
+
+    /// V8: 고객을 삭제해도 그 고객의 지난 매출·입금은 남고, 미수금 목록에서만 빠짐
+    #[tokio::test]
+    async fn deleting_customer_keeps_revenue() {
+        let db = setup_test_db().await.unwrap();
+        let cid = customers::create(&db, "고객".into(), None, None)
+            .await
+            .unwrap()
+            .id;
+        let paid = item(&db, cid, 10000, kst_at(24, 10, 0)).await;
+        payments::create(
+            &db,
+            paid,
+            10000,
+            Some("cash".into()),
+            Some(kst_at(24, 10, 5)),
+        )
+        .await
+        .unwrap();
+        item(&db, cid, 3000, kst_at(24, 11, 0)).await; // 미수
+
+        assert!(customers::delete(&db, cid).await.unwrap());
+
+        let s24 = get_revenue_summary(&db, day(24), day(24), &kst())
+            .await
+            .unwrap();
+        assert_eq!(s24.total_sales, 13000);
+        assert_eq!(s24.actual_income, 10000);
+        let records = list_payment_records(&db, day(24), day(24), &kst())
+            .await
+            .unwrap();
+        assert_eq!(records[0].customer_name, "고객");
+        assert!(list_unpaid_records(&db).await.unwrap().is_empty());
+    }
+
+    /// 취소한 접수와 결제는 매출·입금에서 빠짐
+    #[tokio::test]
+    async fn cancelled_order_is_excluded() {
+        let db = setup_test_db().await.unwrap();
+        let cid = customers::create(&db, "고객".into(), None, None)
+            .await
+            .unwrap()
+            .id;
+        let keep = item(&db, cid, 4000, kst_at(24, 9, 0)).await;
+        let wrong = item(&db, cid, 7000, kst_at(24, 9, 30)).await;
+        payments::create(
+            &db,
+            wrong,
+            7000,
+            Some("card".into()),
+            Some(kst_at(24, 9, 31)),
+        )
+        .await
+        .unwrap();
+
+        crate::services::orders::cancel(&db, wrong).await.unwrap();
+
+        let s24 = get_revenue_summary(&db, day(24), day(24), &kst())
+            .await
+            .unwrap();
+        assert_eq!(s24.total_sales, 4000);
+        assert_eq!(s24.actual_income, 0);
+        let sales = list_sales_records(&db, day(24), day(24), &kst())
+            .await
+            .unwrap();
+        assert_eq!(
+            sales.iter().map(|r| r.work_item_id).collect::<Vec<_>>(),
+            vec![keep]
+        );
+        assert!(
+            list_payment_records(&db, day(24), day(24), &kst())
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(list_weekly_chart(&db, &kst()).await.unwrap().len(), 7);
+    }
 }

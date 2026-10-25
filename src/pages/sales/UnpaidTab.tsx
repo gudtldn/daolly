@@ -5,6 +5,8 @@ import { useNavigate } from "react-router";
 import { salesApi } from "@/bindings/sales";
 import type { UnpaidRecord } from "@/types";
 import { formatSmartDateTime } from "@/utils/dateUtils";
+import { ErrorDetails } from "@/components/ErrorDetails";
+import { errorDetail, errorMessage } from "@/utils/errors";
 
 // Group flat UnpaidRecord[] by customer for accordion display.
 interface CustomerGroup {
@@ -45,7 +47,7 @@ export function UnpaidTab() {
   const navigate = useNavigate();
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [records, setRecords] = useState<UnpaidRecord[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const loadData = () => {
@@ -54,7 +56,7 @@ export function UnpaidTab() {
     void salesApi
       .listUnpaidRecords()
       .then(setRecords)
-      .catch(() => setError("데이터를 불러오는 중 오류가 발생했습니다."))
+      .catch((e: unknown) => setError(e))
       .finally(() => setIsLoading(false));
   };
 
@@ -108,9 +110,12 @@ export function UnpaidTab() {
   return (
     <div className="h-full flex flex-col gap-4 min-h-0 relative">
       <LoadingOverlay isLoading={isLoading} />
-      {error && (
+      {error != null && (
         <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-2.5 rounded-lg bg-danger-50 border border-danger-200 text-danger-700 text-sm dark:bg-danger-950/30 dark:border-danger-900/40 dark:text-danger-400">
-          <span>{error}</span>
+          <div>
+            <p>매출 자료를 불러오지 못했습니다. {errorMessage(error)}</p>
+            <ErrorDetails detail={errorDetail(error)} className="mt-1" />
+          </div>
           <button
             onClick={loadData}
             className="shrink-0 px-2.5 py-1 text-sm font-medium bg-danger-100 dark:bg-danger-900/40 border border-danger-300 dark:border-danger-700 rounded-lg hover:bg-danger-200 dark:hover:bg-danger-900/60 transition-colors cursor-pointer"
@@ -126,7 +131,7 @@ export function UnpaidTab() {
             <Clock className="w-6 h-6 text-warning-600 dark:text-warning-400" />
           </div>
           <div>
-            <p className="text-[0.6875rem] font-bold text-warning-600/80 dark:text-warning-400/70 uppercase tracking-wider mb-0.5">총 미수금 합계</p>
+            <p className="text-xs font-bold text-warning-600/80 dark:text-warning-400/70 uppercase tracking-wider mb-0.5">총 미수금 합계</p>
             <div className="flex items-baseline gap-1.5">
               <span className="text-3xl font-black text-warning-700 dark:text-warning-300 tracking-tight">
                 {totalUnpaid.toLocaleString()}
@@ -173,6 +178,7 @@ export function UnpaidTab() {
                   <div key={customer.customerId} className="group">
                     {/* 고객 행 */}
                     <div
+                      data-track="미수금 고객 행"
                       onClick={() => toggleExpand(customer.customerId)}
                       className={`grid ${gridCols} items-center px-4 py-3.5 transition-colors cursor-pointer ${
                         isExpanded ? "bg-surface-elevated/80" : "hover:bg-surface-elevated/40"
@@ -218,9 +224,9 @@ export function UnpaidTab() {
                       <div className="bg-surface-elevated/30 border-t border-border-default/50 px-4 py-2 animate-in fade-in slide-in-from-top-1 duration-200">
                         <div className="bg-surface-card rounded-md border border-border-default/60 shadow-inner-sm overflow-hidden mb-2">
                           <div className="grid grid-cols-[140px_1fr_120px_48px] px-4 py-2 bg-surface-elevated/50 border-b border-border-default/50">
-                            <span className="text-[0.625rem] font-bold text-on-surface-muted uppercase">일시</span>
-                            <span className="text-[0.625rem] font-bold text-on-surface-muted uppercase">상세 내용</span>
-                            <span className="text-[0.625rem] font-bold text-on-surface-muted uppercase text-right">금액</span>
+                            <span className="text-xs font-bold text-on-surface-muted uppercase">일시</span>
+                            <span className="text-xs font-bold text-on-surface-muted uppercase">상세 내용</span>
+                            <span className="text-xs font-bold text-on-surface-muted uppercase text-right">금액</span>
                             <span />
                           </div>
                           <div className="divide-y divide-border-default/40">

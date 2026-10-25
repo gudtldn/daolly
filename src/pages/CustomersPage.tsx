@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { Virtuoso } from "react-virtuoso";
 import type { VirtuosoHandle } from "react-virtuoso";
 import { useLocation } from "react-router";
+import { toast } from "sonner";
 import { useSearch } from "@/hooks/useSearch";
 import { useSortableData } from "@/hooks/useSortableData";
 import { useListInteraction, type InteractionSource } from "@/hooks/useListInteraction";
@@ -18,13 +19,17 @@ import {
   X,
 } from "lucide-react";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
-import type { Customer, WorkItemFull, WorkItemDetail, WorkItemStatus, CreateWorkItem, UpdateWorkItem, DetailInput, CreateCustomer, UpdateCustomer } from "@/types";
+import type { Customer, WorkItemFull, WorkItemDetail, WorkItemStatus, ReceiveOrder, AmendOrder, CreateCustomer, UpdateCustomer } from "@/types";
 import { useCustomerStore } from "@/stores/customerStore";
 import { useWorkItemStore } from "@/stores/workItemStore";
 import { useDialogStore } from "@/stores/dialogStore";
-import { workItemApi } from "@/bindings";
+import { customerApi, workItemApi } from "@/bindings";
+
+// 삭제 후 '되돌리기'를 누를 수 있는 시간 (알림 위에 마우스를 올리면 그동안은 사라지지 않음)
+const UNDO_DURATION_MS = 8_000;
 import { CustomerFormCard } from "@/pages/customers/CustomerFormCard";
 import { WorkItemFormCard } from "@/pages/customers/WorkItemFormCard";
+import { toastError } from "@/utils/notify";
 
 // 날짜 포맷 헬퍼
 function formatDateShort(iso: string | null): string {
@@ -234,12 +239,16 @@ function CustomerListPanel({
         <button
           onClick={onEdit}
           disabled={selectedId === null}
+          title="고객 정보 수정"
+          aria-label="고객 정보 수정"
           className="p-2 border border-border-default rounded-lg text-on-surface-muted hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
           <Pencil className="w-4 h-4" />
         </button>
         <button
           onClick={onDelete}
           disabled={selectedId === null}
+          title="고객 삭제"
+          aria-label="고객 삭제"
           className="p-2 border border-danger-200 dark:border-danger-800 rounded-lg text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
           <Trash2 className="w-4 h-4" />
         </button>
@@ -254,6 +263,7 @@ function CustomerListPanel({
             const isSelected = selectedId === c.id;
             return (
               <div
+                data-track="고객 목록 행"
                 onClick={() => onSelect(c)}
                 className={`p-4 cursor-pointer transition-colors border-b border-border-default ${
                   isSelected
@@ -513,13 +523,15 @@ function WorkItemListPanel({
     return (
       <div className="flex-1 bg-surface-card rounded-lg shadow-sm border border-border-default flex flex-col items-center justify-center text-on-surface-muted">
         <ClipboardList className="w-16 h-16 mb-4 opacity-20" />
-        <h3 className="text-lg font-medium">고객을 선택해주세요</h3>
+        <h3 className="text-lg font-medium">고객을 선택해 주세요</h3>
       </div>
     );
   }
 
   const totalAmount = workItems.reduce((sum, item) => sum + item.price, 0);
-  const totalUnpaid = workItems.reduce((sum, item) => sum + (item.price - item.paidAmount), 0);
+  // 더 받은 접수가 다른 접수의 미수금을 가리지 않도록 따로 셈 (서버의 미수금 집계와 같은 방식)
+  const totalUnpaid = workItems.reduce((sum, item) => sum + Math.max(item.price - item.paidAmount, 0), 0);
+  const totalOverpaid = workItems.reduce((sum, item) => sum + Math.max(item.paidAmount - item.price, 0), 0);
 
   return (
     <div className="flex-1 bg-surface-card rounded-lg shadow-sm flex flex-col overflow-hidden border border-border-default transition-colors">
@@ -541,15 +553,21 @@ function WorkItemListPanel({
             미수금:{" "}
             <strong className="text-danger-600 text-base ml-1">{totalUnpaid.toLocaleString()}원</strong>
           </span>
+          {totalOverpaid > 0 && (
+            <span className="text-on-surface-muted" title="청구 금액보다 더 받은 접수가 있습니다. 작업을 열어 가격이나 결제를 확인해 주세요.">
+              더 받은 금액:{" "}
+              <strong className="text-warning-600 text-base ml-1">{totalOverpaid.toLocaleString()}원</strong>
+            </span>
+          )}
         </div>
         <div className="flex space-x-2">
           <button onClick={onAdd} className="flex items-center px-3 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors cursor-pointer">
             <Plus className="w-4 h-4 mr-1" /> 추가
           </button>
-          <button onClick={() => activeWorkItemId && onEdit(activeWorkItemId)} disabled={!activeWorkItemId} className="p-2 border border-border-default rounded-lg text-on-surface-muted hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+          <button onClick={() => activeWorkItemId && onEdit(activeWorkItemId)} disabled={!activeWorkItemId} title="작업 수정 (작업을 먼저 고르세요)" aria-label="작업 수정" className="p-2 border border-border-default rounded-lg text-on-surface-muted hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
             <Pencil className="w-4 h-4" />
           </button>
-          <button onClick={() => activeWorkItemId && onDelete(activeWorkItemId)} disabled={!activeWorkItemId} className="p-2 border border-danger-200 dark:border-danger-800 rounded-lg text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+          <button onClick={() => activeWorkItemId && onDelete(activeWorkItemId)} disabled={!activeWorkItemId} title="작업 삭제 (작업을 먼저 고르세요)" aria-label="작업 삭제" className="p-2 border border-danger-200 dark:border-danger-800 rounded-lg text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
@@ -561,7 +579,7 @@ function WorkItemListPanel({
             <tr>
               {(["status", "receivedAt", "pickedUpAt", "description", "price"] as const).map((col) => {
                 const labels: Record<string, string> = { status: "상태", receivedAt: "접수", pickedUpAt: "수령", description: "작업내용", price: "금액" };
-                const widths: Record<string, string> = { status: "px-2 py-3 text-center w-24", receivedAt: "px-2 py-3 w-12 whitespace-nowrap", pickedUpAt: "px-2 py-3 w-12 whitespace-nowrap", description: "px-3 py-3", price: "px-3 py-3 w-24" };
+                const widths: Record<string, string> = { status: "px-2 py-3 text-center w-24", receivedAt: "px-2 py-3 w-12 whitespace-nowrap", pickedUpAt: "px-2 py-3 w-12 whitespace-nowrap", description: "px-3 py-3", price: "px-3 py-3 w-28 whitespace-nowrap" };
                 const isSortActive = sortConfig.key === col;
                 return (
                   <th key={col} onClick={() => requestSort(col)} className={`${widths[col]} font-medium cursor-pointer select-none hover:text-on-surface transition-colors group`}>
@@ -588,6 +606,7 @@ function WorkItemListPanel({
                 <Fragment key={item.id}>
                   <tr
                     ref={setItemRef(itemIdx)}
+                    data-track="작업 항목 행"
                     onClick={() => handleToggle(item.id)}
                     onMouseEnter={() => lastSource === "mouse" && setHighlightedIdx(itemIdx)}
                     className={`transition-colors cursor-pointer ${isExpanded ? "bg-primary-50/60 dark:bg-primary-950/40" : ""} ${lastSource === "mouse" ? "hover:bg-surface-elevated" : ""} ${lastSource === "keyboard" && isHighlighted && isActive ? "ring-2 ring-inset ring-primary-400" : ""}`}
@@ -604,7 +623,7 @@ function WorkItemListPanel({
                     <td className="px-3 py-3 font-bold text-on-surface">{item.description}</td>
                     <td className="px-3 py-3">
                       <div className="flex flex-col items-start gap-1">
-                        <span className="text-base font-bold text-on-surface leading-none">{item.price.toLocaleString()}원</span>
+                        <span className="text-base font-bold text-on-surface leading-none whitespace-nowrap">{item.price.toLocaleString()}원</span>
                         {isUnpaid ? (
                           <button onClick={(e) => { e.stopPropagation(); onPayment(item.id); }} className="px-2 py-1 bg-danger-50 dark:bg-danger-950 border border-danger-200 dark:border-danger-800 text-danger-600 dark:text-danger-400 rounded-lg text-sm font-bold whitespace-nowrap leading-none cursor-pointer hover:bg-danger-100 dark:hover:bg-danger-900 transition-colors">
                             미수금 {(item.price - item.paidAmount).toLocaleString()}원
@@ -640,7 +659,7 @@ function WorkItemListPanel({
                                   <td className="py-1.5 text-on-surface">
                                     <span>{d.itemName}</span>
                                     {d.optionsMemo && (
-                                      <p className="mt-0.5 text-[0.6875rem] text-on-surface-muted">&#8627; {d.optionsMemo}</p>
+                                      <p className="mt-0.5 text-xs text-on-surface-muted">&#8627; {d.optionsMemo}</p>
                                     )}
                                   </td>
                                   <td className="py-1.5 text-center text-on-surface-muted">{d.quantity}</td>
@@ -720,18 +739,44 @@ export function CustomersPage() {
 
   const handleDelete = async () => {
     if (!selectedCustomer) return;
+    // 고객은 목록에서만 빠지고 지난 접수·결제는 매출 기록으로 남음
+    const unpaid = useCustomerStore.getState().unpaidMap[selectedCustomer.id] ?? 0;
     const confirmed = await showConfirm({
       title: "고객 삭제",
-      message: `"${selectedCustomer.name}" 고객을 삭제하시겠습니까? 관련 접수 내역도 모두 삭제됩니다.`,
+      message: `"${selectedCustomer.name}" 고객을 삭제하시겠습니까? 매출 기록은 그대로 남습니다.${
+        unpaid > 0 ? ` (미수금 ${unpaid.toLocaleString()}원 남음)` : ""
+      }`,
       confirmText: "삭제",
       isDestructive: true,
     });
     if (!confirmed) return;
-    await deleteCustomer(selectedCustomer.id);
+    const deleted = selectedCustomer;
+    await deleteCustomer(deleted.id);
     await loadCustomers(searchKeyword);
     const { customers: remaining } = useCustomerStore.getState();
     if (remaining.length > 0) select(remaining[0]);
     loadUnpaid();
+    toast.success(`"${deleted.name}" 고객을 삭제했습니다.`, {
+      duration: UNDO_DURATION_MS,
+      action: {
+        label: "되돌리기",
+        onClick: async () => {
+          try {
+            await customerApi.restore(deleted.id);
+            await loadCustomers(searchKeyword);
+            const restored = useCustomerStore.getState().customers.find((c) => c.id === deleted.id);
+            if (restored) {
+              select(restored);
+              setScrollToCustomerId(restored.id);
+            }
+            loadUnpaid();
+            toast.success(`"${deleted.name}" 고객을 되돌렸습니다.`);
+          } catch (e) {
+            toastError("되돌리지 못했습니다", e);
+          }
+        },
+      },
+    });
   };
 
   const handleCardSave = async (data: CreateCustomer | UpdateCustomer) => {
@@ -758,10 +803,28 @@ export function CustomersPage() {
   const handleWiDelete = async (id: number) => {
     const item = useWorkItemStore.getState().workItems.find((w) => w.id === id);
     if (!item) return;
-    const confirmed = await showConfirm({ title: "작업 삭제", message: `"${item.description}" 작업을 삭제하시겠습니까?`, confirmText: "삭제", isDestructive: true });
+    // 접수는 취소 표시만 하고 기록은 남음. 받은 결제도 함께 취소되어 매출에서 빠짐
+    const paidNote = item.paidAmount > 0 ? ` 받은 금액 ${item.paidAmount.toLocaleString()}원도 매출에서 빠집니다.` : "";
+    const confirmed = await showConfirm({ title: "작업 삭제", message: `"${item.description}" 작업을 삭제하시겠습니까?${paidNote}`, confirmText: "삭제", isDestructive: true });
     if (!confirmed) return;
     await useWorkItemStore.getState().delete(id);
     loadUnpaid();
+    toast.success(`"${item.description}" 작업을 삭제했습니다.`, {
+      duration: UNDO_DURATION_MS,
+      action: {
+        label: "되돌리기",
+        onClick: async () => {
+          try {
+            await workItemApi.restore(id);
+            await useWorkItemStore.getState().load();
+            loadUnpaid();
+            toast.success(`"${item.description}" 작업을 되돌렸습니다.`);
+          } catch (e) {
+            toastError("되돌리지 못했습니다", e);
+          }
+        },
+      },
+    });
   };
 
   const handleWiChangeStatus = async (id: number, status: WorkItemStatus) => {
@@ -788,15 +851,12 @@ export function CustomersPage() {
     setWiCardOpen(true);
   };
 
-  const handleWiCardSave = async (data: CreateWorkItem | UpdateWorkItem, details?: DetailInput[], status?: WorkItemStatus, pickedUpAtOverride?: string) => {
+  const handleWiCardSave = async (data: ReceiveOrder | AmendOrder) => {
+    // 새 접수와 수정 모두 한 번에 저장 (중간에 실패해도 반쯤 저장되지 않음)
     if (wiCardMode === "create") {
-      const created = await useWorkItemStore.getState().create(data as CreateWorkItem);
-      if (status) await useWorkItemStore.getState().updateStatus(created.id, status);
-      if (pickedUpAtOverride) await useWorkItemStore.getState().update(created.id, { pickedUpAt: pickedUpAtOverride });
+      await useWorkItemStore.getState().receive(data as ReceiveOrder);
     } else if (editingWorkItem) {
-      if (status) await useWorkItemStore.getState().updateStatus(editingWorkItem.id, status);
-      await useWorkItemStore.getState().update(editingWorkItem.id, data as UpdateWorkItem);
-      if (details) await workItemApi.replaceDetails(editingWorkItem.id, details);
+      await useWorkItemStore.getState().amend(editingWorkItem.id, data as AmendOrder);
       setDetailsRefreshId({ id: editingWorkItem.id, nonce: Date.now() });
     }
     loadUnpaid();

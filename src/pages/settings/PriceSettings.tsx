@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Tag, Plus, Pen, Trash2, GripVertical, FileUp, FileDown } from "lucide-react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
+import { particle } from "@/utils/korean";
 import {
   DndContext,
   closestCenter,
@@ -24,6 +25,7 @@ import { usePriceStore } from "@/stores/priceStore";
 import { useDialogStore } from "@/stores/dialogStore";
 import type { Category, PriceItem } from "@/types";
 import { CurrencyInput } from "@/components/CurrencyInput";
+import { toastError } from "@/utils/notify";
 
 // ============================================================
 // Form components rendered inside GlobalDialog customContent
@@ -425,7 +427,7 @@ export function PriceSettings() {
   const handleDeleteItem = async (item: PriceItem) => {
     const ok = await showConfirm({
       title: "품목 삭제",
-      message: `"${item.name}"을(를) 삭제하시겠습니까?`,
+      message: `"${item.name}"${particle(item.name, "을", "를")} 삭제하시겠습니까?`,
       confirmText: "삭제",
       isDestructive: true,
     });
@@ -456,7 +458,7 @@ export function PriceSettings() {
       await exportSettings(path);
       toast.success("단가표를 내보냈습니다.");
     } catch (e) {
-      toast.error(`내보내기 실패: ${e}`);
+      toastError("단가표를 내보내지 못했습니다", e);
     }
   };
 
@@ -479,7 +481,7 @@ export function PriceSettings() {
       await importSettings(path);
       toast.success("단가표를 가져왔습니다.");
     } catch (e) {
-      toast.error(`가져오기 실패: ${e}`);
+      toastError("단가표를 가져오지 못했습니다", e);
     }
   };
 
@@ -545,7 +547,7 @@ export function PriceSettings() {
                   </li>
                 )}
                 {categories.length > 1 && (
-                  <li className="px-3 py-2 text-[0.65rem] text-on-surface-muted/60 text-center border-t border-border-default/50">
+                  <li className="px-3 py-2 text-xs text-on-surface-muted/60 text-center border-t border-border-default/50">
                     &#8942; 좌측 핸들을 드래그해서 순서를 변경할 수 있습니다
                   </li>
                 )}
@@ -619,13 +621,13 @@ export function PriceSettings() {
                             <td colSpan={4} className="p-10 text-center text-sm text-on-surface-muted">
                               {selectedCategoryId
                                 ? "등록된 품목이 없습니다."
-                                : "카테고리를 먼저 선택해주세요."}
+                                : "카테고리를 먼저 선택해 주세요."}
                             </td>
                           </tr>
                         )}
                         {activeItems.length > 1 && (
                           <tr>
-                            <td colSpan={4} className="px-3 py-2 text-[0.65rem] text-on-surface-muted/60 text-center border-t border-border-default/50">
+                            <td colSpan={4} className="px-3 py-2 text-xs text-on-surface-muted/60 text-center border-t border-border-default/50">
                               &#8942; 좌측 핸들을 드래그하면 순서를 변경할 수 있습니다
                             </td>
                           </tr>

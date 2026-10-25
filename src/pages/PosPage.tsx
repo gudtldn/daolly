@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
+import { loadRecentCustomers, rememberRecentCustomer } from "@/utils/recentCustomers";
 import { useSearch } from "@/hooks/useSearch";
 import { useListInteraction } from "@/hooks/useListInteraction";
 import { CurrencyInput } from "@/components/CurrencyInput";
@@ -17,6 +18,8 @@ import {
 import { useCartStore, type CartItem, type PaymentMethod } from "@/stores/cartStore";
 import { useDialogStore } from "@/stores/dialogStore";
 import { CustomerFormCard } from "@/pages/customers/CustomerFormCard";
+import { PickupDialog, PAYMENT_LABELS } from "@/pages/pos/PickupDialog";
+import { toastError } from "@/utils/notify";
 
 // ============================================================
 // CustomerPanel 전용 상수/헬퍼
@@ -61,6 +64,9 @@ function CustomerPanel({
   const [unpaid, setUnpaid] = useState(0);
   const [recentItems, setRecentItems] = useState<WorkItem[]>([]);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
+  // 출고할 세탁물 (출고 창), 출고 후 목록·미수금 다시 불러오기
+  const [pickupTarget, setPickupTarget] = useState<WorkItem | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   const {
     source: lastSource,
@@ -121,7 +127,7 @@ function CustomerPanel({
     workItemApi.getAllUnpaidAmounts().then((m) => {
       setUnpaid(m[selectedCustomer.id] ?? 0);
     }).catch(() => {});
-  }, [selectedCustomer, refreshToken]);
+  }, [selectedCustomer, refreshToken, reloadToken]);
 
   useEffect(() => {
     if (!selectedCustomer) { setRecentItems([]); return; }
@@ -133,12 +139,14 @@ function CustomerPanel({
         const sorted = [...items].sort(
           (a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
         );
-        setRecentItems(sorted.slice(0, RECENT_LIMIT));
+        // 찾아갈 세탁물(출고 전)은 오래됐어도 모두 보여 주고, 나머지는 최근 것만
+        const shown = new Set(sorted.slice(0, RECENT_LIMIT).map((i) => i.id));
+        setRecentItems(sorted.filter((i) => shown.has(i.id) || i.status !== "PickedUp"));
       })
       .catch(() => { if (!cancelled) setRecentItems([]); })
       .finally(() => { if (!cancelled) setIsLoadingItems(false); });
     return () => { cancelled = true; };
-  }, [selectedCustomer?.id, refreshToken]);
+  }, [selectedCustomer?.id, refreshToken, reloadToken]);
 
 
   const isSearchPending = query.trim() !== debouncedQuery.trim() || isLoading;
@@ -250,6 +258,7 @@ function CustomerPanel({
                   <button
                     key={c.id}
                     ref={setItemRef(idx)}
+                    data-track="고객 검색 결과"
                     onClick={() => handleSelect(c)}
                     onMouseMove={() => {
                       if (lastSource !== "mouse" || highlightIdx !== idx) {
@@ -268,7 +277,7 @@ function CustomerPanel({
                       )}
                     </div>
                     {idx === highlightIdx && (
-                      <span className="text-[0.6rem] text-on-surface-muted bg-surface-elevated px-1.5 py-0.5 rounded border border-border-default shrink-0 animate-in fade-in duration-200">Enter</span>
+                      <span className="text-xs text-on-surface-muted bg-surface-elevated px-1.5 py-0.5 rounded border border-border-default shrink-0 animate-in fade-in duration-200">Enter</span>
                     )}
                   </button>
                 ))}
@@ -283,6 +292,7 @@ function CustomerPanel({
                     {results.length > 0 && <div className="border-t border-border-default/50 my-1" />}
                     <button
                       ref={setItemRef(results.length)}
+                      data-track="검색어로 신규 등록"
                       onClick={handleAddNew}
                       onMouseMove={() => {
                         if (lastSource !== "mouse" || highlightIdx !== results.length) {
@@ -300,7 +310,7 @@ function CustomerPanel({
                           <span className="truncate">"{query.trim()}"님 신규 등록</span>
                         </div>
                         {highlightIdx === results.length && (
-                          <span className="text-[0.65rem] text-on-surface-muted bg-surface-elevated px-1.5 py-0.5 rounded border border-border-default shrink-0 animate-in fade-in duration-200">Enter</span>
+                          <span className="text-xs text-on-surface-muted bg-surface-elevated px-1.5 py-0.5 rounded border border-border-default shrink-0 animate-in fade-in duration-200">Enter</span>
                         )}
                       </div>
                     </button>
@@ -369,14 +379,16 @@ function CustomerPanel({
                   {recentItems.map((item) => {
                     const unpaidAmt = item.price - item.paidAmount;
                     return (
-                      <button
+                      <div
                         key={item.id}
-                        onClick={() => onViewHistory(selectedCustomer.id, item.id)}
-                        className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors cursor-pointer hover:border-primary-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 dark:hover:border-primary-700 ${
-                          item.status === "PickedUp"
-                            ? "opacity-55 border-border-default bg-surface"
-                            : "border-border-default bg-surface"
+                        className={`flex items-stretch rounded-lg border border-border-default bg-surface transition-colors hover:border-primary-300 dark:hover:border-primary-700 ${
+                          item.status === "PickedUp" ? "opacity-55" : ""
                         }`}
+                      >
+                      <button
+                        data-track="최근 접수 항목"
+                        onClick={() => onViewHistory(selectedCustomer.id, item.id)}
+                        className="flex-1 min-w-0 text-left px-3 py-2.5 rounded-lg transition-colors cursor-pointer hover:bg-primary-50 dark:hover:bg-primary-900/20"
                       >
                         <div className="flex items-center justify-between gap-2 mb-1">
                           <span className="text-sm font-medium text-on-surface truncate flex-1">
@@ -393,6 +405,15 @@ function CustomerPanel({
                           </span>
                         </div>
                       </button>
+                      {item.status !== "PickedUp" && (
+                        <button
+                          onClick={() => setPickupTarget(item)}
+                          className="shrink-0 my-2 mr-2 px-3 rounded-md text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 transition-colors cursor-pointer"
+                        >
+                          출고
+                        </button>
+                      )}
+                      </div>
                     );
                   })}
                 </div>
@@ -403,7 +424,7 @@ function CustomerPanel({
           <div className="h-full flex flex-col p-2">
             <div className="flex flex-col items-center justify-center text-center text-on-surface-muted gap-3 py-10">
               <User className="w-10 h-10 opacity-20" />
-              <p className="text-sm">위 검색창에서 고객을 선택해주세요.</p>
+              <p className="text-sm break-keep">이름이나 전화번호 뒷자리로 고객을 찾아 주세요.</p>
             </div>
             
             {recentCustomers.length > 0 && (
@@ -417,6 +438,7 @@ function CustomerPanel({
                   {recentCustomers.map((c) => (
                     <button
                       key={c.id}
+                      data-track="최근 선택 고객"
                       onClick={() => onSelect(c)}
                       className="flex items-center justify-between w-full px-3 py-2.5 bg-surface hover:bg-surface-elevated border border-border-default hover:border-primary-300 rounded-lg transition-all cursor-pointer group text-left"
                     >
@@ -438,6 +460,24 @@ function CustomerPanel({
           </div>
         )}
       </div>
+
+      <PickupDialog
+        item={pickupTarget}
+        onClose={() => setPickupTarget(null)}
+        onPickedUp={(receipt, method, collected) => {
+          setPickupTarget(null);
+          setReloadToken((n) => n + 1);
+          const desc = receipt.description ?? "세탁물";
+          const left = receipt.price - receipt.paidAmount;
+          if (method) {
+            toast.success(`${desc} 출고 완료 (${PAYMENT_LABELS[method]} ${collected.toLocaleString()}원)`);
+          } else if (left > 0) {
+            toast.success(`${desc} 출고 완료 (미수금 ${left.toLocaleString()}원)`);
+          } else {
+            toast.success(`${desc} 출고 완료`);
+          }
+        }}
+      />
     </div>
   );
 }
@@ -670,7 +710,7 @@ function OrderPanel({
           ))}
           {categories.length === 0 && (
             <div className="flex-1 px-4 py-3.5 text-sm text-on-surface-muted text-center">
-              단가표에서 카테고리를 먼저 설정해주세요.
+              단가표에서 카테고리를 먼저 설정해 주세요.
             </div>
           )}
         </div>
@@ -754,11 +794,12 @@ function OrderPanel({
         <table className="w-full text-sm text-left">
           <thead className="bg-surface sticky top-0 border-b border-border-default text-on-surface-muted z-10">
             <tr>
-              <th className="px-4 py-3 font-medium">품목명 / 메모</th>
-              <th className="px-4 py-3 font-medium text-center w-28">수량</th>
-              <th className="px-4 py-3 font-medium text-right w-32">단가</th>
-              <th className="px-4 py-3 font-medium text-right w-32">금액</th>
-              <th className="px-4 py-3 font-medium text-center w-20">수정</th>
+              {/* 숫자 칸은 좁게 두고 남는 폭을 품목명에 줌 (좁은 화면에서 품목명이 세로로 쪼개지지 않도록) */}
+              <th className="px-4 py-3 font-medium whitespace-nowrap">품목명 / 메모</th>
+              <th className="px-2 py-3 font-medium text-center whitespace-nowrap w-28">수량</th>
+              <th className="px-2 py-3 font-medium text-right whitespace-nowrap w-24">단가</th>
+              <th className="px-2 py-3 font-medium text-right whitespace-nowrap w-24">금액</th>
+              <th className="px-2 py-3 font-medium text-center whitespace-nowrap w-16">수정</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border-default">
@@ -782,14 +823,14 @@ function OrderPanel({
                   ) : (
                     <div
                       onClick={() => setEditingMemoIdx(index)}
-                      className="text-sm text-on-surface-muted mt-0.5 cursor-pointer hover:text-primary-500 transition-colors inline-block"
+                      className="text-sm text-on-surface-muted mt-0.5 cursor-pointer hover:text-primary-500 transition-colors inline-block whitespace-nowrap"
                       title="메모 수정"
                     >
                       {item.optionsMemo ? `↳ ${item.optionsMemo}` : <span className="opacity-50">↳ 메모 추가...</span>}
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-2 py-3">
                   <div className="flex items-center justify-center gap-1.5 bg-surface border border-border-default rounded-lg p-1">
                     <button
                       onClick={() => onUpdateQty(index, Math.max(1, item.quantity - 1))}
@@ -806,7 +847,7 @@ function OrderPanel({
                     </button>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-right">
+                <td className="px-2 py-3 text-right">
                   {editingPriceIdx === index ? (
                     <CurrencyInput
                       autoFocus
@@ -828,10 +869,10 @@ function OrderPanel({
                     </button>
                   )}
                 </td>
-                <td className="px-4 py-3 text-right font-bold text-on-surface">
+                <td className="px-2 py-3 text-right font-bold text-on-surface">
                   {(item.unitPrice * item.quantity).toLocaleString()}
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-2 py-3">
                   <div className="flex items-center justify-center gap-1">
                     <button
                       onClick={() => openFullEdit(index)}
@@ -855,7 +896,7 @@ function OrderPanel({
               <tr>
                 <td colSpan={5} className="p-12 text-center text-on-surface-muted">
                   <Shirt className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                  위 버튼을 클릭하여 품목을 추가해주세요.
+                  위 버튼을 클릭하여 품목을 추가해 주세요.
                 </td>
               </tr>
             )}
@@ -956,10 +997,9 @@ function PaymentPanel({
       </div>
 
       <div className="p-4 border-t border-border-default bg-surface-elevated shrink-0">
-        {(noCustomer || noMethod) && (
-          <p className="text-sm text-warning-600 text-center mb-3">
-            {noCustomer ? "고객을 먼저 선택해주세요." : "결제 수단을 선택해주세요."}
-          </p>
+        {/* 고객을 고르기 전에는 가운데 덮개가 안내하므로 여기서는 결제 수단만 알림 */}
+        {!noCustomer && noMethod && (
+          <p className="text-sm text-warning-600 text-center mb-3">결제 수단을 선택해 주세요.</p>
         )}
         <button
           onClick={() => method && onSubmit(method, note)}
@@ -995,12 +1035,10 @@ export function PosPage() {
 
   // 다른 페이지에서 돌아왔을 때 cartStore.customerId로 고객 복원 및 최근 목록 로드
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("pos_recent_customers");
-      if (stored) setRecentCustomers(JSON.parse(stored));
-    } catch (e) {
-      console.warn("Failed to load recent customers:", e);
-    }
+    let cancelled = false;
+    loadRecentCustomers()
+      .then((list) => { if (!cancelled) setRecentCustomers(list); })
+      .catch((e) => console.warn("Failed to load recent customers:", e));
 
     const storedId = useCartStore.getState().customerId;
     if (storedId && !selectedCustomer) {
@@ -1011,18 +1049,13 @@ export function PosPage() {
         useCartStore.getState().setCustomer(null); // stale id cleanup
       });
     }
+    return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSelectCustomer = (c: Customer) => {
     setSelectedCustomer(c);
     setCustomer(c.id);
-
-    setRecentCustomers((prev) => {
-      const filtered = prev.filter((p) => p.id !== c.id);
-      const next = [c, ...filtered].slice(0, 5);
-      localStorage.setItem("pos_recent_customers", JSON.stringify(next));
-      return next;
-    });
+    setRecentCustomers(rememberRecentCustomer(recentCustomers, c));
   };
 
   const handleDeselectCustomer = () => {
@@ -1046,7 +1079,7 @@ export function PosPage() {
       handleSelectCustomer(created);
       toast.success(`${created.name} 고객님이 등록되었습니다.`);
     } catch (e) {
-      toast.error(`고객 등록 실패: ${String(e)}`);
+      toastError("고객을 등록하지 못했습니다", e);
       throw e; // CustomerFormCard에서 에러 처리를 할 수 있도록 던짐
     }
   };
@@ -1059,7 +1092,7 @@ export function PosPage() {
       setSubmitCount((n) => n + 1);
       toast.success(`${customerName}님 접수 완료`);
     } catch (e) {
-      toast.error(`접수 실패: ${String(e)}`);
+      toastError("접수하지 못했습니다", e);
     } finally {
       setSubmitting(false);
     }
@@ -1082,7 +1115,7 @@ export function PosPage() {
           <div className="absolute inset-0 z-50 bg-surface/90 flex items-center justify-center rounded-xl">
             <div className="flex flex-col items-center gap-3 bg-surface-card border border-border-default rounded-lg px-8 py-6 shadow-xl">
               <User className="w-10 h-10 text-on-surface-muted opacity-40" />
-              <p className="text-sm font-semibold text-on-surface">왼쪽 검색에서 고객을 먼저 선택해주세요.</p>
+              <p className="text-sm font-semibold text-on-surface">고객을 고르면 품목을 담고 결제할 수 있습니다.</p>
             </div>
           </div>
         )}

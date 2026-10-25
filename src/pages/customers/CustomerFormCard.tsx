@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import type { Customer, CreateCustomer, UpdateCustomer } from "@/types";
+import { ErrorNotice } from "@/components/ErrorDetails";
 
 // 전화번호 포맷: 02-XXX(X)-XXXX / 0XX-XXX(X)-XXXX
 function formatPhone(digits: string): string {
@@ -32,7 +33,7 @@ export function CustomerFormCard({ open, mode, customer, onSave, onClose }: Prop
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<unknown>(null);
   const [saving, setSaving] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
@@ -63,7 +64,7 @@ export function CustomerFormCard({ open, mode, customer, onSave, onClose }: Prop
       setPhone("");
       setNote("");
     }
-    setError("");
+    setError(null);
     setSaving(false);
   }, [open, mode, customer]);
 
@@ -103,11 +104,11 @@ export function CustomerFormCard({ open, mode, customer, onSave, onClose }: Prop
   const handleSubmit = async () => {
     const trimmed = name.trim();
     if (!trimmed) {
-      setError("이름을 입력해주세요.");
+      setError("이름을 입력해 주세요.");
       nameRef.current?.focus();
       return;
     }
-    setError("");
+    setError(null);
     setSaving(true);
     try {
       await onSave({
@@ -117,7 +118,7 @@ export function CustomerFormCard({ open, mode, customer, onSave, onClose }: Prop
       });
       onClose();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(e);
     } finally {
       setSaving(false);
     }
@@ -160,10 +161,11 @@ export function CustomerFormCard({ open, mode, customer, onSave, onClose }: Prop
 
         {/* body */}
         <div className="px-5 py-4 space-y-4">
-          {error && (
-            <div className="text-sm text-danger-600 dark:text-danger-400 bg-danger-50 dark:bg-danger-950 px-3 py-2 rounded-lg">
-              {error}
-            </div>
+          {error != null && (
+            <ErrorNotice
+              error={error}
+              className="text-sm text-danger-600 dark:text-danger-400 bg-danger-50 dark:bg-danger-950 px-3 py-2 rounded-lg"
+            />
           )}
 
           <div>
