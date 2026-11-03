@@ -18,6 +18,9 @@ pub struct Model {
     pub created_at: String,
     /// 마지막 수정일
     pub last_modified_at: String,
+    /// 삭제(보관)한 시각. 목록에서는 빠지지만 지난 접수·결제 기록은 남음
+    #[serde(skip)]
+    pub deleted_at: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

@@ -13,6 +13,7 @@ export type {
   TopItem,
   RevenueSummary,
   PaymentRecord,
+  CreditPayment,
   PaymentMethod,
 } from "./models";
 
@@ -24,10 +25,23 @@ export type {
   CreatePriceItem,
   UpdatePriceItem,
   DetailInput,
-  CreateWorkItem,
-  UpdateWorkItem,
+  Prepayment,
+  ReceiveOrder,
+  AmendOrder,
   CreatePayment,
   UpdatePayment,
 } from "./dto";
 
 export type { AppSettings, GeneralSettings, UiSettings, FontSize } from "./settings";
+
+export type {
+  BackupKind,
+  BackupInfo,
+  MirrorStatus,
+  BackupOutcome,
+  BackupSettings,
+  StartupNotice,
+  StartupStatus,
+} from "./backup";
+
+export type { UpdateStatus } from "./update";
