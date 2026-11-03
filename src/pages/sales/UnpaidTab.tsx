@@ -168,7 +168,7 @@ export function UnpaidTab() {
                 <Clock className="w-10 h-10" />
               </div>
               <p className="text-sm font-bold">현재 미수금이 없습니다.</p>
-              <p className="text-sm opacity-60 mt-1">받을 돈이 남은 접수가 없습니다.</p>
+              <p className="text-sm opacity-60 mt-1">나중에 결제한 접수가 생기면 여기에 고객별로 모아 보여 줍니다.</p>
             </div>
           ) : (
             <div className="divide-y divide-border-default">
