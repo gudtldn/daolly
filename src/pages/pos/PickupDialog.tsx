@@ -96,7 +96,7 @@ export function PickupDialog({ item, onClose, onPickedUp }: Props) {
               disabled={pending}
               className="w-full py-3 rounded-lg border border-border-default text-sm font-medium text-on-surface-muted hover:bg-surface-elevated transition-colors cursor-pointer disabled:opacity-50"
             >
-              외상으로 출고
+              나중에 결제하고 출고
               <span className="block text-xs font-normal mt-0.5">
                 {balance.toLocaleString()}원은 미수금으로 남습니다.
               </span>

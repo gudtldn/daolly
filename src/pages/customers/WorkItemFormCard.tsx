@@ -33,7 +33,7 @@ function changedDate(current: string, initial: string): string | null {
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   cash: "현금",
   card: "카드",
-  credit: "외상",
+  credit: "나중에 결제",
   transfer: "계좌이체",
   // 구형 한글 key fallback (DB 마이그레이션 전 데이터 호환)
   "현금": "현금",

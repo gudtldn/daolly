@@ -24,7 +24,7 @@ describe("CreditPaymentReview", () => {
     vi.clearAllMocks();
   });
 
-  it("정리할 외상 결제가 없으면 아무것도 보이지 않는다", async () => {
+  it("정리할 결제가 없으면 아무것도 보이지 않는다", async () => {
     payments.listCredit.mockResolvedValue([]);
     const { container } = render(<CreditPaymentReview />);
     await waitFor(() => expect(payments.listCredit).toHaveBeenCalled());
@@ -37,13 +37,13 @@ describe("CreditPaymentReview", () => {
     payments.delete.mockResolvedValue(undefined);
     render(<CreditPaymentReview />);
 
-    expect(await screen.findByText("외상으로 기록된 결제 1건")).toBeInTheDocument();
+    expect(await screen.findByText("결제로 잘못 기록된 미수금 1건")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "결제에서 빼기" }));
     await waitFor(() => expect(useDialogStore.getState().isOpen).toBe(true));
     act(() => useDialogStore.getState().close(true));
 
     await waitFor(() => expect(payments.delete).toHaveBeenCalledWith(11));
-    await waitFor(() => expect(screen.queryByText("외상으로 기록된 결제 1건")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText("결제로 잘못 기록된 미수금 1건")).not.toBeInTheDocument());
   });
 
   it("취소하면 지우지 않는다", async () => {

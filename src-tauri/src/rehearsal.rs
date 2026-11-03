@@ -214,7 +214,7 @@ async fn print_review_items(db: &DatabaseConnection) {
     println!("확인할 데이터:");
     let items = [
         (
-            "외상으로 기록된 결제 (데이터 관리 화면에서 정리)",
+            "결제로 잘못 기록된 미수금(예전 외상 결제, 데이터 관리 화면에서 정리)",
             "SELECT COUNT(*), COALESCE(SUM(amount), 0) FROM payments WHERE method IN ('credit', '외상')",
         ),
         (

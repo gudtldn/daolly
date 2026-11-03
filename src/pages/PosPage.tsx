@@ -915,7 +915,7 @@ const PAYMENT_OPTIONS: { key: PaymentMethod; label: string; icon: React.ReactNod
   { key: "card", label: "신용카드", icon: <CreditCard className="w-5 h-5 mb-1" /> },
   { key: "cash", label: "현금", icon: <Banknote className="w-5 h-5 mb-1" /> },
   { key: "transfer", label: "계좌이체", icon: <Landmark className="w-5 h-5 mb-1" /> },
-  { key: "credit", label: "외상 (후불)", icon: <Clock className="w-5 h-5 mb-1" /> },
+  { key: "credit", label: "나중에 결제", icon: <Clock className="w-5 h-5 mb-1" /> },
 ];
 
 function PaymentPanel({

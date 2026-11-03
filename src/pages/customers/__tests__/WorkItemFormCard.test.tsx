@@ -130,12 +130,12 @@ describe("WorkItemFormCard 수정", () => {
     await waitFor(() => expect(paymentApi.delete).toHaveBeenCalledWith(9));
   });
 
-  it("결제 수단에 외상이 없다 (외상은 결제를 기록하지 않음)", () => {
+  it("결제 수단에 나중에 결제가 없다 (결제를 기록하지 않는 것이므로)", () => {
     render(
       <WorkItemFormCard open mode="edit" customerId={1} workItem={workItem} initialTab="payment" onSave={vi.fn()} onClose={vi.fn()} />,
     );
     expect(screen.getByRole("option", { name: "현금" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "외상" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "나중에 결제" })).not.toBeInTheDocument();
   });
 });
 

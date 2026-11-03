@@ -136,7 +136,7 @@ describe("cartStore", () => {
       expect(useCartStore.getState().requestId).toBeNull();
     });
 
-    it("외상이면 결제 없이 접수", async () => {
+    it("나중에 결제면 결제 없이 접수", async () => {
       mockReceive.mockResolvedValue(receipt);
       fillCart();
 

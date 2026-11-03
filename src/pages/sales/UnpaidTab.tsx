@@ -156,7 +156,7 @@ export function UnpaidTab() {
             <span className="text-sm font-bold text-on-surface-muted uppercase tracking-wider">고객명</span>
             <span className="text-sm font-bold text-on-surface-muted uppercase tracking-wider">전화번호</span>
             <span className="text-sm font-bold text-on-surface-muted uppercase tracking-wider text-right">미수금 합계</span>
-            <span className="text-sm font-bold text-on-surface-muted uppercase tracking-wider text-right">마지막 외상일</span>
+            <span className="text-sm font-bold text-on-surface-muted uppercase tracking-wider text-right">최근 접수일</span>
             <span />
           </div>
         </div>
@@ -168,7 +168,7 @@ export function UnpaidTab() {
                 <Clock className="w-10 h-10" />
               </div>
               <p className="text-sm font-bold">현재 미수금이 없습니다.</p>
-              <p className="text-sm opacity-60 mt-1">모든 외상이 결제되었습니다.</p>
+              <p className="text-sm opacity-60 mt-1">받을 돈이 남은 접수가 없습니다.</p>
             </div>
           ) : (
             <div className="divide-y divide-border-default">

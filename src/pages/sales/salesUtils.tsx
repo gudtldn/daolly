@@ -92,7 +92,7 @@ export function PaymentMethodBadge({ method }: { method: string }) {
   if (m === "credit" || m === "외상") {
     return (
       <span className={`${baseClass} ${smallText} bg-warning-50 text-warning-700 dark:bg-warning-900/40 dark:text-warning-300 border-warning-200/50 dark:border-warning-800/50`}>
-        <Clock className="w-3 h-3" /> 외상
+        <Clock className="w-3 h-3" /> 나중에 결제
       </span>
     );
   }

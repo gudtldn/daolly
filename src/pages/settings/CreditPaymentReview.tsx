@@ -6,7 +6,7 @@ import type { CreditPayment } from "@/types";
 import { ErrorNotice } from "@/components/ErrorDetails";
 
 /**
- * 예전 버전에서 결제 수단을 '외상'으로 등록한 결제 점검.
+ * 예전 버전에서 결제 수단을 '외상'(지금의 '나중에 결제')으로 등록한 결제 점검.
  * 이런 결제는 돈을 받지 않았는데 받은 것으로 계산되어 미수금에서 빠졌습니다.
  * 자동으로 정리하지 않고, 확인한 뒤 결제에서 빼면(결제 취소) 미수금으로 다시 표시됩니다.
  * 정리할 결제가 없으면 아무것도 보이지 않습니다.
@@ -33,7 +33,7 @@ export function CreditPaymentReview() {
 
   const handleRemove = async (p: CreditPayment) => {
     const ok = await showConfirm({
-      title: "외상 결제 정리",
+      title: "미수금으로 돌리기",
       message: `${p.customerName}님 ${p.amount.toLocaleString()}원을 미수금으로 돌리시겠습니까?`,
       confirmText: "결제에서 빼기",
       isDestructive: true,
@@ -56,9 +56,9 @@ export function CreditPaymentReview() {
       <div className="flex items-start gap-3 mb-4">
         <AlertTriangle className="w-5 h-5 text-warning-600 dark:text-warning-400 shrink-0 mt-0.5" />
         <div>
-          <h4 className="text-sm font-semibold text-on-surface">외상으로 기록된 결제 {items.length}건</h4>
+          <h4 className="text-sm font-semibold text-on-surface">결제로 잘못 기록된 미수금 {items.length}건</h4>
           <p className="text-sm text-on-surface-muted mt-1">
-            예전 버전에서 외상을 결제처럼 저장한 기록입니다. 이대로 두면 받지 않은 돈이 입금으로 잡혀 매출과
+            예전 버전에서 '나중에 결제'로 받은 돈을 결제처럼 저장한 기록입니다. 이대로 두면 받지 않은 돈이 입금으로 잡혀 매출과
             미수금이 실제와 달라집니다. 실제로 받지 않은 금액이라면 '결제에서 빼기'를 눌러 미수금으로 돌려 주세요.
           </p>
         </div>
