@@ -153,7 +153,7 @@ export function DatabaseSettings() {
           </div>
           <div className="flex items-start gap-2 bg-warning-50 dark:bg-warning-950 border border-warning-200 dark:border-warning-800 rounded-lg px-4 py-3 text-sm text-warning-700 dark:text-warning-300">
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>현재 데이터는 자동으로 백업된 뒤 교체됩니다. 복원 후 앱이 자동으로 재시작됩니다.</span>
+            <span>지금 데이터는 자동으로 백업한 뒤 바꿉니다. 복원이 끝나면 프로그램이 다시 시작됩니다.</span>
           </div>
         </div>
       ),
@@ -176,7 +176,7 @@ export function DatabaseSettings() {
       const selected = await open({
         multiple: false,
         filters: [{ name: "SQLite Database", extensions: ["db"] }],
-        title: "이전 버전 customer.db 선택",
+        title: "예전 고객관리 프로그램의 customer.db 선택",
       });
 
       if (!selected) return;
@@ -197,7 +197,7 @@ export function DatabaseSettings() {
             </p>
             <div className="flex items-start gap-2 bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800 rounded-lg px-4 py-3 text-sm text-primary-700 dark:text-primary-300">
               <History className="w-4 h-4 mt-0.5 shrink-0" />
-              <span>가져오기 완료 후 데이터 확인을 위해 앱을 재시작하시기 바랍니다.</span>
+              <span>가져오기가 끝나면 프로그램이 다시 시작됩니다.</span>
             </div>
           </div>
         ),
@@ -213,7 +213,7 @@ export function DatabaseSettings() {
         // 자동 재시작으로 인한 연결 끊김은 에러로 처리하지 않음
         if (!isRestartDisconnect(e)) throw e;
       }
-      toast.success("데이터 이관 완료. 앱을 재시작합니다.");
+      toast.success("가져오기 완료. 프로그램을 다시 시작합니다.");
       await loadBackups();
     } catch (e: unknown) {
       setError(e);
@@ -234,12 +234,12 @@ export function DatabaseSettings() {
             <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" />
             <div className="space-y-1">
               <p className="font-bold">주의: 모든 데이터가 삭제됩니다.</p>
-              <p className="text-sm">손님 정보, 작업 내역, 매출 기록, 단가 설정 등 모든 정보가 초기화됩니다.</p>
+              <p className="text-sm">고객 정보, 작업 내역, 매출 기록, 단가표가 모두 지워집니다.</p>
             </div>
           </div>
           <p className="text-sm text-on-surface">
             삭제 전 <strong className="text-primary-600 dark:text-primary-400">자동으로 백업</strong>이 생성되며,
-            삭제 완료 후 상태 초기화를 위해 <strong className="text-primary-600 dark:text-primary-400">앱이 재시작</strong>됩니다.
+            삭제가 끝나면 <strong className="text-primary-600 dark:text-primary-400">프로그램이 다시 시작</strong>됩니다.
             정말로 모든 데이터를 삭제하시겠습니까?
           </p>
         </div>
@@ -268,7 +268,7 @@ export function DatabaseSettings() {
   return (
     <div className="h-full overflow-y-auto relative">
       <LoadingOverlay isLoading={migrationLoading} message="데이터를 가져오는 중입니다..." absolute={false} />
-      <LoadingOverlay isLoading={backupLoading || mirrorLoading} message="데이터베이스 백업 중..." absolute={false} />
+      <LoadingOverlay isLoading={backupLoading || mirrorLoading} message="백업 중..." absolute={false} />
       <LoadingOverlay isLoading={restoreLoading} message="복원 중..." absolute={false} />
       <LoadingOverlay isLoading={clearLoading} message="모든 데이터를 삭제 중..." absolute={false} />
 
@@ -295,7 +295,7 @@ export function DatabaseSettings() {
 
         {/* DB 위치 */}
         <section className="bg-surface-card rounded-lg border border-border-default p-5 shadow-sm">
-          <h4 className="text-sm font-semibold text-on-surface mb-4">데이터베이스 위치</h4>
+          <h4 className="text-sm font-semibold text-on-surface mb-4">데이터 파일 위치</h4>
           <div className="flex items-center gap-3">
             <span className="flex-1 text-sm text-on-surface-muted font-mono bg-surface-elevated px-3 py-2 rounded-lg break-all">
               {dbPath}
@@ -316,7 +316,7 @@ export function DatabaseSettings() {
             <div>
               <h4 className="text-sm font-semibold text-on-surface">이전 버전 데이터 가져오기</h4>
               <p className="text-sm text-on-surface-muted mt-1">
-                예전에 쓰던 고객관리 프로그램의 데이터 파일(customer.db)을 골라 손님과 작업 내역을 가져옵니다.
+                예전에 쓰던 고객관리 프로그램의 데이터 파일(customer.db)을 골라 고객과 작업 내역을 가져옵니다.
               </p>
             </div>
             <button
@@ -393,7 +393,7 @@ export function DatabaseSettings() {
           </div>
 
           {loading ? (
-            <p className="text-sm text-on-surface-muted text-center py-8">로딩 중...</p>
+            <p className="text-sm text-on-surface-muted text-center py-8">불러오는 중...</p>
           ) : backups.length === 0 ? (
             <div className="py-12 border border-dashed border-border-default rounded-lg flex flex-col items-center justify-center">
               <Database className="w-8 h-8 text-on-surface-muted/30 mb-2" />
@@ -404,7 +404,7 @@ export function DatabaseSettings() {
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-surface-elevated text-on-surface-muted z-10">
                   <tr>
-                    <th className="px-4 py-3 text-left font-medium">생성 일시</th>
+                    <th className="px-4 py-3 text-left font-medium">백업 일시</th>
                     <th className="px-4 py-3 text-left font-medium w-32">종류</th>
                     <th className="px-4 py-3 text-right font-medium w-24">크기</th>
                     <th className="w-28"></th>
@@ -448,7 +448,7 @@ export function DatabaseSettings() {
               <div>
                 <h4 className="text-sm font-bold text-danger-700 dark:text-danger-400">데이터 초기화</h4>
                 <p className="text-sm text-on-surface-muted mt-1">
-                  모든 데이터를 삭제하고 앱을 초기 상태로 되돌립니다. 삭제 전 백업이 자동으로 생성됩니다.
+                  모든 데이터를 지우고 처음 설치한 상태로 되돌립니다. 지우기 전에 자동으로 백업합니다.
                 </p>
               </div>
             </div>

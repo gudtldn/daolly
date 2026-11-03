@@ -307,7 +307,7 @@ function CustomerPanel({
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2.5 text-primary-600 font-bold min-w-0">
                           <UserPlus className="w-4 h-4 shrink-0" />
-                          <span className="truncate">"{query.trim()}"님 신규 등록</span>
+                          <span className="truncate">"{query.trim()}"(으)로 새 고객 등록</span>
                         </div>
                         {highlightIdx === results.length && (
                           <span className="text-xs text-on-surface-muted bg-surface-elevated px-1.5 py-0.5 rounded border border-border-default shrink-0 animate-in fade-in duration-200">Enter</span>
@@ -710,7 +710,7 @@ function OrderPanel({
           ))}
           {categories.length === 0 && (
             <div className="flex-1 px-4 py-3.5 text-sm text-on-surface-muted text-center">
-              단가표에서 카테고리를 먼저 설정해 주세요.
+              단가표에 분류를 먼저 만들어 주세요.
             </div>
           )}
         </div>
@@ -758,7 +758,7 @@ function OrderPanel({
           <div className="flex flex-col items-center gap-3 animate-in fade-in zoom-in-95 duration-300">
             <p className="text-sm text-on-surface-muted">
               {categories.length === 0 
-                ? "단가표에 등록된 카테고리가 없습니다." 
+                ? "단가표에 등록된 분류가 없습니다." 
                 : "이 분류에 등록된 품목이 없습니다."}
             </p>
             <button
@@ -770,7 +770,7 @@ function OrderPanel({
               }`}
             >
               <Keyboard className="w-5 h-5" />
-              {showDirectInput ? "직접 입력 창 활성화됨" : "품목 직접 입력하기"}
+              {showDirectInput ? "직접 입력 중" : "품목 직접 입력하기"}
             </button>
           </div>
         )}
@@ -896,7 +896,7 @@ function OrderPanel({
               <tr>
                 <td colSpan={5} className="p-12 text-center text-on-surface-muted">
                   <Shirt className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                  위 버튼을 클릭하여 품목을 추가해 주세요.
+                  위에서 품목을 눌러 담아 주세요.
                 </td>
               </tr>
             )}

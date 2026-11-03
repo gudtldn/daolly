@@ -116,7 +116,7 @@ function App() {
           } else {
             void useDialogStore.getState().showAlert({
               title: "복원하지 못했습니다",
-              message: `${notice.message} 그래서 복원하기 전 데이터로 시작했습니다. 다른 백업으로 복원하려면 환경 설정 > 데이터 관리를 이용하세요.`,
+              message: `${notice.message} 복원하기 전 데이터로 시작했습니다. 다른 백업으로 복원하려면 환경 설정 > 데이터 관리를 이용하세요.`,
               detail: notice.detail,
             });
           }

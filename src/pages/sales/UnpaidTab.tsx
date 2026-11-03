@@ -143,7 +143,7 @@ export function UnpaidTab() {
         <div className="flex flex-col items-end gap-1">
           <div className="flex items-center gap-2 bg-warning-100/50 dark:bg-warning-900/30 px-3 py-1.5 rounded-full border border-warning-200/50 dark:border-warning-900/50">
             <Users className="w-4 h-4 text-warning-600 dark:text-warning-400" />
-            <span className="text-sm font-bold text-warning-700 dark:text-warning-300">{customers.length}명의 고객</span>
+            <span className="text-sm font-bold text-warning-700 dark:text-warning-300">고객 {customers.length}명</span>
           </div>
         </div>
       </div>

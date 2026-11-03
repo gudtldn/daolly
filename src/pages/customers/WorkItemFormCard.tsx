@@ -308,7 +308,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
     if (saving) return;
     const trimmedDesc = description.trim();
     if (!trimmedDesc) {
-      setError("작업내용을 입력해 주세요.");
+      setError("작업 내용을 입력해 주세요.");
       descRef.current?.focus();
       return;
     }
@@ -434,7 +434,7 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
           {/* 작업내용 */}
           <div>
             <label className="block text-sm font-medium text-on-surface mb-1">
-              작업내용 <span className="text-danger-500">*</span>
+              작업 내용 <span className="text-danger-500">*</span>
             </label>
             <input
               ref={descRef}
@@ -627,15 +627,15 @@ export function WorkItemFormCard({ open, mode, customerId, workItem, initialTab,
                 {/* 요약 카드 */}
                 <div className="grid grid-cols-3 gap-3">
                   <div className="bg-surface-elevated rounded-lg px-4 py-3 text-center">
-                    <div className="text-sm text-on-surface-muted mb-1">종액</div>
+                    <div className="text-sm text-on-surface-muted mb-1">총액</div>
                     <div className="text-lg font-bold text-on-surface">{(workItem?.price ?? 0).toLocaleString()}원</div>
                   </div>
                   <div className="bg-surface-elevated rounded-lg px-4 py-3 text-center">
-                    <div className="text-sm text-on-surface-muted mb-1">납부액</div>
+                    <div className="text-sm text-on-surface-muted mb-1">받은 금액</div>
                     <div className="text-lg font-bold text-primary-600 dark:text-primary-400">{totalPaid.toLocaleString()}원</div>
                   </div>
                   <div className={`rounded-lg px-4 py-3 text-center ${remaining > 0 ? "bg-danger-50 dark:bg-danger-950" : "bg-success-50 dark:bg-success-950"}`}>
-                    <div className="text-sm text-on-surface-muted mb-1">잔액</div>
+                    <div className="text-sm text-on-surface-muted mb-1">남은 금액</div>
                     <div className={`text-lg font-bold ${remaining > 0 ? "text-danger-600 dark:text-danger-400" : "text-success-600 dark:text-success-400"}`}>
                       {remaining > 0 ? `${remaining.toLocaleString()}원` : "완납"}
                     </div>

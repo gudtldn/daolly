@@ -94,7 +94,7 @@ describe("SalesPage", () => {
     renderWithRouter(<SalesPage />);
     expect(screen.getByText(/자주 찾는 품목/)).toBeInTheDocument();
     // API mock이 빈 배열을 반환하므로 "데이터 없음" 메시지가 표시됨
-    expect(screen.getByText("데이터 없음")).toBeInTheDocument();
+    expect(screen.getByText("이 기간에 접수한 품목이 없습니다.")).toBeInTheDocument();
   });
 
   it("매출 요약은 가게 날짜로 조회하고 서버가 집계한 결제 수단별 금액을 표시한다", async () => {

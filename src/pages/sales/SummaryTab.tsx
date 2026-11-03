@@ -185,12 +185,12 @@ export function SummaryTab() {
           </div>
           <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5">
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-on-surface-muted">당일</span>
+              <span className="text-xs font-bold text-on-surface-muted">당일 결제</span>
               <span className="text-sm font-bold text-primary-600/90 dark:text-primary-400">{currentPaymentIncome.toLocaleString()}원</span>
             </div>
             <div className="w-px h-3 bg-border-default/60 self-center" />
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-on-surface-muted">미수</span>
+              <span className="text-xs font-bold text-on-surface-muted">미수 수납</span>
               <span className="text-sm font-bold text-primary-600/90 dark:text-primary-400">{summary.backPaymentIncome.toLocaleString()}원</span>
             </div>
           </div>
@@ -240,7 +240,7 @@ export function SummaryTab() {
           </div>
           <div className="mt-3 flex items-center gap-1.5 text-sm font-medium text-on-surface-muted">
             <Receipt className="w-3 h-3" />
-            <span>{salesRecords.length}건의 작업 접수됨</span>
+            <span>작업 {salesRecords.length}건 접수</span>
           </div>
         </div>
       </div>
@@ -290,7 +290,7 @@ export function SummaryTab() {
             <h4 className="text-xs font-bold text-on-surface-muted mb-3 uppercase tracking-wider">자주 찾는 품목</h4>
             <div className="flex-1 overflow-y-auto space-y-2">
               {topItems.length === 0 ? (
-                <p className="text-sm text-on-surface-muted text-center py-8">데이터 없음</p>
+                <p className="text-sm text-on-surface-muted text-center py-8">이 기간에 접수한 품목이 없습니다.</p>
               ) : (
                 topItems.map((item) => (
                   <div key={item.rank} className="flex justify-between items-center text-sm">

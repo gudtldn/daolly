@@ -305,7 +305,7 @@ function CustomerListPanel({
           components={{
             EmptyPlaceholder: () => {
               if (isLoading) {
-                return <div className="p-8 text-center text-on-surface-muted text-sm">로딩 중...</div>;
+                return <div className="p-8 text-center text-on-surface-muted text-sm">불러오는 중...</div>;
               }
               if (debouncedSearchKeyword) {
                 return (
@@ -318,7 +318,7 @@ function CustomerListPanel({
                       className="flex items-center px-4 py-2 bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-800 rounded-lg text-sm font-medium hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors cursor-pointer"
                     >
                       <Plus className="w-4 h-4 mr-1.5" />
-                      신규 고객으로 추가하기
+                      새 고객으로 추가하기
                     </button>
                   </div>
                 );
@@ -578,7 +578,7 @@ function WorkItemListPanel({
           <thead className="bg-surface-elevated sticky top-0 border-b border-border-default text-on-surface-muted z-10">
             <tr>
               {(["status", "receivedAt", "pickedUpAt", "description", "price"] as const).map((col) => {
-                const labels: Record<string, string> = { status: "상태", receivedAt: "접수", pickedUpAt: "수령", description: "작업내용", price: "금액" };
+                const labels: Record<string, string> = { status: "상태", receivedAt: "접수", pickedUpAt: "수령", description: "작업 내용", price: "금액" };
                 const widths: Record<string, string> = { status: "px-2 py-3 text-center w-24", receivedAt: "px-2 py-3 w-12 whitespace-nowrap", pickedUpAt: "px-2 py-3 w-12 whitespace-nowrap", description: "px-3 py-3", price: "px-3 py-3 w-28 whitespace-nowrap" };
                 const isSortActive = sortConfig.key === col;
                 return (
@@ -642,7 +642,7 @@ function WorkItemListPanel({
                     <tr>
                       <td colSpan={7} className="bg-surface-elevated/50 dark:bg-surface-elevated/30 px-6 py-3">
                         {details === undefined ? (
-                          <p className="text-sm text-on-surface-muted text-center py-2">로딩 중...</p>
+                          <p className="text-sm text-on-surface-muted text-center py-2">불러오는 중...</p>
                         ) : details.length > 0 ? (
                           <table className="w-full text-sm">
                             <thead>

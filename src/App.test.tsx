@@ -163,7 +163,7 @@ describe("App", () => {
     render(<App />);
     expect(await screen.findByText("복원하지 못했습니다")).toBeInTheDocument();
     // 왜 실패했는지 + 지금 어떤 데이터인지 + 무엇을 하면 되는지
-    expect(screen.getByText(/손상되어 읽을 수 없습니다. 그래서 복원하기 전 데이터로 시작했습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/손상되어 읽을 수 없습니다. 복원하기 전 데이터로 시작했습니다/)).toBeInTheDocument();
     // 기술적인 원문은 접어 둔 개발자용 칸에만
     expect(screen.getByText("file is not a database").closest("details")).not.toBeNull();
   });

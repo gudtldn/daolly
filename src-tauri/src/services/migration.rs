@@ -114,10 +114,10 @@ async fn import_legacy(
     let orphan_customer_id = 999999;
     let orphan_model = customer::ActiveModel {
         id: Set(orphan_customer_id),
-        name: Set("이름 없음 (고아 데이터)".to_owned()),
+        name: Set("고객 정보 없음".to_owned()),
         phone_number: Set(None),
         note: Set(Some(
-            "구버전에서 고객 정보가 유실된 세탁물들입니다.".to_owned(),
+            "예전 프로그램에서 고객 정보 없이 남아 있던 세탁물입니다.".to_owned(),
         )),
         created_at: Set(now.clone()),
         last_modified_at: Set(now.clone()),
@@ -259,7 +259,7 @@ mod tests {
         assert_eq!(customers.len(), 3);
         let hgd = customers.iter().find(|c| c.name == "홍길동").unwrap();
         assert_eq!(hgd.phone_number, Some("010-1234-5678".to_owned())); // 포매팅 확인
-        assert!(customers.iter().any(|c| c.name.contains("이름 없음")));
+        assert!(customers.iter().any(|c| c.name == "고객 정보 없음"));
 
         // 3.2 작업 수 검증 (총 3건)
         let work_items = work_item::Entity::find().all(&db).await.unwrap();
