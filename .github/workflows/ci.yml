@@ -23,7 +23,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
+          # lts/*는 Node 26부터 내장 localStorage가 jsdom 것을 가려 테스트가 깨지므로 고정
+          node-version: '24'
           cache: 'npm'
 
       - name: Install Rust stable
