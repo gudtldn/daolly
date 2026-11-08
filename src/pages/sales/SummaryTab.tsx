@@ -170,9 +170,10 @@ export function SummaryTab() {
       </div>
 
       {/* KPI 카드 4개 */}
-      <div className="grid grid-cols-4 gap-4 shrink-0">
+      {/* 첫 카드는 결제 내역을 한 줄에 담도록 조금 넓게 (줄이 늘면 아래 그래프가 줄어듦) */}
+      <div className="grid grid-cols-[1.6fr_1fr_1fr_1fr] gap-4 shrink-0">
         {/* 오늘 입금된 금액 */}
-        <div className="bg-surface-card border border-border-default border-l-4 border-l-primary-500 p-5 rounded-xl shadow-sm relative overflow-hidden">
+        <div className="@container bg-surface-card border border-border-default border-l-4 border-l-primary-500 p-5 rounded-xl shadow-sm relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-5">
             <Wallet className="w-16 h-16 text-primary-600" />
           </div>
@@ -183,15 +184,17 @@ export function SummaryTab() {
             </h3>
             <span className="text-lg font-medium text-primary-600/70 dark:text-primary-400/70">원</span>
           </div>
-          <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-on-surface-muted">당일 결제</span>
-              <span className="text-sm font-bold text-primary-600/90 dark:text-primary-400">{currentPaymentIncome.toLocaleString()}원</span>
+          {/* 줄 수가 금액 크기가 아니라 카드 폭으로만 정해지게: 넓으면 한 줄, 창이 좁으면 두 줄.
+              (금액에 따라 줄이 늘면 아래 그래프 크기가 기간마다 바뀜) 금액은 줄이지 않고 이름만 말줄임 */}
+          <div className="mt-3 flex flex-col gap-1 @[18rem]:flex-row @[18rem]:items-center @[18rem]:gap-2 whitespace-nowrap">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-xs font-bold text-on-surface-muted truncate">당일 결제</span>
+              <span className="shrink-0 text-sm font-bold text-primary-600/90 dark:text-primary-400">{currentPaymentIncome.toLocaleString()}원</span>
             </div>
-            <div className="w-px h-3 bg-border-default/60 self-center" />
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-on-surface-muted">미수 수납</span>
-              <span className="text-sm font-bold text-primary-600/90 dark:text-primary-400">{summary.backPaymentIncome.toLocaleString()}원</span>
+            <div className="hidden @[18rem]:block shrink-0 w-px h-3 bg-border-default/60" />
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-xs font-bold text-on-surface-muted truncate">미수 수납</span>
+              <span className="shrink-0 text-sm font-bold text-primary-600/90 dark:text-primary-400">{summary.backPaymentIncome.toLocaleString()}원</span>
             </div>
           </div>
         </div>
@@ -250,7 +253,7 @@ export function SummaryTab() {
         {/* 좌측 패널: 차트 + 인기품목 */}
         <div className="w-72 shrink-0 flex flex-col gap-4 min-h-0">
           <div className="flex-1 bg-surface-card border border-border-default rounded-lg shadow-sm flex flex-col p-4 overflow-visible">
-            <h3 className="text-sm font-bold text-on-surface mb-4">주간 매출 추이</h3>
+            <h3 className="text-sm font-bold text-on-surface mb-4">최근 7일 접수</h3>
             <div className="flex-1 flex items-end justify-between gap-1.5 relative min-h-0">
               {chartData.map((data, i) => {
                 const isToday = i === chartData.length - 1;

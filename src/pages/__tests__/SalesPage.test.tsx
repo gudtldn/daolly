@@ -87,7 +87,7 @@ describe("SalesPage", () => {
 
   it("매출 요약 탭에서 주간 차트 레이블이 표시된다", () => {
     renderWithRouter(<SalesPage />);
-    expect(screen.getByText("주간 매출 추이")).toBeInTheDocument();
+    expect(screen.getByText("최근 7일 접수")).toBeInTheDocument();
   });
 
   it("매출 요약 탭에서 자주 찾는 품목 섹션이 표시된다", () => {
