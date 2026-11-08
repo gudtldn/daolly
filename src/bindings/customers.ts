@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./invoke";
 import type { Customer, CreateCustomer, UpdateCustomer } from "@/types";
 
 export const customerApi = {
@@ -22,5 +22,10 @@ export const customerApi = {
 
   delete(id: number): Promise<void> {
     return invoke("delete_customer", { id });
+  },
+
+  /** 삭제한 고객 되돌리기 */
+  restore(id: number): Promise<void> {
+    return invoke("restore_customer", { id });
   },
 };

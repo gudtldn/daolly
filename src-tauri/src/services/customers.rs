@@ -1,20 +1,29 @@
-use chrono::Utc;
+use sea_orm::prelude::Expr;
 use sea_orm::*;
 
 use crate::db::entities::customer;
+use crate::services::audit::{self, Entry};
+use crate::timestamp;
 
 pub async fn list(
     db: &DatabaseConnection,
     search: Option<String>,
 ) -> Result<Vec<customer::Model>, DbErr> {
-    let mut query = customer::Entity::find();
+    let mut query = customer::Entity::find().filter(customer::Column::DeletedAt.is_null());
 
     if let Some(keyword) = search {
-        query = query.filter(
-            Condition::any()
-                .add(customer::Column::Name.contains(&keyword))
-                .add(customer::Column::PhoneNumber.contains(&keyword)),
-        );
+        let mut condition = Condition::any()
+            .add(customer::Column::Name.contains(&keyword))
+            .add(customer::Column::PhoneNumber.contains(&keyword));
+        // 전화번호는 하이픈을 넣어 저장하므로 숫자만 비교 (12345678, 01012345678로도 찾기)
+        let digits: String = keyword.chars().filter(char::is_ascii_digit).collect();
+        if !digits.is_empty() {
+            condition = condition.add(Expr::cust_with_values(
+                "REPLACE(REPLACE(phone_number, '-', ''), ' ', '') LIKE ?",
+                [format!("%{digits}%")],
+            ));
+        }
+        query = query.filter(condition);
     }
 
     query = query.order_by_asc(customer::Column::Name);
@@ -22,8 +31,12 @@ pub async fn list(
     query.all(db).await
 }
 
+/// 삭제하지 않은 고객
 pub async fn get_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<customer::Model>, DbErr> {
-    customer::Entity::find_by_id(id).one(db).await
+    customer::Entity::find_by_id(id)
+        .filter(customer::Column::DeletedAt.is_null())
+        .one(db)
+        .await
 }
 
 pub fn format_phone(phone: &str) -> String {
@@ -64,7 +77,7 @@ pub async fn create(
         .map(|s| format_phone(&s));
     let note = note.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty());
 
-    let now = Utc::now().to_rfc3339();
+    let now = timestamp::now();
     let model = customer::ActiveModel {
         name: Set(name),
         phone_number: Set(phone_number),
@@ -97,14 +110,60 @@ pub async fn update(
     active.name = Set(name);
     active.phone_number = Set(phone_number);
     active.note = Set(note);
-    active.last_modified_at = Set(Utc::now().to_rfc3339());
+    active.last_modified_at = Set(timestamp::now());
 
     active.update(db).await
 }
 
-pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<u64, DbErr> {
-    let res = customer::Entity::delete_by_id(id).exec(db).await?;
-    Ok(res.rows_affected)
+/// 삭제한 고객을 되돌립니다. 없는 고객이면 false
+pub async fn restore(db: &DatabaseConnection, id: i32) -> Result<bool, DbErr> {
+    let tx = db.begin().await?;
+    let Some(existing) = customer::Entity::find_by_id(id).one(&tx).await? else {
+        return Ok(false);
+    };
+    if existing.deleted_at.is_some() {
+        audit::record(
+            &tx,
+            Entry::CustomerRestored {
+                customer: &existing,
+            },
+        )
+        .await?;
+        let mut active: customer::ActiveModel = existing.into();
+        active.deleted_at = Set(None);
+        active.last_modified_at = Set(timestamp::now());
+        active.update(&tx).await?;
+    }
+    tx.commit().await?;
+    Ok(true)
+}
+
+/// 고객을 목록에서 삭제합니다. 지난 접수·결제는 매출 기록으로 남습니다.
+/// (예전에는 접수·결제까지 함께 지워져 지난 매출이 사라졌음) 없는 고객이면 false
+pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<bool, DbErr> {
+    let tx = db.begin().await?;
+    let Some(existing) = customer::Entity::find_by_id(id)
+        .filter(customer::Column::DeletedAt.is_null())
+        .one(&tx)
+        .await?
+    else {
+        return Ok(false);
+    };
+    audit::record(
+        &tx,
+        Entry::CustomerDeleted {
+            customer: &existing,
+        },
+    )
+    .await?;
+
+    let now = timestamp::now();
+    let mut active: customer::ActiveModel = existing.into();
+    active.deleted_at = Set(Some(now.clone()));
+    active.last_modified_at = Set(now);
+    active.update(&tx).await?;
+    tx.commit().await?;
+    Ok(true)
 }
 
 #[cfg(test)]
@@ -146,13 +205,38 @@ mod tests {
         assert_eq!(results[0].name, "홍길동");
     }
 
+    /// V5: 010-1234-5678로 저장된 번호를 하이픈 없이 찾기
+    #[tokio::test]
+    async fn search_phone_by_digits() {
+        let db = setup_test_db().await.unwrap();
+        create(&db, "홍길동".into(), Some("010-1234-5678".into()), None)
+            .await
+            .unwrap();
+
+        for keyword in ["12345678", "01012345678", "1234-5678", "5678", "010 1234"] {
+            let found = list(&db, Some(keyword.into())).await.unwrap();
+            assert_eq!(found.len(), 1, "{keyword}");
+        }
+        assert!(list(&db, Some("9999".into())).await.unwrap().is_empty());
+    }
+
     #[tokio::test]
     async fn delete_customer_success() {
         let db = setup_test_db().await.unwrap();
         let c = create(&db, "삭제대상".into(), None, None).await.unwrap();
-        let rows = delete(&db, c.id).await.unwrap();
-        assert_eq!(rows, 1);
+        assert!(delete(&db, c.id).await.unwrap());
         assert!(get_by_id(&db, c.id).await.unwrap().is_none());
+        assert!(list(&db, None).await.unwrap().is_empty());
+        // 두 번 지울 수 없음
+        assert!(!delete(&db, c.id).await.unwrap());
+
+        // 되돌리기
+        assert!(restore(&db, c.id).await.unwrap());
+        assert_eq!(list(&db, None).await.unwrap().len(), 1);
+        assert_eq!(
+            crate::services::audit::actions(&db).await,
+            vec!["customer.delete", "customer.restore"]
+        );
     }
 
     #[tokio::test]

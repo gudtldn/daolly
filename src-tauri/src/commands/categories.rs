@@ -47,7 +47,7 @@ pub async fn update_category(
     let existing = category::Entity::find_by_id(id)
         .one(db.inner())
         .await?
-        .ok_or_else(|| AppError::NotFound(format!("category {id}")))?;
+        .ok_or_else(|| AppError::NotFound("카테고리"))?;
 
     Ok(services::categories::update(db.inner(), existing, data.name, data.sort_order).await?)
 }
@@ -56,7 +56,7 @@ pub async fn update_category(
 pub async fn delete_category(db: State<'_, DatabaseConnection>, id: i32) -> CmdResult<()> {
     let rows = services::categories::delete(db.inner(), id).await?;
     if rows == 0 {
-        return Err(AppError::NotFound(format!("category {id}")));
+        return Err(AppError::NotFound("카테고리"));
     }
     Ok(())
 }

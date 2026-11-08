@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Tag, Plus, Pen, Trash2, GripVertical, FileUp, FileDown } from "lucide-react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
+import { particle } from "@/utils/korean";
 import {
   DndContext,
   closestCenter,
@@ -24,6 +25,7 @@ import { usePriceStore } from "@/stores/priceStore";
 import { useDialogStore } from "@/stores/dialogStore";
 import type { Category, PriceItem } from "@/types";
 import { CurrencyInput } from "@/components/CurrencyInput";
+import { toastError } from "@/utils/notify";
 
 // ============================================================
 // Form components rendered inside GlobalDialog customContent
@@ -79,7 +81,7 @@ function CategoryFormContent({
           disabled={!name.trim()}
           className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
         >
-          저장하기
+          저장
         </button>
       </div>
     </form>
@@ -147,7 +149,7 @@ function PriceItemFormContent({
           disabled={!isValid}
           className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
         >
-          저장하기
+          저장
         </button>
       </div>
     </form>
@@ -333,7 +335,7 @@ export function PriceSettings() {
 
   const handleAddCategory = () => {
     showCustom({
-      title: "카테고리 추가",
+      title: "분류 추가",
       hideFooter: true,
       customContent: (
         <CategoryFormContent
@@ -348,7 +350,7 @@ export function PriceSettings() {
 
   const handleEditCategory = (cat: Category) => {
     showCustom({
-      title: "카테고리 수정",
+      title: "분류 수정",
       hideFooter: true,
       customContent: (
         <CategoryFormContent
@@ -363,8 +365,8 @@ export function PriceSettings() {
 
   const handleDeleteCategory = async (cat: Category) => {
     const ok = await showConfirm({
-      title: "카테고리 삭제",
-      message: `"${cat.name}" 카테고리를 삭제하시겠습니까? 해당 카테고리의 품목도 모두 삭제됩니다.`,
+      title: "분류 삭제",
+      message: `"${cat.name}" 분류를 삭제하시겠습니까? 이 분류의 품목도 모두 삭제됩니다.`,
       confirmText: "삭제",
       isDestructive: true,
     });
@@ -425,7 +427,7 @@ export function PriceSettings() {
   const handleDeleteItem = async (item: PriceItem) => {
     const ok = await showConfirm({
       title: "품목 삭제",
-      message: `"${item.name}"을(를) 삭제하시겠습니까?`,
+      message: `"${item.name}"${particle(item.name, "을", "를")} 삭제하시겠습니까?`,
       confirmText: "삭제",
       isDestructive: true,
     });
@@ -456,7 +458,7 @@ export function PriceSettings() {
       await exportSettings(path);
       toast.success("단가표를 내보냈습니다.");
     } catch (e) {
-      toast.error(`내보내기 실패: ${e}`);
+      toastError("단가표를 내보내지 못했습니다", e);
     }
   };
 
@@ -479,7 +481,7 @@ export function PriceSettings() {
       await importSettings(path);
       toast.success("단가표를 가져왔습니다.");
     } catch (e) {
-      toast.error(`가져오기 실패: ${e}`);
+      toastError("단가표를 가져오지 못했습니다", e);
     }
   };
 
@@ -488,7 +490,7 @@ export function PriceSettings() {
       <div className="flex items-center justify-between mb-6 shrink-0">
         <div className="flex items-center gap-2">
           <Tag className="w-5 h-5 text-on-surface-muted" />
-          <h3 className="text-lg font-bold text-on-surface">단가표 및 옵션 관리</h3>
+          <h3 className="text-lg font-bold text-on-surface">단가표 관리</h3>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -541,12 +543,12 @@ export function PriceSettings() {
                 ))}
                 {categories.length === 0 && (
                   <li className="p-8 text-center text-sm text-on-surface-muted">
-                    카테고리가 없습니다.
+                    분류가 없습니다.
                   </li>
                 )}
                 {categories.length > 1 && (
-                  <li className="px-3 py-2 text-[0.65rem] text-on-surface-muted/60 text-center border-t border-border-default/50">
-                    &#8942; 좌측 핸들을 드래그해서 순서를 변경할 수 있습니다
+                  <li className="px-3 py-2 text-xs text-on-surface-muted/60 text-center border-t border-border-default/50">
+                    &#8942; 왼쪽 손잡이를 끌어서 순서를 바꿀 수 있습니다
                   </li>
                 )}
               </ul>
@@ -619,14 +621,14 @@ export function PriceSettings() {
                             <td colSpan={4} className="p-10 text-center text-sm text-on-surface-muted">
                               {selectedCategoryId
                                 ? "등록된 품목이 없습니다."
-                                : "카테고리를 먼저 선택해주세요."}
+                                : "분류를 먼저 선택해 주세요."}
                             </td>
                           </tr>
                         )}
                         {activeItems.length > 1 && (
                           <tr>
-                            <td colSpan={4} className="px-3 py-2 text-[0.65rem] text-on-surface-muted/60 text-center border-t border-border-default/50">
-                              &#8942; 좌측 핸들을 드래그하면 순서를 변경할 수 있습니다
+                            <td colSpan={4} className="px-3 py-2 text-xs text-on-surface-muted/60 text-center border-t border-border-default/50">
+                              &#8942; 왼쪽 손잡이를 끌어서 순서를 바꿀 수 있습니다
                             </td>
                           </tr>
                         )}
